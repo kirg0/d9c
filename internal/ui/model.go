@@ -1123,6 +1123,18 @@ func logFileName(name string) string {
 	return safe + "-" + time.Now().Format("20060102-150405") + ".log"
 }
 
+// truncateRunes shortens a display string to at most max runes, appending an
+// ellipsis when it clips. It counts and cuts by rune (not byte) so multi-byte
+// text (e.g. Cyrillic error messages / names) is never split mid-character —
+// the same invariant table.truncate keeps for table cells.
+func truncateRunes(s string, max int) string {
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	return string(r[:max-1]) + "…"
+}
+
 // sanitizeFileName keeps only filename-safe characters, replacing the rest with
 // '-' and trimming leading/trailing separators.
 func sanitizeFileName(s string) string {

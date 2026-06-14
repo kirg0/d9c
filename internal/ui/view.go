@@ -387,10 +387,7 @@ func (m Model) viewCopyOverlay() string {
 
 	for i, it := range m.copyItems {
 		label := fmt.Sprintf("%-*s", maxLabel, it.Label)
-		val := it.Value
-		if len(val) > 50 {
-			val = val[:49] + "…"
-		}
+		val := truncateRunes(it.Value, 50)
 		if i == m.copyCursor {
 			line := " ▶  " + styles.CopyMenuSelected.Render(" "+label+"  "+val+" ")
 			rows = append(rows, line)

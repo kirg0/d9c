@@ -1147,10 +1147,7 @@ func (m Model) handleCopyMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			item := m.copyItems[m.copyCursor]
 			_ = clipboard.WriteAll(item.Value)
 			label := item.Label
-			val := item.Value
-			if len(val) > 30 {
-				val = val[:29] + "…"
-			}
+			val := truncateRunes(item.Value, 30)
 			m.copyNotif = label + ": " + val
 			m.mode = ModeNormal
 			return m, clearCopyNotifCmd()
