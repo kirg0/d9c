@@ -196,8 +196,17 @@
       естественном конце; `RestoreComposeProject` пробрасывает stop внутреннего
       `up`-стрима. Тесты: `TestStreamDockerJSONStopUnblocksProducer` (docker),
       `TestProgressConsoleStopOnClose`/`OnEsc` (ui)
-- [ ] `update.go` разросся до ~1500 строк — выделить dispatch-таблицы команд
-      и хендлеры форм в отдельные файлы (`update_dispatch.go`, `update_forms.go`)
+- [x] `update.go` разросся (~2090 строк) — dispatch-таблицы команд и хендлеры
+      форм вынесены в отдельные файлы. `update_dispatch.go` (13 функций):
+      `dispatchCommand` + per-view `dispatchHost/Compose/ImageCommand` и их
+      хелперы (`setAlertThreshold`/`alertSummary`/`parseLogOptions`/
+      `targetContainerIDs`/`bulkAction`/`selectedImageRef`/`imageRefFromTags`/
+      `firstNonEmpty`/`saveHostsThenRefresh`). `update_forms.go` (7 функций):
+      хендлеры модальных форм `handleHost/Push/Net/Vol/Run/ExecForm` + `splitList`.
+      В `update.go` остался Elm-цикл `Update`, роутинг клавиш (`handleKey`/
+      `handleNormal`/`handleAction`) и overlay-хендлеры. Чистый перенос целых
+      функций (поведение не менялось), пакет один — `update_test.go` без правок;
+      gate зелёный (gofmt/vet/golangci-lint 0 issues/test/-race)
 
 ---
 
