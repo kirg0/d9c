@@ -149,7 +149,7 @@ func (m Model) viewHeader() string {
 		if m.paused {
 			breadcrumb += styles.HeaderPaused.Render(" ⏸ paused ")
 		} else {
-			breadcrumb += styles.HeaderInfo.Render(fmt.Sprintf(" ↻%s ", m.refreshInterval))
+			breadcrumb += styles.HeaderInfo.Render(fmt.Sprintf(" ↻ %s ", m.refreshInterval))
 		}
 		// Resource-usage alerts: count of containers breaching a threshold.
 		if m.resource == ViewContainers && m.alerts.Active() {
