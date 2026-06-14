@@ -50,18 +50,20 @@ func TestBuildHelpContentCompose(t *testing.T) {
 	}
 }
 
-// TestBuildHelpContentAlertGlyphSpacing guards the :alert hint: the ⚠ glyph is
-// ambiguous-width (terminals draw it 2 cells wide) so it must keep a space on
-// each side, otherwise it overdraws the adjacent bracket. See the header ↻ fix.
-func TestBuildHelpContentAlertGlyphSpacing(t *testing.T) {
+// TestBuildHelpContentNoGluedWideGlyph guards against the (⚠) overlap class:
+// emoji-presentation glyphs (⚠ ⏸ ✖ ✔ ▶) are drawn 2 cells wide by many
+// terminals while runewidth counts them as 1, so a glyph glued to the next
+// visible rune overdraws it. Keep such glyphs clear of adjacent text in help.
+func TestBuildHelpContentNoGluedWideGlyph(t *testing.T) {
 	m := NewModel(&config.Config{}, docker.NewFakeBackend(), nil, nil, false)
-	got := m.buildHelpContent()
-	if !strings.Contains(got, "⚠") {
-		t.Fatal("help content should mention the ⚠ marker")
-	}
-	for _, tight := range []string{"(⚠", "⚠)"} {
-		if strings.Contains(got, tight) {
-			t.Errorf("⚠ glyph must not touch a bracket (found %q) — it overdraws the bracket", tight)
+	wide := map[rune]bool{'⚠': true, '⏸': true, '✖': true, '✔': true, '▶': true}
+	rs := []rune(m.buildHelpContent())
+	for i, r := range rs {
+		if !wide[r] || i+1 >= len(rs) {
+			continue
+		}
+		if next := rs[i+1]; next != ' ' && next != '\n' {
+			t.Errorf("wide glyph %q is glued to %q in help — it overdraws the next char", string(r), string(next))
 		}
 	}
 }
