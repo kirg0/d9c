@@ -394,15 +394,15 @@ func (b *dockerBackend) ComposeRemove(project string) error {
 // ComposeUp/Pull/Down run the corresponding `docker compose` action on the host
 // and stream its combined stdout/stderr line-by-line, so the UI can show live
 // progress (layer pulls, container creation) for these long-running operations.
-func (b *dockerBackend) ComposeUp(project string) (<-chan string, error) {
+func (b *dockerBackend) ComposeUp(project string) (<-chan string, func(), error) {
 	return b.runComposeSSHStream(project, "up -d")
 }
 
-func (b *dockerBackend) ComposePull(project string) (<-chan string, error) {
+func (b *dockerBackend) ComposePull(project string) (<-chan string, func(), error) {
 	return b.runComposeSSHStream(project, "pull")
 }
 
-func (b *dockerBackend) ComposeDown(project string) (<-chan string, error) {
+func (b *dockerBackend) ComposeDown(project string) (<-chan string, func(), error) {
 	return b.runComposeSSHStream(project, "down")
 }
 
@@ -415,17 +415,17 @@ func (b *dockerBackend) ComposeConfig(project string) (string, error) {
 
 // CreateComposeFile writes content to "<dir>/docker-compose.yaml" on the host
 // (creating dir if needed) and brings the project up, streaming `up` output.
-func (b *dockerBackend) CreateComposeFile(dir, content string) (<-chan string, error) {
+func (b *dockerBackend) CreateComposeFile(dir, content string) (<-chan string, func(), error) {
 	if b.sshClient == nil {
-		return nil, fmt.Errorf("creating a compose project requires an SSH connection (use -H ssh://...)")
+		return nil, nil, fmt.Errorf("creating a compose project requires an SSH connection (use -H ssh://...)")
 	}
 	dir = strings.TrimRight(strings.ReplaceAll(dir, "\\", "/"), "/")
 	if dir == "" {
-		return nil, fmt.Errorf("a target directory is required")
+		return nil, nil, fmt.Errorf("a target directory is required")
 	}
 	path := dir + "/docker-compose.yaml"
 	if err := b.sshEnsureDirAndWrite(dir, path, content); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	base := "docker compose --project-directory " + shellQuote(dir) + " -f " + shellQuote(path) + " up -d"
 	if b.sshNeedsSudo() {
@@ -481,54 +481,98 @@ func (b *dockerBackend) BackupComposeProject(project string) (string, error) {
 // RestoreComposeProject uploads a local gzip-tar backup, extracts it into the
 // project's working directory and brings the project up again, streaming the
 // extract and `up` progress line-by-line into the returned channel.
-func (b *dockerBackend) RestoreComposeProject(project, backupPath string) (<-chan string, error) {
+func (b *dockerBackend) RestoreComposeProject(project, backupPath string) (<-chan string, func(), error) {
 	if b.sshClient == nil {
-		return nil, fmt.Errorf("restore requires an SSH connection (use -H ssh://...)")
+		return nil, nil, fmt.Errorf("restore requires an SSH connection (use -H ssh://...)")
 	}
 	workdir, configFiles, err := b.composeProjectMeta(project)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if workdir == "" {
-		return nil, fmt.Errorf("project %q has no working directory to restore into", project)
+		return nil, nil, fmt.Errorf("project %q has no working directory to restore into", project)
 	}
 	f, err := os.Open(backupPath)
 	if err != nil {
-		return nil, fmt.Errorf("open backup: %w", err)
+		return nil, nil, fmt.Errorf("open backup: %w", err)
 	}
 	// A streamed pipe can't be retried mid-flight, so decide on sudo up front.
 	sudo := b.sshNeedsSudo()
 
 	out := make(chan string, 256)
+	done := make(chan struct{})
+	var once sync.Once
+	// upStop aborts the inner `up` stream once it exists; guarded because the
+	// producer sets it after stop may already have fired.
+	var mu sync.Mutex
+	var upStop func()
+	// stop aborts the restore: closing the backup file unblocks the extract pipe,
+	// done unblocks producers, and the inner up-stream (if started) is torn down.
+	stop := func() {
+		once.Do(func() {
+			close(done)
+			_ = f.Close()
+			mu.Lock()
+			s := upStop
+			mu.Unlock()
+			if s != nil {
+				s()
+			}
+		})
+	}
+	send := func(line string) bool {
+		select {
+		case out <- line:
+			return true
+		case <-done:
+			return false
+		}
+	}
 	go func() {
 		defer close(out)
-		defer func() { _ = f.Close() }()
+		defer stop()
 
-		out <- "extracting " + backupPath + " into " + workdir
+		if !send("extracting " + backupPath + " into " + workdir) {
+			return
+		}
 		extract := "tar xzf - -C " + shellQuote(workdir)
 		if sudo {
 			extract = "sudo " + extract
 		}
 		if err := b.sshPipeReader(extract, f); err != nil {
-			out <- "error: " + err.Error()
+			send("error: " + err.Error())
 			return
 		}
 
-		out <- "starting project…"
+		if !send("starting project…") {
+			return
+		}
 		upBase := buildComposeCmd(project, workdir, configFiles, "up -d")
 		if sudo {
 			upBase = "sudo " + upBase
 		}
-		ch, err := b.sshExecStream(upBase)
+		ch, stopUp, err := b.sshExecStream(upBase)
 		if err != nil {
-			out <- "error: " + err.Error()
+			send("error: " + err.Error())
 			return
 		}
+		mu.Lock()
+		upStop = stopUp
+		mu.Unlock()
+		// Cover the window where stop fired before upStop was published.
+		select {
+		case <-done:
+			stopUp()
+		default:
+		}
 		for line := range ch {
-			out <- line
+			if !send(line) {
+				stopUp()
+				return
+			}
 		}
 	}()
-	return out, nil
+	return out, stop, nil
 }
 
 // backupFileName builds a safe "<project>-<timestamp>.tar.gz" name.
@@ -690,13 +734,13 @@ func (b *dockerBackend) sshPipeReader(cmd string, r io.Reader) error {
 // runComposeSSHStream builds the `docker compose <action>` command for the
 // project (escalating to sudo if the host requires it) and streams its combined
 // output line-by-line into the returned channel, which closes when it exits.
-func (b *dockerBackend) runComposeSSHStream(project, action string) (<-chan string, error) {
+func (b *dockerBackend) runComposeSSHStream(project, action string) (<-chan string, func(), error) {
 	if b.sshClient == nil {
-		return nil, fmt.Errorf("compose %s requires an SSH connection (use -H ssh://...)", action)
+		return nil, nil, fmt.Errorf("compose %s requires an SSH connection (use -H ssh://...)", action)
 	}
 	workdir, configFiles, err := b.composeProjectMeta(project)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	base := buildComposeCmd(project, workdir, configFiles, action)
 	if b.sshNeedsSudo() {
@@ -715,38 +759,59 @@ func (b *dockerBackend) sshNeedsSudo() bool {
 
 // sshExecStream runs a command over SSH and streams its combined stdout/stderr
 // line-by-line into the returned channel. The channel is closed when the command
-// exits; on a non-zero exit a trailing line carries the error.
-func (b *dockerBackend) sshExecStream(cmd string) (<-chan string, error) {
+// exits; on a non-zero exit a trailing line carries the error. The returned stop
+// aborts the command early: closing the session kills the remote process and
+// unblocks producers stuck on a send nobody reads. The caller MUST call stop
+// when it abandons the channel, otherwise the SSH session and goroutines leak.
+func (b *dockerBackend) sshExecStream(cmd string) (<-chan string, func(), error) {
 	session, err := b.sshClient.NewSession()
 	if err != nil {
-		return nil, fmt.Errorf("ssh session: %w", err)
+		return nil, nil, fmt.Errorf("ssh session: %w", err)
 	}
 	stdout, err := session.StdoutPipe()
 	if err != nil {
 		_ = session.Close()
-		return nil, err
+		return nil, nil, err
 	}
 	stderr, err := session.StderrPipe()
 	if err != nil {
 		_ = session.Close()
-		return nil, err
+		return nil, nil, err
 	}
 	if err := session.Start(cmd); err != nil {
 		_ = session.Close()
-		return nil, fmt.Errorf("start %q: %w", cmd, err)
+		return nil, nil, fmt.Errorf("start %q: %w", cmd, err)
 	}
 
 	out := make(chan string, 256)
+	done := make(chan struct{})
+	var once sync.Once
+	stop := func() {
+		once.Do(func() {
+			close(done)
+			_ = session.Close()
+		})
+	}
+	send := func(line string) bool {
+		select {
+		case out <- line:
+			return true
+		case <-done:
+			return false
+		}
+	}
 	var wg sync.WaitGroup
 	scan := func(r io.Reader) {
 		defer wg.Done()
 		sc := bufio.NewScanner(r)
 		sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 		for sc.Scan() {
-			out <- sc.Text()
+			if !send(sc.Text()) {
+				return
+			}
 		}
 		if err := sc.Err(); err != nil {
-			out <- "error: read output: " + err.Error()
+			send("error: read output: " + err.Error())
 		}
 	}
 	wg.Add(2)
@@ -755,12 +820,12 @@ func (b *dockerBackend) sshExecStream(cmd string) (<-chan string, error) {
 	go func() {
 		wg.Wait()
 		if err := session.Wait(); err != nil {
-			out <- "error: " + err.Error()
+			send("error: " + err.Error())
 		}
-		_ = session.Close()
+		stop() // release the session when the command ends naturally
 		close(out)
 	}()
-	return out, nil
+	return out, stop, nil
 }
 
 // runComposeSSHOutput runs `docker compose <action>` over SSH using the

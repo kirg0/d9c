@@ -304,6 +304,51 @@ func TestLogsStopOnEsc(t *testing.T) {
 	}
 }
 
+// The progress console (compose up/pull/down, image build/push) reuses the logs
+// view, so closing it with q must release the operation stream via its stop
+// handle — otherwise the SSH session / daemon request behind it leaks.
+func TestProgressConsoleStopOnClose(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	step := func(msg tea.Msg) tea.Cmd { var c tea.Cmd; tm, c = tm.Update(msg); return c }
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+
+	stopped := false
+	step(opStartedMsg{ch: make(chan string), stop: func() { stopped = true }, title: "compose up: web"})
+	if m := tm.(Model); m.mode != ModeLogs {
+		t.Fatalf("mode = %v, want ModeLogs", m.mode)
+	}
+	if m := tm.(Model); m.logStop == nil {
+		t.Fatal("opStartedMsg must store the stream's stop handle")
+	}
+	step(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	if !stopped {
+		t.Error("q must call the operation stream's stop handle")
+	}
+	if m := tm.(Model); m.logCh != nil || m.logStop != nil {
+		t.Error("logCh/logStop must be cleared after close")
+	}
+}
+
+// Esc closes the progress console through the global key handler — the operation
+// stream must be released on that path too.
+func TestProgressConsoleStopOnEsc(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	step := func(msg tea.Msg) tea.Cmd { var c tea.Cmd; tm, c = tm.Update(msg); return c }
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+
+	stopped := false
+	step(opStartedMsg{ch: make(chan string), stop: func() { stopped = true }, title: "build: ."})
+	step(tea.KeyMsg{Type: tea.KeyEsc})
+	if !stopped {
+		t.Error("esc must call the operation stream's stop handle")
+	}
+	if m := tm.(Model); m.mode != ModeNormal {
+		t.Errorf("mode = %v, want ModeNormal", m.mode)
+	}
+}
+
 // Refreshing (r) and closing (esc) the events view must stop the abandoned
 // subscription — each refresh used to leak one.
 func TestEventsStopOnRefreshAndClose(t *testing.T) {

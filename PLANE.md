@@ -183,12 +183,19 @@
 
 ## Техдолг / надёжность
 
-- [ ] Stop-handle для конечных прогресс-стримов (`BuildImage`/`PushImage`/
+- [x] Stop-handle для конечных прогресс-стримов (`BuildImage`/`PushImage`/
       `ComposeUp`/`ComposePull`/`ComposeDown`/`CreateComposeFile`/
-      `RestoreComposeProject`): выход из консоли (`q`) посреди долгой операции
-      бросает канал — продьюсер блокируется на отправке после заполнения
-      буфера (256 строк) и висит вместе с соединением/SSH-сессией до конца
-      процесса. Применить тот же паттерн done+stop, что в logs/events
+      `RestoreComposeProject`, плюс плагинный `streamLocalProcess`): теперь
+      возвращают `(ch, stop, err)` по тому же паттерну done+stop, что logs/events.
+      Прогресс-консоль переиспользует `ModeLogs`, поэтому `opStartedMsg` несёт
+      `stop` и кладёт его в `m.logStop` — закрытие консоли (`q`/глобальный esc),
+      refresh и смена хоста рвут стрим (раньше продьюсер висел на send после
+      заполнения буфера 256 вместе с SSH-сессией/запросом к демону до конца
+      процесса). `streamDockerJSON`/`sshExecStream`/`streamLocalProcess` закрывают
+      нижележащий ресурс (reader/SSH session/процесс) и зовут `stop` на
+      естественном конце; `RestoreComposeProject` пробрасывает stop внутреннего
+      `up`-стрима. Тесты: `TestStreamDockerJSONStopUnblocksProducer` (docker),
+      `TestProgressConsoleStopOnClose`/`OnEsc` (ui)
 - [ ] `update.go` разросся до ~1500 строк — выделить dispatch-таблицы команд
       и хендлеры форм в отдельные файлы (`update_dispatch.go`, `update_forms.go`)
 

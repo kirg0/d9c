@@ -144,9 +144,14 @@ type statsUpdatedMsg struct {
 // Operation-console messages drive the live progress view for long-running
 // compose-engine commands (up/pull/down) streamed over SSH.
 type (
-	// opStartedMsg opens the console once the streaming channel is ready.
+	// opStartedMsg opens the console once the streaming channel is ready. stop
+	// releases the backend resources behind the stream (SSH session, daemon
+	// request, local process) and is stored as the console's logStop so closing
+	// the console tears the stream down; it may be nil for streams with no
+	// lifecycle to release.
 	opStartedMsg struct {
 		ch    <-chan string
+		stop  func()
 		title string
 	}
 	// opLineMsg carries one streamed progress line.
@@ -712,13 +717,13 @@ func fetchCompose(b docker.Backend) tea.Cmd {
 // streamOpCmd starts a streaming operation (compose up/pull/down, image
 // build/push) and, once the channel is ready, opens the progress console under
 // the given title.
-func streamOpCmd(start func() (<-chan string, error), title string) tea.Cmd {
+func streamOpCmd(start func() (<-chan string, func(), error), title string) tea.Cmd {
 	return func() tea.Msg {
-		ch, err := start()
+		ch, stop, err := start()
 		if err != nil {
 			return errMsg{err}
 		}
-		return opStartedMsg{ch: ch, title: title}
+		return opStartedMsg{ch: ch, stop: stop, title: title}
 	}
 }
 
@@ -760,11 +765,11 @@ func composeConfigCmd(b docker.Backend, project string) tea.Cmd {
 // opening the streaming operation console with the `up` output.
 func createComposeCmd(b docker.Backend, dir, content string) tea.Cmd {
 	return func() tea.Msg {
-		ch, err := b.CreateComposeFile(dir, content)
+		ch, stop, err := b.CreateComposeFile(dir, content)
 		if err != nil {
 			return errMsg{err}
 		}
-		return opStartedMsg{ch: ch, title: "compose create: " + dir}
+		return opStartedMsg{ch: ch, stop: stop, title: "compose create: " + dir}
 	}
 }
 
@@ -846,11 +851,11 @@ func humanSize(n int64) string {
 // working directory and brings it back up, streaming progress to the console.
 func restoreComposeCmd(b docker.Backend, project, backupPath string) tea.Cmd {
 	return func() tea.Msg {
-		ch, err := b.RestoreComposeProject(project, backupPath)
+		ch, stop, err := b.RestoreComposeProject(project, backupPath)
 		if err != nil {
 			return errMsg{err}
 		}
-		return opStartedMsg{ch: ch, title: "compose restore: " + project}
+		return opStartedMsg{ch: ch, stop: stop, title: "compose restore: " + project}
 	}
 }
 

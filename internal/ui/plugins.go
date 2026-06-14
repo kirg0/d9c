@@ -127,11 +127,11 @@ func (m Model) pluginCmd(p plugins.Plugin) tea.Cmd {
 	if p.Background {
 		title := "plugin: " + p.Name
 		return func() tea.Msg {
-			ch, err := streamLocalProcess(name, args)
+			ch, stop, err := streamLocalProcess(name, args)
 			if err != nil {
 				return errMsg{err}
 			}
-			return opStartedMsg{ch: ch, title: title}
+			return opStartedMsg{ch: ch, stop: stop, title: title}
 		}
 	}
 	c := exec.Command(name, args...)
@@ -140,32 +140,55 @@ func (m Model) pluginCmd(p plugins.Plugin) tea.Cmd {
 
 // streamLocalProcess starts a local command and streams its combined
 // stdout/stderr line-by-line into the returned channel, which closes when the
-// process exits (a non-zero exit appends a trailing "error: …" line).
-func streamLocalProcess(name string, args []string) (<-chan string, error) {
+// process exits (a non-zero exit appends a trailing "error: …" line). The
+// returned stop kills the process and unblocks producers stuck on a send nobody
+// reads; the caller MUST call it when it abandons the channel, otherwise the
+// process and goroutines leak.
+func streamLocalProcess(name string, args []string) (<-chan string, func(), error) {
 	c := exec.Command(name, args...)
 	stdout, err := c.StdoutPipe()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	stderr, err := c.StderrPipe()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := c.Start(); err != nil {
-		return nil, fmt.Errorf("start %s: %w", name, err)
+		return nil, nil, fmt.Errorf("start %s: %w", name, err)
 	}
 
 	out := make(chan string, 256)
+	done := make(chan struct{})
+	var once sync.Once
+	stop := func() {
+		once.Do(func() {
+			close(done)
+			if c.Process != nil {
+				_ = c.Process.Kill()
+			}
+		})
+	}
+	send := func(line string) bool {
+		select {
+		case out <- line:
+			return true
+		case <-done:
+			return false
+		}
+	}
 	var wg sync.WaitGroup
 	scan := func(r io.Reader) {
 		defer wg.Done()
 		sc := bufio.NewScanner(r)
 		sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 		for sc.Scan() {
-			out <- sc.Text()
+			if !send(sc.Text()) {
+				return
+			}
 		}
 		if err := sc.Err(); err != nil {
-			out <- "error: read output: " + err.Error()
+			send("error: read output: " + err.Error())
 		}
 	}
 	wg.Add(2)
@@ -174,9 +197,10 @@ func streamLocalProcess(name string, args []string) (<-chan string, error) {
 	go func() {
 		wg.Wait()
 		if err := c.Wait(); err != nil {
-			out <- "error: " + err.Error()
+			send("error: " + err.Error())
 		}
+		stop() // release process handle when it ends naturally
 		close(out)
 	}()
-	return out, nil
+	return out, stop, nil
 }
