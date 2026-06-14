@@ -16,8 +16,8 @@ coverage.*
 /d9c-config.yaml
 /d9c-plugins.yaml
 
-# Claude Code machine-local settings (project settings.json is tracked)
-/.claude/settings.local.json
+# Claude Code workspace (settings + memory) — not tracked by git
+/.claude/
 
 # OS / editor cruft
 .DS_Store
