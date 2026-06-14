@@ -1,0 +1,24 @@
+# Build output
+/d9c
+/d9c.exe
+*.exe
+*.test
+
+# Test / coverage artifacts
+*.out
+coverage.*
+
+# Runtime data written next to the binary (saved hosts, compose backups)
+/d9c-hosts.json
+/*.tar.gz
+
+# User-local config (lives next to the binary; machine-specific)
+/d9c-config.yaml
+/d9c-plugins.yaml
+
+# Claude Code machine-local settings (project settings.json is tracked)
+/.claude/settings.local.json
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db

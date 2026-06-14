@@ -1,0 +1,50 @@
+version: "2"
+
+linters:
+  # Defaults (errcheck, govet, ineffassign, staticcheck, unused) plus extras.
+  enable:
+    - bodyclose      # HTTP/response bodies are closed
+    - errorlint      # correct error wrapping/comparison (%w, errors.Is/As)
+    - gocritic       # opinionated correctness/style/performance checks
+    - misspell       # common spelling mistakes in comments/strings
+    - revive         # fast, configurable golint replacement
+    - unconvert      # remove redundant type conversions
+    - unparam        # detect unused function parameters
+    - wastedassign   # assignments whose value is never used
+
+  settings:
+    revive:
+      rules:
+        # `exported` (mandatory doc comments) is a library convention; this is
+        # an application with internal-only packages, so we skip it.
+        - name: error-strings     # error strings lowercase, no punctuation
+        - name: context-as-argument
+        - name: indent-error-flow
+    gocritic:
+      disabled-checks:
+        # A single-case type/value switch is a deliberate, extensible pattern in
+        # the bubbletea Update handlers.
+        - singleCaseSwitch
+
+  exclusions:
+    generated: lax
+    paths:
+      # cmd/* are throwaway diagnostic utilities, not held to library standards.
+      - cmd/
+    rules:
+      # Test files may legitimately ignore errors, compare error identity, and
+      # skip doc comments.
+      - path: _test\.go
+        linters:
+          - errcheck
+          - errorlint
+          - revive
+          - unparam
+      # fake.go reproduces verbatim Docker daemon output, which is capitalised.
+      - path: internal/docker/fake\.go
+        text: "ST1005"
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

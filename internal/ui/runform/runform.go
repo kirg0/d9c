@@ -1,0 +1,132 @@
+// Package runform renders the modal "run container" wizard shown in the
+// containers view: image plus optional name, ports, env and volumes.
+package runform
+
+import (
+	"strings"
+
+	"d9c/internal/ui/styles"
+
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
+
+const fieldCount = 5 // image, name, ports, env, volumes
+
+// Model is the five-field (Image, Name, Ports, Env, Volumes) run wizard.
+type Model struct {
+	image   textinput.Model
+	name    textinput.Model
+	ports   textinput.Model
+	env     textinput.Model
+	volumes textinput.Model
+	focus   int // 0 = image … 4 = volumes
+	errMsg  string
+}
+
+// New builds an empty form.
+func New() Model {
+	mk := func(placeholder string) textinput.Model {
+		ti := textinput.New()
+		ti.Placeholder = placeholder
+		ti.CharLimit = 512
+		ti.Width = 52
+		return ti
+	}
+	return Model{
+		image:   mk("nginx:latest"),
+		name:    mk("my-app (optional)"),
+		ports:   mk("8080:80, 9443:443/udp (optional)"),
+		env:     mk("KEY=value, OTHER=x (optional)"),
+		volumes: mk("/host/path:/ctr/path, myvol:/data (optional)"),
+	}
+}
+
+// Open resets the form for a fresh run, optionally pre-filling the image.
+func (m *Model) Open(image string) {
+	m.errMsg = ""
+	m.image.SetValue(image)
+	m.name.SetValue("")
+	m.ports.SetValue("")
+	m.env.SetValue("")
+	m.volumes.SetValue("")
+	m.focusField(0)
+}
+
+// SetError shows a validation/operation message inside the form (keeps it open).
+func (m *Model) SetError(s string) { m.errMsg = s }
+
+func (m *Model) fields() []*textinput.Model {
+	return []*textinput.Model{&m.image, &m.name, &m.ports, &m.env, &m.volumes}
+}
+
+func (m *Model) focusField(i int) {
+	m.focus = (i%fieldCount + fieldCount) % fieldCount
+	for j, f := range m.fields() {
+		if j == m.focus {
+			f.Focus()
+			f.CursorEnd()
+		} else {
+			f.Blur()
+		}
+	}
+}
+
+// Next moves focus to the following field.
+func (m *Model) Next() { m.focusField(m.focus + 1) }
+
+// Prev moves focus to the previous field.
+func (m *Model) Prev() { m.focusField(m.focus - 1) }
+
+// Image returns the trimmed image field.
+func (m Model) Image() string { return strings.TrimSpace(m.image.Value()) }
+
+// Name returns the trimmed name field.
+func (m Model) Name() string { return strings.TrimSpace(m.name.Value()) }
+
+// Ports returns the raw ports field (comma-separated specs).
+func (m Model) Ports() string { return m.ports.Value() }
+
+// Env returns the raw env field (comma-separated KEY=VALUE pairs).
+func (m Model) Env() string { return m.env.Value() }
+
+// Volumes returns the raw volumes field (comma-separated bind specs).
+func (m Model) Volumes() string { return m.volumes.Value() }
+
+// Update forwards key events to the focused field.
+func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	f := m.fields()[m.focus]
+	*f, cmd = f.Update(msg)
+	return m, cmd
+}
+
+// View renders the form centered within the given area.
+func (m Model) View(width, height int) string {
+	field := func(label string, ti textinput.Model, active bool) string {
+		labelStyle := styles.FormLabel
+		marker := "  "
+		if active {
+			labelStyle = styles.FormLabelActive
+			marker = "▸ "
+		}
+		return marker + labelStyle.Render(label) + "\n  " + ti.View()
+	}
+
+	labels := []string{"Image", "Name", "Ports", "Env", "Volumes"}
+	var b strings.Builder
+	b.WriteString(styles.FormTitle.Render(" Run container "))
+	b.WriteString("\n\n")
+	for i, ti := range []textinput.Model{m.image, m.name, m.ports, m.env, m.volumes} {
+		b.WriteString(field(labels[i], ti, m.focus == i))
+		b.WriteString("\n\n")
+	}
+	if m.errMsg != "" {
+		b.WriteString(styles.FormError.Render("✖ "+m.errMsg) + "\n")
+	}
+	b.WriteString(styles.FormHint.Render("tab switch · enter run · esc cancel"))
+
+	panel := styles.OverlayPanel.Render(b.String())
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, panel)
+}

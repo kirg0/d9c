@@ -1,0 +1,276 @@
+package docker
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"strings"
+	"sync"
+	"time"
+
+	"d9c/internal/config"
+
+	"github.com/docker/docker/api/types/events"
+	"github.com/docker/docker/client"
+	"golang.org/x/crypto/ssh"
+)
+
+// Backend abstracts all Docker operations for easy mocking and future Podman support.
+type Backend interface {
+	// Containers
+	ListContainers(showAll bool) ([]Container, error)
+	InspectContainer(id string) (*InspectResult, error)
+	StartContainer(id string) error
+	StopContainer(id string) error
+	RestartContainer(id string) error
+	RemoveContainer(id string, force bool) error
+	KillContainer(id string, signal string) error
+	// ContainerLogs streams log lines until stop is called or the container
+	// stops producing. The caller MUST call stop when it abandons the channel,
+	// otherwise the Follow connection and producer goroutine leak.
+	ContainerLogs(id string, opts LogOptions) (lines <-chan string, stop func(), err error)
+	ContainerStats(ids []string) (map[string]ContainerStats, error)
+	ExecInteractive(containerID string, cmd []string) (ExecSession, error)
+	RunContainer(opts RunOptions) error
+	// RunInteractive starts a disposable interactive container from an image
+	// (`docker run --rm -it` analogue); closing the session removes it.
+	RunInteractive(opts ExecRunOptions) (ExecSession, error)
+	// Container filesystem (`docker cp` / browse). ListPath lists a directory
+	// inside the container; CopyFromContainer downloads a path into a local
+	// directory; CopyToContainer uploads a local path into a container directory.
+	ListPath(containerID, dir string) ([]FileEntry, error)
+	CopyFromContainer(containerID, srcPath, destDir string) error
+	CopyToContainer(containerID, localPath, destDir string) error
+	// Images
+	ListImages() ([]Image, error)
+	InspectImage(id string) (*InspectResult, error)
+	RemoveImage(id string, force bool) error
+	// Networks
+	ListNetworks() ([]Network, error)
+	InspectNetwork(id string) (*InspectResult, error)
+	RemoveNetwork(id string) error
+	CreateNetwork(opts NetworkCreateOptions) error
+	// Volumes
+	ListVolumes() ([]Volume, error)
+	InspectVolume(name string) (*InspectResult, error)
+	RemoveVolume(name string) error
+	CreateVolume(opts VolumeCreateOptions) error
+	PruneVolumes() (int, error)
+	// Extra image ops
+	PullImage(ref string) error
+	PruneImages() (int, error)
+	TagImage(source, target string) error
+	PushImage(ref string, auth RegistryAuth) (<-chan string, error)
+	BuildImage(contextDir, tag string) (<-chan string, error)
+	ImageHistory(id string) (*InspectResult, error)
+	// Docker Compose projects (discovered via container labels)
+	ListComposeProjects() ([]ComposeProject, error)
+	ListComposeContainers(project string) ([]Container, error)
+	InspectComposeProject(project string) (*InspectResult, error)
+	// ComposeLogs streams the aggregated project logs; same stop contract as
+	// ContainerLogs.
+	ComposeLogs(project string, opts LogOptions) (lines <-chan string, stop func(), err error)
+	ComposeStart(project string) error
+	ComposeStop(project string) error
+	ComposeRestart(project string) error
+	ComposePause(project string) error
+	ComposeUnpause(project string) error
+	ComposeRemove(project string) error
+	ComposeUp(project string) (<-chan string, error)
+	ComposePull(project string) (<-chan string, error)
+	ComposeDown(project string) (<-chan string, error)
+	ComposeConfig(project string) (string, error)
+	ReadComposeFile(project string) (path, content string, err error)
+	WriteComposeFile(project, content string) error
+	CreateComposeFile(dir, content string) (<-chan string, error)
+	BackupComposeProject(project string) (string, error)
+	RestoreComposeProject(project, backupPath string) (<-chan string, error)
+	// System-wide operations
+	// SystemDF reports the daemon's disk usage (`docker system df`).
+	SystemDF() (*InspectResult, error)
+	// SystemPrune removes stopped containers, unused networks, dangling images
+	// and the build cache; it returns a human-readable summary.
+	SystemPrune() (string, error)
+	// Events returns a live stream of Docker daemon events as formatted strings.
+	// stop ends the subscription and closes the channel; the caller MUST call it
+	// when it abandons the stream (closing the view, refreshing).
+	Events() (lines <-chan string, stop func(), err error)
+	// Ping checks the connection to the daemon is alive (used by auto-reconnect).
+	Ping() error
+	// Info returns a one-shot daemon summary (container/image counts, version) —
+	// the data behind the multi-host dashboard. Reachable is left to the caller.
+	Info() (HostSummary, error)
+	Close()
+}
+
+type dockerBackend struct {
+	cli     *client.Client
+	closeFn func()
+	// sshClient is non-nil for ssh:// connections; used to exec `docker compose`
+	// on the host for compose-engine operations (up/pull). nil for tcp://.
+	sshClient *ssh.Client
+
+	// statsPrev caches the last CPU counters per container so the one-shot
+	// stats endpoint (which carries no precpu data) can report CPU% as the
+	// delta between refresh ticks. Guarded by statsMu; see ContainerStats.
+	statsMu   sync.Mutex
+	statsPrev map[string]cpuSample
+}
+
+// New creates a Backend from the provided config.
+// Supports tcp:// and ssh:// schemes in cfg.Host.
+func New(cfg *config.Config) (Backend, error) {
+	host := cfg.Host
+
+	if strings.HasPrefix(host, "ssh://") {
+		return newSSHBackend(cfg)
+	}
+	return newTCPBackend(cfg)
+}
+
+func newTCPBackend(cfg *config.Config) (Backend, error) {
+	opts := []client.Opt{
+		client.WithHost(cfg.Host),
+		client.WithAPIVersionNegotiation(),
+	}
+
+	if cfg.TLSCert != "" && cfg.TLSKey != "" {
+		opts = append(opts, client.WithTLSClientConfig(cfg.TLSCACert, cfg.TLSCert, cfg.TLSKey))
+	}
+
+	cli, err := client.NewClientWithOpts(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("docker TCP client: %w", err)
+	}
+	return &dockerBackend{cli: cli, closeFn: func() { _ = cli.Close() }}, nil
+}
+
+func newSSHBackend(cfg *config.Config) (Backend, error) {
+	dialer, sshClient, closeTunnel, err := sshDialer(cfg.Host, cfg.SSHKeyFile, cfg.SSHPassword)
+	if err != nil {
+		return nil, fmt.Errorf("SSH tunnel: %w", err)
+	}
+
+	// Use tcp://localhost so the Docker client accepts the scheme on all OSes.
+	// The actual connection is intercepted by our DialContext (dial-stdio over SSH).
+	cli, err := client.NewClientWithOpts(
+		client.WithHost("tcp://localhost"),
+		client.WithDialContext(dialer),
+		client.WithAPIVersionNegotiation(),
+	)
+	if err != nil {
+		closeTunnel()
+		return nil, fmt.Errorf("docker SSH client: %w", err)
+	}
+
+	return &dockerBackend{
+		cli:       cli,
+		sshClient: sshClient,
+		closeFn:   func() { _ = cli.Close(); closeTunnel() },
+	}, nil
+}
+
+func (b *dockerBackend) Ping() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := b.cli.Ping(ctx)
+	return err
+}
+
+func (b *dockerBackend) Close() {
+	b.closeFn()
+}
+
+// Events opens a stream of Docker daemon events and formats them into human-
+// readable lines. The returned stop cancels the subscription and closes the
+// channel; every send also watches the context so an abandoned stream can't
+// block the producer forever.
+func (b *dockerBackend) Events() (<-chan string, func(), error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	msgCh, errCh := b.cli.Events(ctx, events.ListOptions{})
+
+	ch := make(chan string, 256)
+	send := func(line string) bool {
+		select {
+		case ch <- line:
+			return true
+		case <-ctx.Done():
+			return false
+		}
+	}
+	go func() {
+		defer close(ch)
+		defer cancel()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-msgCh:
+				if !ok || !send(formatEvent(msg)) {
+					return
+				}
+			case err, ok := <-errCh:
+				if !ok || !send("[error] "+err.Error()) {
+					return
+				}
+			}
+		}
+	}()
+
+	return ch, cancel, nil
+}
+
+// formatEvent renders a single Docker events.Message as a one-line string.
+func formatEvent(msg events.Message) string {
+	actor := shortID(msg.Actor.ID)
+	attrs := msg.Actor.Attributes
+	if name, ok := attrs["name"]; ok {
+		actor = name
+	}
+	if container, ok := attrs["container"]; ok {
+		actor = shortID(container)
+	}
+	return fmt.Sprintf("%s %s %s (%s)", msg.Type, msg.Action, actor, msg.Scope)
+}
+
+// shortID truncates a full Docker object ID to the familiar 12-character form;
+// shorter strings (names, already-short IDs) pass through unchanged.
+func shortID(id string) string {
+	if len(id) > 12 {
+		return id[:12]
+	}
+	return id
+}
+
+// IsConnectionError reports whether err looks like a lost/unreachable daemon
+// connection (TCP socket down or SSH tunnel broken), as opposed to a normal
+// operational error like "no such container". The auto-reconnect logic uses it
+// to decide when to start retrying.
+func IsConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if client.IsErrConnectionFailed(err) {
+		return true
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return true
+	}
+	msg := err.Error()
+	for _, s := range []string{
+		"connection refused", "connection reset", "broken pipe",
+		"no route to host", "i/o timeout", "EOF",
+		"use of closed network connection", "ssh:", "tunnel",
+	} {
+		if strings.Contains(msg, s) {
+			return true
+		}
+	}
+	return false
+}
