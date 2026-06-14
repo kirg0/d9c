@@ -2,6 +2,7 @@
 /d9c
 /d9c.exe
 *.exe
+*.exe~
 *.test
 
 # Test / coverage artifacts

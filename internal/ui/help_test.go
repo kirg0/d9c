@@ -50,6 +50,22 @@ func TestBuildHelpContentCompose(t *testing.T) {
 	}
 }
 
+// TestBuildHelpContentAlertGlyphSpacing guards the :alert hint: the ⚠ glyph is
+// ambiguous-width (terminals draw it 2 cells wide) so it must keep a space on
+// each side, otherwise it overdraws the adjacent bracket. See the header ↻ fix.
+func TestBuildHelpContentAlertGlyphSpacing(t *testing.T) {
+	m := NewModel(&config.Config{}, docker.NewFakeBackend(), nil, nil, false)
+	got := m.buildHelpContent()
+	if !strings.Contains(got, "⚠") {
+		t.Fatal("help content should mention the ⚠ marker")
+	}
+	for _, tight := range []string{"(⚠", "⚠)"} {
+		if strings.Contains(got, tight) {
+			t.Errorf("⚠ glyph must not touch a bracket (found %q) — it overdraws the bracket", tight)
+		}
+	}
+}
+
 // TestHelpOpenClose drives '?' to open and q/esc to close the help overlay.
 func TestHelpOpenClose(t *testing.T) {
 	fb := docker.NewFakeBackend()

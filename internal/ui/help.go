@@ -74,7 +74,7 @@ func (m Model) buildHelpContent() string {
 		{":system prune", "Полная очистка (с подтверждением)"},
 		{":theme <name>", "Сменить цветовую тему на лету"},
 		{":interval <dur>", "Интервал автообновления (pause/resume)"},
-		{":alert cpu|mem <%>", "Порог CPU/MEM для подсветки (⚠); off — выключить"},
+		{":alert cpu|mem <%>", "Порог CPU/MEM для подсветки ( ⚠ ); off — выключить"},
 	})
 
 	if plugs := m.plugins.ForScope(m.pluginScope()); len(plugs) > 0 {
