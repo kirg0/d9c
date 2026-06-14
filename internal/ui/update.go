@@ -296,6 +296,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case opStartedMsg:
 		m.stopLogStream() // release any container-log stream the console replaces
 		m.logCh = msg.ch
+		m.logStop = msg.stop // closing the console tears the progress stream down
 		m.opTitle = msg.title
 		m.logs.Open(msg.title)
 		m.mode = ModeLogs
@@ -1504,11 +1505,11 @@ func (m *Model) dispatchComposeCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error)
 	case "remove", "rm":
 		return containerAction(func() error { return m.backend.ComposeRemove(project) }), nil
 	case "up":
-		return streamOpCmd(func() (<-chan string, error) { return m.backend.ComposeUp(project) }, "compose up: "+project), nil
+		return streamOpCmd(func() (<-chan string, func(), error) { return m.backend.ComposeUp(project) }, "compose up: "+project), nil
 	case "pull":
-		return streamOpCmd(func() (<-chan string, error) { return m.backend.ComposePull(project) }, "compose pull: "+project), nil
+		return streamOpCmd(func() (<-chan string, func(), error) { return m.backend.ComposePull(project) }, "compose pull: "+project), nil
 	case "down":
-		return streamOpCmd(func() (<-chan string, error) { return m.backend.ComposeDown(project) }, "compose down: "+project), nil
+		return streamOpCmd(func() (<-chan string, func(), error) { return m.backend.ComposeDown(project) }, "compose down: "+project), nil
 	case "config":
 		return composeConfigCmd(m.backend, project), nil
 	case "edit":
@@ -1544,7 +1545,7 @@ func (m *Model) dispatchImageCommand(cmd *cmdline.CommandMsg) (bool, tea.Cmd, er
 		if len(cmd.Args) > 1 {
 			tag = cmd.Args[1]
 		}
-		return true, streamOpCmd(func() (<-chan string, error) { return m.backend.BuildImage(dir, tag) }, "build: "+dir), nil
+		return true, streamOpCmd(func() (<-chan string, func(), error) { return m.backend.BuildImage(dir, tag) }, "build: "+dir), nil
 
 	case "tag":
 		if len(cmd.Args) == 0 {
@@ -1648,7 +1649,7 @@ func (m Model) handlePushForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.pushAuth[auth.Registry] = auth
 		m.mode = ModeNormal
 		m.relayout()
-		return m, streamOpCmd(func() (<-chan string, error) { return m.backend.PushImage(ref, auth) }, "push: "+ref)
+		return m, streamOpCmd(func() (<-chan string, func(), error) { return m.backend.PushImage(ref, auth) }, "push: "+ref)
 	case "tab", "down":
 		m.pushForm.Next()
 		return m, nil

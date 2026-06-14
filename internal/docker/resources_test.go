@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestFriendlyImageRemoveErr(t *testing.T) {
@@ -74,7 +75,8 @@ func TestStreamDockerJSON(t *testing.T) {
 {"status":"Pulling","id":"abc","progress":"[==>]"}
 {"error":"boom"}
 `
-	ch := streamDockerJSON(io.NopCloser(strings.NewReader(body)))
+	ch, stop := streamDockerJSON(io.NopCloser(strings.NewReader(body)))
+	defer stop()
 	var got []string
 	for line := range ch {
 		got = append(got, line)
@@ -88,6 +90,37 @@ func TestStreamDockerJSON(t *testing.T) {
 			t.Errorf("line %d = %q, want %q", i, got[i], want[i])
 		}
 	}
+}
+
+// streamDockerJSON's stop must release a producer that is blocked sending into
+// a full channel buffer (the abandoned-console leak): closing the reader and the
+// done channel unblocks it so the goroutine exits and the channel closes.
+func TestStreamDockerJSONStopUnblocksProducer(t *testing.T) {
+	var b strings.Builder
+	for i := 0; i < 1000; i++ { // far more than the 256-line buffer
+		b.WriteString(`{"stream":"x\n"}` + "\n")
+	}
+	ch, stop := streamDockerJSON(io.NopCloser(strings.NewReader(b.String())))
+
+	// Abandon the stream without draining it: the producer fills the buffer and
+	// blocks on a send. stop must let it return rather than leak forever.
+	stop()
+
+	drained := make(chan struct{})
+	go func() {
+		for range ch { //nolint:revive // drain whatever is buffered until closed
+		}
+		close(drained)
+	}()
+	select {
+	case <-drained:
+	case <-time.After(2 * time.Second):
+		t.Fatal("stop did not release the producer; channel never closed")
+	}
+
+	// stop is idempotent — a second call (e.g. from the producer's defer and the
+	// UI both calling it) must not panic.
+	stop()
 }
 
 func TestCleanHistoryCmd(t *testing.T) {
@@ -177,10 +210,11 @@ func TestFakeImageOps(t *testing.T) {
 
 	t.Run("build appends image and streams", func(t *testing.T) {
 		before := len(f.Images)
-		ch, err := f.BuildImage("/some/dir", "myapp:latest")
+		ch, stop, err := f.BuildImage("/some/dir", "myapp:latest")
 		if err != nil {
 			t.Fatalf("build: %v", err)
 		}
+		defer stop()
 		var lines int
 		for range ch {
 			lines++
@@ -194,10 +228,11 @@ func TestFakeImageOps(t *testing.T) {
 	})
 
 	t.Run("push streams and echoes auth", func(t *testing.T) {
-		ch, err := f.PushImage("myreg:5000/app:1", RegistryAuth{Registry: "myreg:5000", Username: "alice", Password: "s3cret"})
+		ch, stop, err := f.PushImage("myreg:5000/app:1", RegistryAuth{Registry: "myreg:5000", Username: "alice", Password: "s3cret"})
 		if err != nil {
 			t.Fatalf("push: %v", err)
 		}
+		defer stop()
 		var sawAuth bool
 		var lines int
 		for line := range ch {

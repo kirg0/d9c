@@ -396,7 +396,7 @@ func (f *FakeBackend) TagImage(source, target string) error {
 
 // PushImage streams canned push progress for the demo. It echoes the registry
 // and whether credentials were supplied so the auth path is observable.
-func (f *FakeBackend) PushImage(ref string, auth RegistryAuth) (<-chan string, error) {
+func (f *FakeBackend) PushImage(ref string, auth RegistryAuth) (<-chan string, func(), error) {
 	who := "anonymous"
 	if auth.Username != "" {
 		who = auth.Username
@@ -405,22 +405,23 @@ func (f *FakeBackend) PushImage(ref string, auth RegistryAuth) (<-chan string, e
 	if reg == "" {
 		reg = "docker.io"
 	}
-	return fakeProgress([]string{
+	ch, stop := fakeProgress([]string{
 		"The push refers to repository [" + ref + "]",
 		"auth: " + who + "@" + reg,
 		"5f70bf18a086: Pushed",
 		"a08c488a9779: Pushed",
 		"latest: digest: sha256:demo size: 1234",
-	}), nil
+	})
+	return ch, stop, nil
 }
 
 // BuildImage appends a freshly "built" image and streams canned build output.
-func (f *FakeBackend) BuildImage(contextDir, tag string) (<-chan string, error) {
+func (f *FakeBackend) BuildImage(contextDir, tag string) (<-chan string, func(), error) {
 	if tag == "" {
 		tag = "<none>:<none>"
 	}
 	f.Images = append(f.Images, Image{ID: "b00b1e5fa11d", Tags: tag, Size: "42 MB", Created: time.Now()})
-	return fakeProgress([]string{
+	ch, stop := fakeProgress([]string{
 		"Step 1/3 : FROM alpine:3.20",
 		" ---> deadbeef0001",
 		"Step 2/3 : COPY . /app",
@@ -429,7 +430,8 @@ func (f *FakeBackend) BuildImage(contextDir, tag string) (<-chan string, error) 
 		" ---> Running in cafe12345678",
 		"Successfully built b00b1e5fa11d",
 		"Successfully tagged " + tag,
-	}), nil
+	})
+	return ch, stop, nil
 }
 
 // ImageHistory returns a canned layer history for the demo.
@@ -640,51 +642,56 @@ func (f *FakeBackend) ComposeRemove(project string) error {
 }
 
 // fakeProgress returns a channel pre-loaded with the given lines and closed, so
-// the UI's streaming consumer reads them all and then sees completion.
-func fakeProgress(lines []string) <-chan string {
+// the UI's streaming consumer reads them all and then sees completion. The
+// channel needs no producer goroutine, so the returned stop is a no-op — it
+// exists only to honour the streaming contract shared with the real backend.
+func fakeProgress(lines []string) (<-chan string, func()) {
 	ch := make(chan string, len(lines))
 	for _, l := range lines {
 		ch <- l
 	}
 	close(ch)
-	return ch
+	return ch, func() {}
 }
 
-func (f *FakeBackend) ComposeUp(project string) (<-chan string, error) {
+func (f *FakeBackend) ComposeUp(project string) (<-chan string, func(), error) {
 	if err := f.setComposeState(project, "running", f.composeTotal(project)); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return fakeProgress([]string{
+	ch, stop := fakeProgress([]string{
 		"[+] Running 2/2",
 		" ⠿ Container " + project + "-web-1  Created",
 		" ⠿ Container " + project + "-web-1  Started",
-	}), nil
+	})
+	return ch, stop, nil
 }
 
-func (f *FakeBackend) ComposePull(project string) (<-chan string, error) {
+func (f *FakeBackend) ComposePull(project string) (<-chan string, func(), error) {
 	for _, p := range f.Composes {
 		if p.Name == project {
-			return fakeProgress([]string{
+			ch, stop := fakeProgress([]string{
 				"[+] Pulling 1/1",
 				" ⠿ web Pulling",
 				" ⠿ nginx:1.25 Pull complete",
 				" ⠿ web Pulled",
-			}), nil
+			})
+			return ch, stop, nil
 		}
 	}
-	return nil, fmt.Errorf("no such compose project: %s", project)
+	return nil, nil, fmt.Errorf("no such compose project: %s", project)
 }
 
-func (f *FakeBackend) ComposeDown(project string) (<-chan string, error) {
+func (f *FakeBackend) ComposeDown(project string) (<-chan string, func(), error) {
 	if err := f.setComposeState(project, "stopped", 0); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return fakeProgress([]string{
+	ch, stop := fakeProgress([]string{
 		"[+] Running 2/2",
 		" ⠿ Container " + project + "-web-1  Stopping",
 		" ⠿ Container " + project + "-web-1  Removed",
 		" ⠿ Network " + project + "_default  Removed",
-	}), nil
+	})
+	return ch, stop, nil
 }
 
 func (f *FakeBackend) ComposeConfig(project string) (string, error) {
@@ -722,10 +729,10 @@ func (f *FakeBackend) WriteComposeFile(project, content string) error {
 	return fmt.Errorf("no such compose project: %s", project)
 }
 
-func (f *FakeBackend) CreateComposeFile(dir, content string) (<-chan string, error) {
+func (f *FakeBackend) CreateComposeFile(dir, content string) (<-chan string, func(), error) {
 	dir = strings.TrimRight(strings.ReplaceAll(dir, "\\", "/"), "/")
 	if dir == "" {
-		return nil, fmt.Errorf("a target directory is required")
+		return nil, nil, fmt.Errorf("a target directory is required")
 	}
 	name := dir
 	if i := strings.LastIndex(dir, "/"); i >= 0 {
@@ -742,11 +749,12 @@ func (f *FakeBackend) CreateComposeFile(dir, content string) (<-chan string, err
 		f.ComposeFiles = map[string]string{}
 	}
 	f.ComposeFiles[name] = content
-	return fakeProgress([]string{
+	ch, stop := fakeProgress([]string{
 		"[+] Running 1/1",
 		" ⠿ Network " + name + "_default  Created",
 		" ⠿ Container " + name + "-app-1  Started",
-	}), nil
+	})
+	return ch, stop, nil
 }
 
 func (f *FakeBackend) BackupComposeProject(project string) (string, error) {
@@ -763,19 +771,20 @@ func (f *FakeBackend) BackupComposeProject(project string) (string, error) {
 	return "", fmt.Errorf("no such compose project: %s", project)
 }
 
-func (f *FakeBackend) RestoreComposeProject(project, backupPath string) (<-chan string, error) {
+func (f *FakeBackend) RestoreComposeProject(project, backupPath string) (<-chan string, func(), error) {
 	if _, err := os.Stat(backupPath); err != nil {
-		return nil, fmt.Errorf("open backup: %w", err)
+		return nil, nil, fmt.Errorf("open backup: %w", err)
 	}
 	if err := f.setComposeState(project, "running", f.composeTotal(project)); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return fakeProgress([]string{
+	ch, stop := fakeProgress([]string{
 		"extracting " + backupPath + " into /srv/" + project,
 		"starting project…",
 		"[+] Running 1/1",
 		" ⠿ Container " + project + "-web-1  Started",
-	}), nil
+	})
+	return ch, stop, nil
 }
 
 func (f *FakeBackend) composeTotal(project string) int {

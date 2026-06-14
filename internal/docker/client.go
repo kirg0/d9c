@@ -62,8 +62,11 @@ type Backend interface {
 	PullImage(ref string) error
 	PruneImages() (int, error)
 	TagImage(source, target string) error
-	PushImage(ref string, auth RegistryAuth) (<-chan string, error)
-	BuildImage(contextDir, tag string) (<-chan string, error)
+	// PushImage / BuildImage stream daemon progress lines. The returned stop
+	// aborts the operation and releases the request/connection; the caller MUST
+	// call it when it abandons the channel, otherwise the producer leaks.
+	PushImage(ref string, auth RegistryAuth) (lines <-chan string, stop func(), err error)
+	BuildImage(contextDir, tag string) (lines <-chan string, stop func(), err error)
 	ImageHistory(id string) (*InspectResult, error)
 	// Docker Compose projects (discovered via container labels)
 	ListComposeProjects() ([]ComposeProject, error)
@@ -78,15 +81,18 @@ type Backend interface {
 	ComposePause(project string) error
 	ComposeUnpause(project string) error
 	ComposeRemove(project string) error
-	ComposeUp(project string) (<-chan string, error)
-	ComposePull(project string) (<-chan string, error)
-	ComposeDown(project string) (<-chan string, error)
+	// ComposeUp/Pull/Down, CreateComposeFile and RestoreComposeProject stream
+	// progress lines from the compose engine. Each returns a stop the caller MUST
+	// call when it abandons the channel, otherwise the SSH session/producer leak.
+	ComposeUp(project string) (lines <-chan string, stop func(), err error)
+	ComposePull(project string) (lines <-chan string, stop func(), err error)
+	ComposeDown(project string) (lines <-chan string, stop func(), err error)
 	ComposeConfig(project string) (string, error)
 	ReadComposeFile(project string) (path, content string, err error)
 	WriteComposeFile(project, content string) error
-	CreateComposeFile(dir, content string) (<-chan string, error)
+	CreateComposeFile(dir, content string) (lines <-chan string, stop func(), err error)
 	BackupComposeProject(project string) (string, error)
-	RestoreComposeProject(project, backupPath string) (<-chan string, error)
+	RestoreComposeProject(project, backupPath string) (lines <-chan string, stop func(), err error)
 	// System-wide operations
 	// SystemDF reports the daemon's disk usage (`docker system df`).
 	SystemDF() (*InspectResult, error)

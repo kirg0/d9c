@@ -52,11 +52,11 @@ func (b *disconnectedBackend) InspectImage(string) (*InspectResult, error) {
 }
 func (b *disconnectedBackend) RemoveImage(string, bool) error { return b.err() }
 func (b *disconnectedBackend) TagImage(string, string) error  { return b.err() }
-func (b *disconnectedBackend) PushImage(string, RegistryAuth) (<-chan string, error) {
-	return nil, b.err()
+func (b *disconnectedBackend) PushImage(string, RegistryAuth) (<-chan string, func(), error) {
+	return nil, nil, b.err()
 }
-func (b *disconnectedBackend) BuildImage(string, string) (<-chan string, error) {
-	return nil, b.err()
+func (b *disconnectedBackend) BuildImage(string, string) (<-chan string, func(), error) {
+	return nil, nil, b.err()
 }
 func (b *disconnectedBackend) ImageHistory(string) (*InspectResult, error) {
 	return nil, b.err()
@@ -88,9 +88,15 @@ func (b *disconnectedBackend) InspectComposeProject(string) (*InspectResult, err
 func (b *disconnectedBackend) ComposeLogs(string, LogOptions) (<-chan string, func(), error) {
 	return nil, nil, b.err()
 }
-func (b *disconnectedBackend) ComposeUp(string) (<-chan string, error)   { return nil, b.err() }
-func (b *disconnectedBackend) ComposePull(string) (<-chan string, error) { return nil, b.err() }
-func (b *disconnectedBackend) ComposeDown(string) (<-chan string, error) { return nil, b.err() }
+func (b *disconnectedBackend) ComposeUp(string) (<-chan string, func(), error) {
+	return nil, nil, b.err()
+}
+func (b *disconnectedBackend) ComposePull(string) (<-chan string, func(), error) {
+	return nil, nil, b.err()
+}
+func (b *disconnectedBackend) ComposeDown(string) (<-chan string, func(), error) {
+	return nil, nil, b.err()
+}
 func (b *disconnectedBackend) ComposeConfig(string) (string, error) {
 	return "", b.err()
 }
@@ -98,14 +104,14 @@ func (b *disconnectedBackend) ReadComposeFile(string) (string, string, error) {
 	return "", "", b.err()
 }
 func (b *disconnectedBackend) WriteComposeFile(string, string) error { return b.err() }
-func (b *disconnectedBackend) CreateComposeFile(string, string) (<-chan string, error) {
-	return nil, b.err()
+func (b *disconnectedBackend) CreateComposeFile(string, string) (<-chan string, func(), error) {
+	return nil, nil, b.err()
 }
 func (b *disconnectedBackend) BackupComposeProject(string) (string, error) {
 	return "", b.err()
 }
-func (b *disconnectedBackend) RestoreComposeProject(string, string) (<-chan string, error) {
-	return nil, b.err()
+func (b *disconnectedBackend) RestoreComposeProject(string, string) (<-chan string, func(), error) {
+	return nil, nil, b.err()
 }
 func (b *disconnectedBackend) SystemDF() (*InspectResult, error)      { return nil, b.err() }
 func (b *disconnectedBackend) SystemPrune() (string, error)           { return "", b.err() }

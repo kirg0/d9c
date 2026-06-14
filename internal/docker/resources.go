@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -158,29 +159,30 @@ func RegistryFromRef(ref string) string {
 // When auth carries a username the credentials are sent to the registry;
 // otherwise the push is anonymous and a private registry will answer 401,
 // surfaced as an error line in the stream.
-func (b *dockerBackend) PushImage(ref string, auth RegistryAuth) (<-chan string, error) {
+func (b *dockerBackend) PushImage(ref string, auth RegistryAuth) (<-chan string, func(), error) {
 	encoded, err := registry.EncodeAuthConfig(registry.AuthConfig{
 		Username:      auth.Username,
 		Password:      auth.Password,
 		ServerAddress: auth.Registry,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("encode registry auth: %w", err)
+		return nil, nil, fmt.Errorf("encode registry auth: %w", err)
 	}
 	reader, err := b.cli.ImagePush(context.Background(), ref, dockerimage.PushOptions{RegistryAuth: encoded})
 	if err != nil {
-		return nil, fmt.Errorf("push image: %w", err)
+		return nil, nil, fmt.Errorf("push image: %w", err)
 	}
-	return streamDockerJSON(reader), nil
+	ch, stop := streamDockerJSON(reader)
+	return ch, stop, nil
 }
 
 // BuildImage builds an image from the Dockerfile in contextDir, streaming the
 // build output. The directory is tarred locally and sent to the daemon, so it
 // works over both TCP and SSH connections (context is relative to where d9c
 // runs, matching `docker build` semantics).
-func (b *dockerBackend) BuildImage(contextDir, tag string) (<-chan string, error) {
+func (b *dockerBackend) BuildImage(contextDir, tag string) (<-chan string, func(), error) {
 	if fi, err := os.Stat(contextDir); err != nil || !fi.IsDir() {
-		return nil, fmt.Errorf("build context %q is not a directory", contextDir)
+		return nil, nil, fmt.Errorf("build context %q is not a directory", contextDir)
 	}
 	tarReader := tarDir(contextDir)
 	opts := types.ImageBuildOptions{Dockerfile: "Dockerfile", Remove: true}
@@ -190,10 +192,11 @@ func (b *dockerBackend) BuildImage(contextDir, tag string) (<-chan string, error
 	resp, err := b.cli.ImageBuild(context.Background(), tarReader, opts)
 	if err != nil {
 		_ = tarReader.Close()
-		return nil, fmt.Errorf("build image: %w", err)
+		return nil, nil, fmt.Errorf("build image: %w", err)
 	}
 	// Keep the context tar open until the build stream drains.
-	return streamDockerJSON(resp.Body, tarReader), nil
+	ch, stop := streamDockerJSON(resp.Body, tarReader)
+	return ch, stop, nil
 }
 
 // tarDir streams the directory tree rooted at dir as a tar archive, with paths
@@ -298,32 +301,50 @@ func formatJSONProgress(m jsonProgress) string {
 
 // streamDockerJSON decodes a Docker JSON progress stream (build/push) into
 // readable lines. Any extra closers (e.g. a build-context tar) are closed once
-// the stream drains.
-func streamDockerJSON(r io.ReadCloser, extra ...io.Closer) <-chan string {
+// the stream drains. The returned stop aborts the stream: it closes the reader
+// (ending the daemon request) and unblocks a producer stuck on a send nobody
+// reads; the caller MUST call it when it abandons the channel, otherwise the
+// connection and producer goroutine leak. stop is also invoked on natural end.
+func streamDockerJSON(r io.ReadCloser, extra ...io.Closer) (<-chan string, func()) {
 	ch := make(chan string, 256)
-	go func() {
-		defer close(ch)
-		defer func() {
+	done := make(chan struct{})
+	var once sync.Once
+	stop := func() {
+		once.Do(func() {
+			close(done)
 			_ = r.Close()
 			for _, c := range extra {
 				_ = c.Close()
 			}
-		}()
+		})
+	}
+	go func() {
+		defer close(ch)
+		defer stop()
 		dec := json.NewDecoder(r)
 		for {
 			var m jsonProgress
 			if err := dec.Decode(&m); err != nil {
+				// A deliberate stop closes the reader, surfacing a read error
+				// here; the done channel keeps it from being reported as one.
 				if err != io.EOF {
-					ch <- "error: " + err.Error()
+					select {
+					case ch <- "error: " + err.Error():
+					case <-done:
+					}
 				}
 				return
 			}
 			if line := formatJSONProgress(m); line != "" {
-				ch <- line
+				select {
+				case ch <- line:
+				case <-done:
+					return
+				}
 			}
 		}
 	}()
-	return ch
+	return ch, stop
 }
 
 // ── Network ───────────────────────────────────────────────────────────────────
