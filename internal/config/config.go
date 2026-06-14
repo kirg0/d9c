@@ -21,6 +21,7 @@ type Config struct {
 	SSHPassword     string
 	ShowAll         bool
 	Demo            bool
+	ShowVersion     bool
 	HostsFile       string
 	PluginsFile     string
 	ConfigFile      string
@@ -38,6 +39,7 @@ func Load() *Config {
 	flag.StringVar(&cfg.SSHPassword, "ssh-password", getenv("DOCKER_SSH_PASSWORD", ""), "SSH password (insecure, prefer key auth)")
 	flag.BoolVar(&cfg.ShowAll, "a", false, "Show all containers (default: running only)")
 	flag.BoolVar(&cfg.Demo, "demo", false, "Run with built-in sample data (no Docker connection)")
+	flag.BoolVar(&cfg.ShowVersion, "version", false, "Print the version and exit")
 	flag.StringVar(&cfg.HostsFile, "hosts-file", "", "Path to the saved-hosts file (default: next to the binary)")
 	flag.StringVar(&cfg.PluginsFile, "plugins-file", "", "Path to the plugins file (default: next to the binary)")
 	flag.StringVar(&cfg.ConfigFile, "config", "", "Path to the config file with theme/colors/keybindings (default: next to the binary)")

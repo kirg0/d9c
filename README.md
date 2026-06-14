@@ -7,7 +7,12 @@
 go run . -demo                 # демо-данные, без Docker
 go run . -H tcp://host:2375
 go run . -H ssh://user@host
+go run . -version              # вывести версию и выйти
 ```
+
+Версия приложения следует [SemVer](https://semver.org) и показана в шапке (`d9c
+v1.0.0`); её же печатает флаг `-version`. При сборке версию можно переопределить:
+`go build -ldflags "-X d9c/internal/version.Version=1.2.3" -o d9c.exe .`.
 
 Разделы: **Containers / Images / Networks / Volumes / Compose / Hosts**.
 Навигация стрелками/`j`/`k`, фильтр `/`, командная строка `:`, выход `q`.

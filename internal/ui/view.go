@@ -6,6 +6,7 @@ import (
 
 	"d9c/internal/ui/styles"
 	uitbl "d9c/internal/ui/table"
+	"d9c/internal/version"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -64,6 +65,7 @@ func (m Model) viewHeader() string {
 	w := m.width
 
 	appBlock := styles.HeaderApp.Render(" d9c ")
+	verBlock := styles.HeaderInfo.Render(" " + version.String() + " ")
 	sep := styles.HeaderSep.Render(" › ")
 
 	var breadcrumb string
@@ -157,7 +159,7 @@ func (m Model) viewHeader() string {
 		}
 	}
 
-	left := appBlock + sep + breadcrumb
+	left := appBlock + verBlock + sep + breadcrumb
 	status := styles.HeaderStatusDown
 	if m.serverUp {
 		status = styles.HeaderStatusOK

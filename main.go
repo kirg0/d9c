@@ -13,6 +13,7 @@ import (
 	"d9c/internal/theme"
 	"d9c/internal/ui"
 	"d9c/internal/ui/styles"
+	"d9c/internal/version"
 )
 
 func main() {
@@ -24,6 +25,11 @@ func main() {
 
 func run() error {
 	cfg := config.Load()
+
+	if cfg.ShowVersion {
+		fmt.Println("d9c " + version.String())
+		return nil
+	}
 
 	hostsPath := cfg.HostsFile
 	if hostsPath == "" {
