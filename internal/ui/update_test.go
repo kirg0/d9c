@@ -442,6 +442,61 @@ func TestStartupHostKeyErrorOpensNotice(t *testing.T) {
 	}
 }
 
+// A live :connect that fails because the host name cannot be resolved opens the
+// dedicated "host not found" notice instead of a raw footer error.
+func TestConnectHostNotFoundOpensNotice(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	step := func(msg tea.Msg) tea.Cmd { var c tea.Cmd; tm, c = tm.Update(msg); return c }
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+
+	dnsErr := errors.New("dial tcp: lookup typo.invalid: no such host")
+	cmd := step(connectResultMsg{host: "tcp://typo.invalid:2375", err: dnsErr})
+	if cmd == nil {
+		t.Fatal("connectResultMsg with no-such-host error must produce an openNoticeMsg cmd")
+	}
+	notice, ok := cmd().(openNoticeMsg)
+	if !ok {
+		t.Fatalf("emitted msg = %T, want openNoticeMsg", cmd())
+	}
+	if !strings.Contains(notice.body, "no such host") {
+		t.Errorf("notice body missing 'no such host' hint:\n%s", notice.body)
+	}
+	if !strings.Contains(notice.body, "tcp://typo.invalid:2375") {
+		t.Errorf("notice body missing the failing host URL:\n%s", notice.body)
+	}
+
+	step(notice)
+	m := tm.(Model)
+	if m.mode != ModeNotice {
+		t.Errorf("mode = %v, want ModeNotice", m.mode)
+	}
+	if m.err != "" {
+		t.Errorf("footer err = %q, want empty (notice replaces it)", m.err)
+	}
+
+	step(tea.KeyMsg{Type: tea.KeyEsc})
+	if m2 := tm.(Model); m2.mode != ModeNormal || m2.noticeBody != "" {
+		t.Errorf("after esc: mode=%v body=%q, want ModeNormal/empty", m2.mode, m2.noticeBody)
+	}
+}
+
+// A startup connect failure caused by an unresolvable host seeds the same
+// "host not found" notice from Init.
+func TestStartupHostNotFoundOpensNotice(t *testing.T) {
+	dnsErr := errors.New("dial tcp: lookup typo.invalid: no such host")
+	m := NewModel(&config.Config{Host: "tcp://typo.invalid:2375"}, docker.NewDisconnected(dnsErr), nil, dnsErr, true)
+	if m.err != "" {
+		t.Errorf("startup footer err = %q, want empty (notice replaces it)", m.err)
+	}
+	if m.startupNotice == nil {
+		t.Fatal("expected startupNotice to be seeded")
+	}
+	if !strings.Contains(m.startupNotice.body, "no such host") {
+		t.Errorf("startupNotice body missing hint:\n%s", m.startupNotice.body)
+	}
+}
+
 // A live :connect must release streams owned by the old backend.
 func TestConnectStopsStreams(t *testing.T) {
 	fb := docker.NewFakeBackend()

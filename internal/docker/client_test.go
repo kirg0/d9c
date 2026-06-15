@@ -61,6 +61,25 @@ func TestIsHostKeyError(t *testing.T) {
 	}
 }
 
+func TestIsHostNotFoundError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{"dns lookup", errors.New("dial tcp: lookup badhost: no such host"), true},
+		{"wrapped lookup", fmt.Errorf("SSH tunnel: %w", errors.New("lookup nope.invalid: no such host")), true},
+		{"connection refused", errors.New("dial tcp 1.2.3.4:2375: connect: connection refused"), false},
+		{"unrelated", errors.New("ssh: handshake failed"), false},
+	}
+	for _, tt := range tests {
+		if got := IsHostNotFoundError(tt.err); got != tt.want {
+			t.Errorf("%s: IsHostNotFoundError = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
 func TestShortID(t *testing.T) {
 	tests := []struct{ in, want string }{
 		{"9ae942fd8fbc1a2b3c4d5e6f", "9ae942fd8fbc"},

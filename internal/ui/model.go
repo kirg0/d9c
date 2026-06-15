@@ -504,7 +504,7 @@ func NewModel(cfg *config.Config, backend docker.Backend, store *hosts.Store, co
 		interval = defaultRefreshInterval
 	}
 	errStr := ""
-	if connectErr != nil && !docker.IsHostKeyError(connectErr) {
+	if connectErr != nil && !docker.IsHostKeyError(connectErr) && !docker.IsHostNotFoundError(connectErr) {
 		errStr = connectErr.Error()
 	}
 	cmd := cmdline.New()
@@ -558,6 +558,9 @@ func NewModel(cfg *config.Config, backend docker.Backend, store *hosts.Store, co
 	m.applyColumns(0)
 	if connectErr != nil && docker.IsHostKeyError(connectErr) {
 		title, body := hostKeyNoticeText(cfg.Host)
+		m.startupNotice = &openNoticeMsg{title: title, body: body}
+	} else if connectErr != nil && docker.IsHostNotFoundError(connectErr) {
+		title, body := hostNotFoundNoticeText(cfg.Host)
 		m.startupNotice = &openNoticeMsg{title: title, body: body}
 	}
 	return m
