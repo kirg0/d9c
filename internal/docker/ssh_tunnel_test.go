@@ -3,9 +3,11 @@ package docker
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"errors"
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"golang.org/x/crypto/ssh"
@@ -80,6 +82,42 @@ func TestHostKeyCallbackNoPath(t *testing.T) {
 	}
 	if err := hostKeyCallbackFor("")("example.com:22", &net.TCPAddr{}, testPublicKey(t)); err != nil {
 		t.Errorf("insecure callback = %v, want nil", err)
+	}
+}
+
+// pickDialStdioCmd must fall through to sudo when the SSH user can't reach the
+// daemon directly, and fail loudly when neither prefix works — the original bug
+// was that the fallback never advanced past the first (failing) command.
+func TestPickDialStdioCmd(t *testing.T) {
+	prefixes := []string{"", "sudo "}
+
+	// User in docker group: the plain command wins.
+	cmd, err := pickDialStdioCmd(prefixes, func(string) error { return nil })
+	if err != nil || cmd != "docker system dial-stdio" {
+		t.Fatalf("in-group: cmd=%q err=%v, want plain dial-stdio", cmd, err)
+	}
+
+	// User not in docker group but passwordless sudo works: fall through to sudo.
+	cmd, err = pickDialStdioCmd(prefixes, func(prefix string) error {
+		if prefix == "" {
+			return errors.New("permission denied")
+		}
+		return nil
+	})
+	if err != nil || cmd != "sudo docker system dial-stdio" {
+		t.Fatalf("sudo fallback: cmd=%q err=%v, want sudo dial-stdio", cmd, err)
+	}
+
+	// Neither works: a wrapped error, no usable command.
+	cmd, err = pickDialStdioCmd(prefixes, func(string) error { return errors.New("permission denied") })
+	if err == nil {
+		t.Fatal("no-access: want error, got nil")
+	}
+	if cmd != "" {
+		t.Errorf("no-access: cmd=%q, want empty", cmd)
+	}
+	if !strings.Contains(err.Error(), "unreachable") {
+		t.Errorf("no-access err = %v, want an 'unreachable' hint", err)
 	}
 }
 

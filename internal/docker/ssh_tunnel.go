@@ -3,6 +3,7 @@ package docker
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -25,8 +26,18 @@ func sshDialer(host, keyFile, password string) (func(ctx context.Context, networ
 		return nil, nil, nil, err
 	}
 
+	// Pick the dial-stdio invocation that actually reaches the daemon (plain or
+	// sudo) ONCE, up front. Probing here makes a "no docker access" host fail
+	// loudly at connect instead of opening dead sessions that surface later as a
+	// silent reconnect loop.
+	cmd, err := probeDialStdioCmd(sshClient)
+	if err != nil {
+		_ = sshClient.Close()
+		return nil, nil, nil, err
+	}
+
 	dialer := func(ctx context.Context, network, _ string) (net.Conn, error) {
-		return newDialStdioConn(sshClient)
+		return tryDialStdio(sshClient, cmd)
 	}
 
 	return dialer, sshClient, func() { _ = sshClient.Close() }, nil
@@ -145,22 +156,59 @@ type sessionConn struct {
 	once    sync.Once
 }
 
-// dialStdioCommands are tried in order until one succeeds.
-var dialStdioCommands = []string{
-	"docker system dial-stdio",
-	"sudo docker system dial-stdio",
+// dialStdioPrefixes are the command prefixes tried, in order, to reach the
+// daemon: run docker directly (SSH user is in the docker group) or via sudo
+// (passwordless sudo allowed). Each maps to "<prefix>docker system dial-stdio".
+var dialStdioPrefixes = []string{"", "sudo "}
+
+// probeDialStdioCmd returns the dial-stdio command that actually has daemon
+// access on this host. It must probe with a command that WAITS for an exit code
+// (docker version), because the dial-stdio session itself reports success the
+// moment it starts — even when the remote docker immediately exits with
+// "permission denied" — which is exactly why the old start-and-hope fallback
+// never advanced to the sudo variant.
+func probeDialStdioCmd(client *ssh.Client) (string, error) {
+	return pickDialStdioCmd(dialStdioPrefixes, func(prefix string) error {
+		return sshRun(client, prefix+"docker version --format '{{.Server.Version}}'")
+	})
 }
 
-func newDialStdioConn(client *ssh.Client) (net.Conn, error) {
+// pickDialStdioCmd is the pure selection core of probeDialStdioCmd: it returns
+// the first prefix whose probe succeeds, mapped to its dial-stdio command, or a
+// wrapped error when none reach the daemon. Split out so the fallback order can
+// be unit-tested without an SSH server.
+func pickDialStdioCmd(prefixes []string, probe func(prefix string) error) (string, error) {
 	var lastErr error
-	for _, cmd := range dialStdioCommands {
-		conn, err := tryDialStdio(client, cmd)
+	for _, prefix := range prefixes {
+		err := probe(prefix)
 		if err == nil {
-			return conn, nil
+			return prefix + "docker system dial-stdio", nil
 		}
 		lastErr = err
 	}
-	return nil, lastErr
+	if lastErr == nil {
+		lastErr = errors.New("no dial-stdio command configured")
+	}
+	return "", fmt.Errorf("docker daemon unreachable over SSH (user not in docker group and sudo unavailable): %w", lastErr)
+}
+
+// sshRun runs cmd on the host and waits for it to finish, returning a non-nil
+// error (with the remote output) when it exits non-zero. Stdin is closed so a
+// sudo password prompt fails fast instead of hanging.
+func sshRun(client *ssh.Client, cmd string) error {
+	session, err := client.NewSession()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = session.Close() }()
+	out, err := session.CombinedOutput(cmd + " < /dev/null")
+	if err != nil {
+		if msg := strings.TrimSpace(string(out)); msg != "" {
+			return fmt.Errorf("%w: %s", err, msg)
+		}
+		return err
+	}
+	return nil
 }
 
 func tryDialStdio(client *ssh.Client, cmd string) (net.Conn, error) {
