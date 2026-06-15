@@ -2,6 +2,7 @@ package docker
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -40,19 +41,68 @@ func buildSSHClient(host, keyFile, password string) (*ssh.Client, error) {
 	user, hostname, port := parseSSHHost(host)
 	authMethods := buildAuthMethods(keyFile, password)
 
-	hostKeyCallback := ssh.InsecureIgnoreHostKey()
-	if khPath := knownHostsFile(); khPath != "" {
-		if cb, err := knownhosts.New(khPath); err == nil {
-			hostKeyCallback = cb
-		}
-	}
-
 	cfg := &ssh.ClientConfig{
 		User:            user,
 		Auth:            authMethods,
-		HostKeyCallback: hostKeyCallback,
+		HostKeyCallback: hostKeyCallback(),
 	}
 	return ssh.Dial("tcp", hostname+":"+port, cfg)
+}
+
+// hostKeyCallback returns an SSH host-key verifier that behaves like OpenSSH's
+// StrictHostKeyChecking=accept-new: a host already in known_hosts is verified
+// (a changed key is rejected so the caller can surface the mismatch notice),
+// while a previously unseen host is trusted on first use and its key appended to
+// known_hosts. Without the trust-on-first-use step, cleaning a stale entry —
+// which the mismatch notice tells the user to do — would leave the host
+// "unknown" and every reconnect would keep failing.
+func hostKeyCallback() ssh.HostKeyCallback {
+	return hostKeyCallbackFor(KnownHostsPath())
+}
+
+// hostKeyCallbackFor is the path-injectable core of hostKeyCallback, split out
+// so the accept-new / reject-mismatch logic can be unit-tested against a temp
+// known_hosts file.
+func hostKeyCallbackFor(path string) ssh.HostKeyCallback {
+	if path == "" {
+		return ssh.InsecureIgnoreHostKey()
+	}
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		verify, err := knownhosts.New(path)
+		if err != nil {
+			// No readable known_hosts file yet: trust on first use.
+			return appendKnownHost(path, hostname, key)
+		}
+		err = verify(hostname, remote, key)
+		if err == nil {
+			return nil
+		}
+		var keyErr *knownhosts.KeyError
+		// A KeyError with an empty Want list means the host is simply unknown;
+		// a non-empty Want means a known host presented a different key (the
+		// dangerous case) — reject it so the mismatch notice fires.
+		if errors.As(err, &keyErr) && len(keyErr.Want) == 0 {
+			return appendKnownHost(path, hostname, key)
+		}
+		return err
+	}
+}
+
+// appendKnownHost records key for hostname in the known_hosts file at path,
+// creating the file (and ~/.ssh) if needed, so subsequent connects validate
+// against it instead of prompting again.
+func appendKnownHost(path, hostname string, key ssh.PublicKey) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	line := knownhosts.Line([]string{knownhosts.Normalize(hostname)}, key)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	_, err = f.WriteString(line + "\n")
+	return err
 }
 
 func buildAuthMethods(keyFile, password string) []ssh.AuthMethod {
@@ -187,17 +237,6 @@ func defaultKeyPaths() []string {
 		home + "/.ssh/id_ed25519",
 		home + "/.ssh/id_rsa",
 	}
-}
-
-func knownHostsFile() string {
-	p := KnownHostsPath()
-	if p == "" {
-		return ""
-	}
-	if _, err := os.Stat(p); err == nil {
-		return p
-	}
-	return ""
 }
 
 // KnownHostsPath returns the OS-specific path to the user's SSH known_hosts
