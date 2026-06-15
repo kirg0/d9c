@@ -264,6 +264,19 @@ func IsHostKeyError(err error) bool {
 	return strings.Contains(msg, "knownhosts:") || strings.Contains(msg, "ssh: host key")
 }
 
+// IsHostNotFoundError reports whether err is a DNS resolution failure raised
+// when the target host name cannot be resolved — the typical case when the
+// host address is mistyped or the host simply does not exist. Go's net package
+// renders this as "...: no such host". The UI uses it to show a dedicated
+// dialog (the same modal as the host-key notice) instead of dumping the raw
+// "lookup ...: no such host" string into the footer.
+func IsHostNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "no such host")
+}
+
 // IsConnectionError reports whether err looks like a lost/unreachable daemon
 // connection (TCP socket down or SSH tunnel broken), as opposed to a normal
 // operational error like "no such container". The auto-reconnect logic uses it

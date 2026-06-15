@@ -210,6 +210,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				title, body := hostKeyNoticeText(msg.host)
 				return m, func() tea.Msg { return openNoticeMsg{title: title, body: body} }
 			}
+			if docker.IsHostNotFoundError(msg.err) {
+				title, body := hostNotFoundNoticeText(msg.host)
+				return m, func() tea.Msg { return openNoticeMsg{title: title, body: body} }
+			}
 			m.err = fmt.Sprintf("connect to %s failed: %v", msg.host, msg.err)
 			return m, nil
 		}
@@ -756,6 +760,21 @@ func hostKeyNoticeText(host string) (title, body string) {
 	b.WriteString("    " + path + "\n\n")
 	b.WriteString("После очистки повторите :connect — d9c примет новый ключ\n")
 	b.WriteString("и сохранит его при следующем подключении.")
+	return title, b.String()
+}
+
+// hostNotFoundNoticeText assembles the user-facing message shown when the
+// target host name cannot be resolved ("no such host") — usually a mistyped
+// address or a host that no longer exists. Same Russian style as the other
+// in-app dialogs; the failing host is embedded so the user can spot a typo.
+func hostNotFoundNoticeText(host string) (title, body string) {
+	title = " Хост не найден "
+	var b strings.Builder
+	fmt.Fprintf(&b, "Не удалось подключиться к %s:\n", host)
+	b.WriteString("не удаётся определить адрес хоста (no such host).\n\n")
+	b.WriteString("Скорее всего, имя хоста указано с опечаткой или такого хоста\n")
+	b.WriteString("не существует. Проверьте, что адрес введён верно и хост\n")
+	b.WriteString("доступен из сети, затем повторите :connect.")
 	return title, b.String()
 }
 

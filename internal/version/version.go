@@ -10,7 +10,7 @@ package version
 // It can be overridden at build time, e.g. to stamp a CI build:
 //
 //	go build -ldflags "-X d9c/internal/version.Version=1.2.3" -o d9c.exe .
-var Version = "1.0.6"
+var Version = "1.0.7"
 
 // String returns the version prefixed with "v" (e.g. "v1.0.0"), the form
 // shown in the UI and printed by the -version flag.
