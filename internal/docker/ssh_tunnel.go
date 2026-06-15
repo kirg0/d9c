@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -189,10 +190,24 @@ func defaultKeyPaths() []string {
 }
 
 func knownHostsFile() string {
-	home, _ := os.UserHomeDir()
-	p := home + "/.ssh/known_hosts"
+	p := KnownHostsPath()
+	if p == "" {
+		return ""
+	}
 	if _, err := os.Stat(p); err == nil {
 		return p
 	}
 	return ""
+}
+
+// KnownHostsPath returns the OS-specific path to the user's SSH known_hosts
+// file (e.g. C:\Users\you\.ssh\known_hosts on Windows). The file may or may not
+// exist; the path is exposed so the UI can tell the user which file to clean
+// when the host key changed.
+func KnownHostsPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return ""
+	}
+	return filepath.Join(home, ".ssh", "known_hosts")
 }

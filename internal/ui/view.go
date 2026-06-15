@@ -29,6 +29,8 @@ func (m Model) View() string {
 		body = m.viewCopyOverlay()
 	case ModeConfirm:
 		body = m.viewConfirmOverlay()
+	case ModeNotice:
+		body = m.viewNoticeOverlay()
 	case ModeBackupPicker:
 		body = m.viewBackupOverlay()
 	case ModeHelp:
@@ -250,6 +252,8 @@ func (m Model) viewFooter() string {
 	case ModeConfirm:
 		sb.WriteString(keyHint("y/enter", "Confirm"))
 		sb.WriteString(keyHint("n/esc", "Cancel"))
+	case ModeNotice:
+		sb.WriteString(keyHint("enter/esc", "Close"))
 	case ModeBackupPicker:
 		if m.backupConfirmDelete != "" {
 			sb.WriteString(styles.FooterError.Render(" delete " + m.backupConfirmDelete + "? "))
@@ -417,6 +421,19 @@ func (m Model) viewConfirmOverlay() string {
 	title := styles.CopyMenuTitle.Render(" Подтверждение ")
 	hint := styles.CopyMenuHint.Render("  y/enter подтвердить   n/esc отмена")
 	content := title + "\n\n" + m.confirmPrompt + "\n\n" + hint
+
+	panel := styles.OverlayPanel.Render(content)
+	return lipgloss.Place(m.width, bodyH, lipgloss.Center, lipgloss.Center, panel)
+}
+
+// viewNoticeOverlay renders the informational modal centered in the body area:
+// a title plus a free-form body. Any key dismisses it; no action is attached.
+func (m Model) viewNoticeOverlay() string {
+	bodyH := m.height - 2 // header + footer
+
+	title := styles.CopyMenuTitle.Render(m.noticeTitle)
+	hint := styles.CopyMenuHint.Render("  enter/esc закрыть")
+	content := title + "\n\n" + m.noticeBody + "\n\n" + hint
 
 	panel := styles.OverlayPanel.Render(content)
 	return lipgloss.Place(m.width, bodyH, lipgloss.Center, lipgloss.Center, panel)

@@ -40,6 +40,27 @@ func TestIsConnectionError(t *testing.T) {
 	}
 }
 
+func TestIsHostKeyError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{"knownhosts key mismatch", errors.New("ssh: handshake failed: knownhosts: key mismatch"), true},
+		{"knownhosts key unknown", errors.New("ssh: handshake failed: knownhosts: key is unknown"), true},
+		{"wrapped knownhosts", fmt.Errorf("SSH tunnel: %w", errors.New("knownhosts: key mismatch")), true},
+		{"ssh host key", errors.New("ssh: host key verification failed"), true},
+		{"plain handshake", errors.New("ssh: handshake failed"), false},
+		{"unrelated", errors.New("connection refused"), false},
+	}
+	for _, tt := range tests {
+		if got := IsHostKeyError(tt.err); got != tt.want {
+			t.Errorf("%s: IsHostKeyError = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
 func TestShortID(t *testing.T) {
 	tests := []struct{ in, want string }{
 		{"9ae942fd8fbc1a2b3c4d5e6f", "9ae942fd8fbc"},
