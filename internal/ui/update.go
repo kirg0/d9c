@@ -206,6 +206,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case connectResultMsg:
 		if msg.err != nil {
+			if docker.IsHostKeyError(msg.err) {
+				title, body := hostKeyNoticeText(msg.host)
+				return m, func() tea.Msg { return openNoticeMsg{title: title, body: body} }
+			}
 			m.err = fmt.Sprintf("connect to %s failed: %v", msg.host, msg.err)
 			return m, nil
 		}
@@ -374,6 +378,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.confirmPrompt = msg.prompt
 		m.confirmAction = msg.action
 		m.mode = ModeConfirm
+		return m, nil
+
+	case openNoticeMsg:
+		m.noticeTitle = msg.title
+		m.noticeBody = msg.body
+		m.err = ""
+		m.mode = ModeNotice
+		m.relayout()
 		return m, nil
 
 	case systemPruneMsg:
@@ -621,6 +633,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.confirmAction = nil
 				m.confirmPrompt = ""
 			}
+			if m.mode == ModeNotice {
+				m.noticeTitle = ""
+				m.noticeBody = ""
+			}
 			m.mode = ModeNormal
 			m.filter.Blur()
 			m.cmdline.Blur()
@@ -665,6 +681,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleExecForm(msg)
 	case ModeConfirm:
 		return m.handleConfirm(msg)
+	case ModeNotice:
+		return m.handleNotice(msg)
 	case ModeFSBrowser:
 		return m.handleFSBrowser(msg)
 	}
@@ -707,6 +725,38 @@ func (m Model) handleFSBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	updated, cmd := m.fsBrowser.Update(msg)
 	m.fsBrowser = updated
 	return m, cmd
+}
+
+// handleNotice closes the informational modal on any key (esc is handled
+// globally). The notice carries no action — it just informs.
+func (m Model) handleNotice(_ tea.KeyMsg) (tea.Model, tea.Cmd) {
+	m.noticeTitle = ""
+	m.noticeBody = ""
+	m.mode = ModeNormal
+	m.relayout()
+	return m, nil
+}
+
+// hostKeyNoticeText assembles the user-facing message shown when an SSH host
+// key check fails (the host was re-provisioned, etc.). The body is in Russian
+// to match the rest of the in-app dialogs, and the actual known_hosts path is
+// embedded so the user knows exactly which file to clean.
+func hostKeyNoticeText(host string) (title, body string) {
+	title = " Ключ хоста изменился "
+	path := docker.KnownHostsPath()
+	if path == "" {
+		path = "~/.ssh/known_hosts"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "Не удалось подключиться к %s:\n", host)
+	b.WriteString("SSH-ключ хоста не совпадает с сохранённым в known_hosts.\n\n")
+	b.WriteString("Скорее всего, удалённый хост был пересоздан и теперь предъявляет\n")
+	b.WriteString("новый ключ. Если вы доверяете этому хосту, удалите устаревшую\n")
+	b.WriteString("запись (или весь файл) и подключитесь заново:\n\n")
+	b.WriteString("    " + path + "\n\n")
+	b.WriteString("После очистки повторите :connect — d9c примет новый ключ\n")
+	b.WriteString("и сохранит его при следующем подключении.")
+	return title, b.String()
 }
 
 // handleConfirm drives the generic confirmation overlay: y/enter runs the

@@ -380,6 +380,68 @@ func TestEventsStopOnRefreshAndClose(t *testing.T) {
 	}
 }
 
+// A live :connect that fails because the host key changed must open the
+// dedicated notice modal (with a hint to clean known_hosts) instead of dumping
+// the raw error into the footer.
+func TestConnectHostKeyErrorOpensNotice(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	step := func(msg tea.Msg) tea.Cmd { var c tea.Cmd; tm, c = tm.Update(msg); return c }
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+
+	hostKeyErr := errors.New("SSH tunnel: ssh: handshake failed: knownhosts: key mismatch")
+	cmd := step(connectResultMsg{host: "ssh://user@host", err: hostKeyErr})
+	if cmd == nil {
+		t.Fatal("connectResultMsg with host-key error must produce an openNoticeMsg cmd")
+	}
+	notice, ok := cmd().(openNoticeMsg)
+	if !ok {
+		t.Fatalf("emitted msg = %T, want openNoticeMsg", cmd())
+	}
+	if !strings.Contains(notice.body, "known_hosts") {
+		t.Errorf("notice body missing 'known_hosts' hint:\n%s", notice.body)
+	}
+	if !strings.Contains(notice.body, "ssh://user@host") {
+		t.Errorf("notice body missing the failing host URL:\n%s", notice.body)
+	}
+
+	// Deliver the message and verify the model enters notice mode with no
+	// footer-error noise.
+	step(notice)
+	m := tm.(Model)
+	if m.mode != ModeNotice {
+		t.Errorf("mode = %v, want ModeNotice", m.mode)
+	}
+	if m.err != "" {
+		t.Errorf("footer err = %q, want empty (notice replaces it)", m.err)
+	}
+	if !strings.Contains(m.View(), "known_hosts") {
+		t.Errorf("view missing notice body")
+	}
+
+	// Esc closes the notice.
+	step(tea.KeyMsg{Type: tea.KeyEsc})
+	if m2 := tm.(Model); m2.mode != ModeNormal || m2.noticeBody != "" {
+		t.Errorf("after esc: mode=%v body=%q, want ModeNormal/empty", m2.mode, m2.noticeBody)
+	}
+}
+
+// A startup connect failure caused by a changed host key seeds the same notice
+// from Init, so the user sees the modal as soon as the app paints.
+func TestStartupHostKeyErrorOpensNotice(t *testing.T) {
+	hostKeyErr := errors.New("SSH tunnel: ssh: handshake failed: knownhosts: key mismatch")
+	m := NewModel(&config.Config{Host: "ssh://user@h"}, docker.NewDisconnected(hostKeyErr), nil, hostKeyErr, true)
+	if m.err != "" {
+		t.Errorf("startup footer err = %q, want empty (notice replaces it)", m.err)
+	}
+	if m.startupNotice == nil {
+		t.Fatal("expected startupNotice to be seeded")
+	}
+	if !strings.Contains(m.startupNotice.body, "known_hosts") {
+		t.Errorf("startupNotice body missing hint:\n%s", m.startupNotice.body)
+	}
+}
+
 // A live :connect must release streams owned by the old backend.
 func TestConnectStopsStreams(t *testing.T) {
 	fb := docker.NewFakeBackend()

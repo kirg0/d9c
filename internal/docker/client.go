@@ -250,6 +250,20 @@ func shortID(id string) string {
 	return id
 }
 
+// IsHostKeyError reports whether err is the SSH known_hosts verification
+// failure raised when the remote host key is missing from ~/.ssh/known_hosts or
+// (more commonly) when the host's key has changed since it was recorded — the
+// typical case after a host is re-provisioned. The UI uses it to show a
+// dedicated dialog instead of dumping the raw "knownhosts: key" string into
+// the footer.
+func IsHostKeyError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "knownhosts:") || strings.Contains(msg, "ssh: host key")
+}
+
 // IsConnectionError reports whether err looks like a lost/unreachable daemon
 // connection (TCP socket down or SSH tunnel broken), as opposed to a normal
 // operational error like "no such container". The auto-reconnect logic uses it

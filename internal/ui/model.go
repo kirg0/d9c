@@ -87,6 +87,7 @@ const (
 	ModeExecForm          // one-off interactive run wizard (`run --rm -it`)
 	ModeConfirm           // generic y/esc confirmation overlay
 	ModeFSBrowser         // container filesystem browser ('f' / :files)
+	ModeNotice            // informational modal (e.g. SSH known_hosts mismatch)
 )
 
 // copyItem is one selectable entry in the copy overlay.
@@ -300,6 +301,15 @@ type openConfirmMsg struct {
 	action tea.Cmd
 }
 
+// openNoticeMsg requests the informational modal: a small centered panel with
+// a title and a body, dismissed by any key. Used for explanatory dialogs that
+// don't take a yes/no decision — e.g. an SSH host-key mismatch suggesting the
+// user clean known_hosts.
+type openNoticeMsg struct {
+	title string
+	body  string
+}
+
 // systemPruneMsg carries the outcome of a full system prune.
 type systemPruneMsg struct {
 	summary string
@@ -464,6 +474,16 @@ type Model struct {
 	// Generic confirmation overlay (ModeConfirm) state.
 	confirmPrompt string
 	confirmAction tea.Cmd
+
+	// Informational notice overlay (ModeNotice) state.
+	noticeTitle string
+	noticeBody  string
+
+	// startupNotice, when non-nil, is dispatched from Init so a startup
+	// connection failure that warrants an explanatory dialog (currently:
+	// SSH known_hosts mismatch) opens the modal instead of just sitting
+	// in the footer.
+	startupNotice *openNoticeMsg
 }
 
 // NewModel builds the root model. The app starts in the hosts view when
@@ -484,7 +504,7 @@ func NewModel(cfg *config.Config, backend docker.Backend, store *hosts.Store, co
 		interval = defaultRefreshInterval
 	}
 	errStr := ""
-	if connectErr != nil {
+	if connectErr != nil && !docker.IsHostKeyError(connectErr) {
 		errStr = connectErr.Error()
 	}
 	cmd := cmdline.New()
@@ -536,11 +556,23 @@ func NewModel(cfg *config.Config, backend docker.Backend, store *hosts.Store, co
 	// Seed columns for the starting resource so a fast first data update can't
 	// render rows against an empty column set (panic in bubbles renderRow).
 	m.applyColumns(0)
+	if connectErr != nil && docker.IsHostKeyError(connectErr) {
+		title, body := hostKeyNoticeText(cfg.Host)
+		m.startupNotice = &openNoticeMsg{title: title, body: body}
+	}
 	return m
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.fetchCurrentResource(), tickCmd(m.refreshInterval), enableQuickEditCmd())
+	cmds := []tea.Cmd{m.fetchCurrentResource(), tickCmd(m.refreshInterval), enableQuickEditCmd()}
+	// If the initial connect failed because the SSH host key changed, surface it
+	// as the notice modal instead of a footer error line — same dialog the user
+	// would get from a live :connect.
+	if m.startupNotice != nil {
+		notice := *m.startupNotice
+		cmds = append(cmds, func() tea.Msg { return notice })
+	}
+	return tea.Batch(cmds...)
 }
 
 func tickCmd(d time.Duration) tea.Cmd {
