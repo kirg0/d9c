@@ -394,6 +394,7 @@ func (m *Model) dispatchComposeCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error)
 	if project == "" {
 		return nil, fmt.Errorf("no compose project selected")
 	}
+	label := m.composeNameFor(project) // short name for op titles
 	switch cmd.Name {
 	case "start":
 		return containerAction(func() error { return m.backend.ComposeStart(project) }), nil
@@ -408,11 +409,11 @@ func (m *Model) dispatchComposeCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error)
 	case "remove", "rm":
 		return containerAction(func() error { return m.backend.ComposeRemove(project) }), nil
 	case "up":
-		return streamOpCmd(func() (<-chan string, func(), error) { return m.backend.ComposeUp(project) }, "compose up: "+project), nil
+		return streamOpCmd(func() (<-chan string, func(), error) { return m.backend.ComposeUp(project) }, "compose up: "+label), nil
 	case "pull":
-		return streamOpCmd(func() (<-chan string, func(), error) { return m.backend.ComposePull(project) }, "compose pull: "+project), nil
+		return streamOpCmd(func() (<-chan string, func(), error) { return m.backend.ComposePull(project) }, "compose pull: "+label), nil
 	case "down":
-		return streamOpCmd(func() (<-chan string, func(), error) { return m.backend.ComposeDown(project) }, "compose down: "+project), nil
+		return streamOpCmd(func() (<-chan string, func(), error) { return m.backend.ComposeDown(project) }, "compose down: "+label), nil
 	case "config":
 		return composeConfigCmd(m.backend, project), nil
 	case "edit":
@@ -420,14 +421,14 @@ func (m *Model) dispatchComposeCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error)
 	case "backup":
 		return backupComposeCmd(m.backend, project), nil
 	case "backups":
-		// Open the catalog of existing backups for this project.
-		return listBackupsCmd(project), nil
+		// Open the catalog of existing backups for this deployment.
+		return listBackupsCmd(project, label), nil
 	case "restore":
 		// With no file, browse the catalog; with one, restore it directly.
 		if len(cmd.Args) == 0 {
-			return listBackupsCmd(project), nil
+			return listBackupsCmd(project, label), nil
 		}
-		return restoreComposeCmd(m.backend, project, cmd.Args[0]), nil
+		return restoreComposeCmd(m.backend, project, label, cmd.Args[0]), nil
 	default:
 		return nil, fmt.Errorf("unknown compose command: %s", cmd.Name)
 	}

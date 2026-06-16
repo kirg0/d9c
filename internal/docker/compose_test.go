@@ -5,6 +5,75 @@ import (
 	"testing"
 )
 
+// groupComposeProjects must split independent deployments that share a project
+// name but live in different working_dirs (the real-world bug), while still
+// collapsing a normal single-dir project's services into one entry.
+func TestGroupComposeProjects(t *testing.T) {
+	members := []composeMember{
+		// Two deployments sharing project "mcmc" but different working_dirs.
+		{project: "mcmc", workdir: "/d/core.licensing", config: "/d/core.licensing/docker-compose.yaml", state: "running"},
+		{project: "mcmc", workdir: "/d/platform_triggers", config: "/d/platform_triggers/docker-compose.yaml", state: "running"},
+		// A normal project: two services, one working_dir → one group.
+		{project: "shop", workdir: "/srv/shop", config: "/srv/shop/compose.yaml", state: "running"},
+		{project: "shop", workdir: "/srv/shop", config: "/srv/shop/compose.yaml", state: "exited"},
+		// No project label → ignored.
+		{project: "", workdir: "/x", state: "running"},
+	}
+
+	got := groupComposeProjects(members)
+	if len(got) != 3 {
+		t.Fatalf("got %d deployments, want 3: %+v", len(got), got)
+	}
+
+	byName := map[string]ComposeProject{}
+	for _, p := range got {
+		byName[p.Name] = p
+	}
+	cl, ok := byName["core.licensing"]
+	if !ok {
+		t.Fatalf("missing core.licensing deployment; got %+v", got)
+	}
+	if cl.Project != "mcmc" || cl.WorkingDir != "/d/core.licensing" || cl.Total != 1 {
+		t.Errorf("core.licensing = %+v, want project mcmc, its own dir, 1 container", cl)
+	}
+	if _, ok := byName["platform_triggers"]; !ok {
+		t.Errorf("the other mcmc deployment was merged away: %+v", got)
+	}
+	shop := byName["shop"]
+	if shop.Total != 2 || shop.Running != 1 || shop.Status != "partial" {
+		t.Errorf("shop = %+v, want 2 total / 1 running / partial", shop)
+	}
+}
+
+func TestComposeIdentityAndDisplayName(t *testing.T) {
+	if id := composeIdentity("mcmc", "/d/a"); id != "/d/a" {
+		t.Errorf("identity with workdir = %q, want /d/a", id)
+	}
+	if id := composeIdentity("solo", ""); id != "solo" {
+		t.Errorf("identity without workdir = %q, want project fallback solo", id)
+	}
+	if n := composeDisplayName("mcmc", "/d/core.licensing"); n != "core.licensing" {
+		t.Errorf("display name = %q, want basename core.licensing", n)
+	}
+	if n := composeDisplayName("solo", ""); n != "solo" {
+		t.Errorf("display name without workdir = %q, want project solo", n)
+	}
+}
+
+// composeFilter must scope by working_dir for a path identity and by project for
+// a bare name — otherwise deployments sharing a project name leak into each
+// other's lifecycle operations.
+func TestComposeFilter(t *testing.T) {
+	pathArgs := composeFilter("/d/core.licensing").Get("label")
+	if len(pathArgs) != 1 || pathArgs[0] != composeWorkdirLabel+"=/d/core.licensing" {
+		t.Errorf("path identity → %v, want working_dir label", pathArgs)
+	}
+	nameArgs := composeFilter("legacy").Get("label")
+	if len(nameArgs) != 1 || nameArgs[0] != composeProjectLabel+"=legacy" {
+		t.Errorf("name identity → %v, want project label", nameArgs)
+	}
+}
+
 func TestBackupFileName(t *testing.T) {
 	got := backupFileName("web app/x")
 	if !strings.HasPrefix(got, "web-app-x-") {

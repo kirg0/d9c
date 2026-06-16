@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -189,9 +190,12 @@ type composeBackupMsg struct {
 	err  error
 }
 
-// backupsListedMsg carries the catalog of existing backups for a project.
+// backupsListedMsg carries the catalog of existing backups for a deployment.
+// project is the identity (working_dir) used to restore; name is the display
+// name the archives are filed under.
 type backupsListedMsg struct {
 	project string
+	name    string
 	items   []backupEntry
 	err     error
 }
@@ -468,7 +472,8 @@ type Model struct {
 	// Backup catalog overlay state
 	backupItems         []backupEntry
 	backupCursor        int
-	backupProject       string
+	backupProject       string // identity (working_dir) of the catalog's deployment
+	backupName          string // its display name (archive prefix / restore title)
 	backupConfirmDelete string // name awaiting a second 'd' to confirm deletion
 
 	// Generic confirmation overlay (ModeConfirm) state.
@@ -816,12 +821,13 @@ func backupComposeCmd(b docker.Backend, project string) tea.Cmd {
 	}
 }
 
-// listBackupsCmd scans the working directory for the project's backup archives
-// and opens the catalog.
-func listBackupsCmd(project string) tea.Cmd {
+// listBackupsCmd scans the working directory for a deployment's backup archives
+// and opens the catalog. identity scopes the eventual restore; name (the
+// deployment's display name) is how the archives are named and matched.
+func listBackupsCmd(identity, name string) tea.Cmd {
 	return func() tea.Msg {
-		items, err := listBackups(".", project)
-		return backupsListedMsg{project: project, items: items, err: err}
+		items, err := listBackups(".", name)
+		return backupsListedMsg{project: identity, name: name, items: items, err: err}
 	}
 }
 
@@ -884,13 +890,13 @@ func humanSize(n int64) string {
 
 // restoreComposeCmd uploads a backup archive, extracts it into the project's
 // working directory and brings it back up, streaming progress to the console.
-func restoreComposeCmd(b docker.Backend, project, backupPath string) tea.Cmd {
+func restoreComposeCmd(b docker.Backend, project, label, backupPath string) tea.Cmd {
 	return func() tea.Msg {
 		ch, stop, err := b.RestoreComposeProject(project, backupPath)
 		if err != nil {
 			return errMsg{err}
 		}
-		return opStartedMsg{ch: ch, stop: stop, title: "compose restore: " + project}
+		return opStartedMsg{ch: ch, stop: stop, title: "compose restore: " + label}
 	}
 }
 
@@ -1230,19 +1236,40 @@ func clearCopyNotifCmd() tea.Cmd {
 }
 
 // selectedID returns the identity of the selected row: NAME (first column) for
-// hosts and volumes, and the trailing ID column for the other resources.
+// hosts and volumes, the working_dir column for compose deployments (PROJECT is
+// first but not unique), and the trailing ID column for the other resources.
 func (m Model) selectedID() string {
 	row := m.table.SelectedRow()
 	if len(row) == 0 {
 		return ""
 	}
 	switch m.resource {
-	case ViewHosts, ViewVolumes, ViewCompose:
+	case ViewHosts, ViewVolumes:
 		return row[0]
+	case ViewCompose:
+		if len(row) > table.ComposeIDColumn {
+			return row[table.ComposeIDColumn]
+		}
+		return ""
 	default:
 		return row[len(row)-1]
 	}
 }
+
+// composeNameFor returns the display name of the deployment identified by id
+// (its working_dir), falling back to the path's base — used to keep titles and
+// breadcrumbs short instead of showing the full working_dir.
+func (m Model) composeNameFor(id string) string {
+	for _, p := range m.composes {
+		if p.WorkingDir == id {
+			return p.Name
+		}
+	}
+	return path.Base(id)
+}
+
+// composeFilterLabel is the human label for the active compose drill-down.
+func (m Model) composeFilterLabel() string { return m.composeNameFor(m.composeFilter) }
 
 // buildCopyItems returns the copyable fields for the currently selected resource.
 func (m Model) buildCopyItems() []copyItem {
@@ -1327,8 +1354,9 @@ func (m Model) buildCopyItems() []copyItem {
 		}
 	case ViewCompose:
 		for _, p := range m.composes {
-			if p.Name == id {
+			if p.WorkingDir == id {
 				items = []copyItem{
+					{"Project", p.Project},
 					{"Name", p.Name},
 					{"Path", p.WorkingDir},
 					{"Status", p.Status},

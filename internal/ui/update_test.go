@@ -619,7 +619,7 @@ func TestBackupComposeCmd(t *testing.T) {
 	defer func() { _ = os.Chdir(old) }()
 
 	fb := docker.NewFakeBackend()
-	msg, ok := backupComposeCmd(fb, "webapp")().(composeBackupMsg)
+	msg, ok := backupComposeCmd(fb, "/srv/webapp")().(composeBackupMsg)
 	if !ok || msg.err != nil {
 		t.Fatalf("backup result = %#v, want success", msg)
 	}
@@ -640,7 +640,7 @@ func TestRestoreComposeCmd(t *testing.T) {
 		t.Fatal(err)
 	}
 	fb := docker.NewFakeBackend()
-	msg := restoreComposeCmd(fb, "webapp", backup)()
+	msg := restoreComposeCmd(fb, "/srv/webapp", "webapp", backup)()
 	op, ok := msg.(opStartedMsg)
 	if !ok {
 		t.Fatalf("restore msg = %#v, want opStartedMsg", msg)

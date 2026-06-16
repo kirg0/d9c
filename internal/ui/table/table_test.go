@@ -51,9 +51,11 @@ func TestIdentityColumnsNotTruncated(t *testing.T) {
 		t.Errorf("host NAME = %q, want full name", hostRows[0][0])
 	}
 
-	composeRows := buildComposeRows([]docker.ComposeProject{{Name: longName, Status: "running"}}, "")
-	if composeRows[0][0] != longName {
-		t.Errorf("compose NAME = %q, want full name", composeRows[0][0])
+	// For compose the identity is the working_dir (PATH column), not NAME.
+	longDir := "/srv/" + strings.Repeat("a", 64)
+	composeRows := buildComposeRows([]docker.ComposeProject{{Project: "p", Name: longName, WorkingDir: longDir, Status: "running"}}, "")
+	if composeRows[0][ComposeIDColumn] != longDir {
+		t.Errorf("compose identity = %q, want full working_dir", composeRows[0][ComposeIDColumn])
 	}
 }
 

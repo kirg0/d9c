@@ -142,7 +142,7 @@ func (m Model) viewHeader() string {
 		breadcrumb = styles.HeaderResource.Render(" "+resName+" ") +
 			styles.HeaderInfo.Render(fmt.Sprintf(" [%d/%d] ", shown, total))
 		if m.resource == ViewContainers && m.composeFilter != "" {
-			breadcrumb += sep + styles.HeaderResource.Render(" compose: "+m.composeFilter+" ")
+			breadcrumb += sep + styles.HeaderResource.Render(" compose: "+m.composeFilterLabel()+" ")
 		}
 		if m.filter.Value() != "" {
 			breadcrumb += styles.HeaderFilter.Render(" </" + m.filter.Value() + "> ")
