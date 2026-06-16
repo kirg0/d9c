@@ -408,13 +408,19 @@ func HostColumns(w int) []table.Column {
 	}
 }
 
+// ComposeIDColumn is the index of the column holding a deployment's identity
+// (its full working_dir). Model.selectedID() reads it for the compose view — the
+// PROJECT column is first but not unique, so it can't serve as the identity.
+const ComposeIDColumn = 2
+
 func ComposeColumns(w int) []table.Column {
 	f := func(pct float64) int { return int(float64(w) * pct) }
 	return []table.Column{
-		{Title: "NAME", Width: f(0.20)},
-		{Title: "PATH", Width: f(0.38)},
-		{Title: "STATUS", Width: f(0.17)},
-		{Title: "COMMAND", Width: f(0.23)},
+		{Title: "PROJECT", Width: f(0.16)},
+		{Title: "NAME", Width: f(0.18)},
+		{Title: "PATH", Width: f(0.30)},
+		{Title: "STATUS", Width: f(0.15)},
+		{Title: "COMMAND", Width: f(0.19)},
 	}
 }
 
@@ -434,7 +440,7 @@ func ContainerStatsColorizers() []Colorizer {
 
 // ComposeColorizers colors the STATUS column of the compose layout.
 func ComposeColorizers() []Colorizer {
-	return []Colorizer{nil, nil, composeStatusStyle, nil}
+	return []Colorizer{nil, nil, nil, composeStatusStyle, nil}
 }
 
 // HostColorizers colors the STATUS column of the hosts layout (col 2).
@@ -674,16 +680,17 @@ func buildComposeRows(projects []docker.ComposeProject, filterStr string) []tabl
 	rows := make([]table.Row, 0, len(projects))
 	matcher := filter.Compile(filterStr)
 	for _, p := range projects {
-		if !matcher.Match(filter.Target{Text: p.Name + p.WorkingDir + p.Status, Status: p.Status}) {
+		if !matcher.Match(filter.Target{Text: p.Project + p.Name + p.WorkingDir + p.Status, Status: p.Status}) {
 			continue
 		}
 		// STATUS is plain text, colored after layout (ComposeColorizers / View).
 		status := fmt.Sprintf("%s %d/%d", p.Status, p.Running, p.Total)
 		rows = append(rows, table.Row{
-			p.Name, // identity column (selectedID) — keep intact
-			truncate(p.WorkingDir, 44),
+			truncate(p.Project, 22),
+			truncate(p.Name, 26),
+			p.WorkingDir, // identity column (selectedID/ComposeIDColumn) — keep intact
 			status,
-			truncate(p.Command, 30),
+			truncate(p.Command, 28),
 		})
 	}
 	return rows

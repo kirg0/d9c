@@ -117,7 +117,7 @@ func TestBackupPickerRestore(t *testing.T) {
 	var lastCmd tea.Cmd
 	step := func(msg tea.Msg) { tm, lastCmd = tm.Update(msg) }
 	step(tea.WindowSizeMsg{Width: 120, Height: 30})
-	step(backupsListedMsg{project: "webapp", items: []backupEntry{{name: filepath.Base(p), path: p}}})
+	step(backupsListedMsg{project: "/srv/webapp", name: "webapp", items: []backupEntry{{name: filepath.Base(p), path: p}}})
 
 	step(tea.KeyMsg{Type: tea.KeyEnter})
 	if tm.(Model).mode != ModeNormal {
@@ -154,6 +154,27 @@ func TestBackupPickerDelete(t *testing.T) {
 	step(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
 	if _, err := os.Stat(p); !os.IsNotExist(err) {
 		t.Errorf("backup not deleted: stat err = %v", err)
+	}
+}
+
+// In the compose view the row identity must be the deployment's working_dir
+// (not the PROJECT column, which can repeat across deployments), so lifecycle
+// ops target exactly one deployment.
+func TestComposeSelectedIDIsWorkingDir(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	step := func(msg tea.Msg) { tm, _ = tm.Update(msg) }
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+	step(switchResourceMsg{resource: ViewCompose})
+	projects, _ := fb.ListComposeProjects()
+	step(composeUpdatedMsg{projects})
+
+	m := tm.(Model)
+	if got := m.selectedID(); got != "/srv/webapp" {
+		t.Errorf("selectedID = %q, want the working_dir /srv/webapp", got)
+	}
+	if got := m.composeNameFor("/srv/webapp"); got != "webapp" {
+		t.Errorf("composeNameFor = %q, want webapp", got)
 	}
 }
 

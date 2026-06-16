@@ -111,8 +111,9 @@ func (m Model) pluginVars() map[string]string {
 		}
 	case ViewCompose:
 		for _, p := range m.composes {
-			if p.Name == id {
+			if p.WorkingDir == id {
 				vars["NAME"], vars["PATH"], vars["STATUS"] = p.Name, p.WorkingDir, p.Status
+				vars["PROJECT"] = p.Project
 				break
 			}
 		}

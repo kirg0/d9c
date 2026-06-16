@@ -479,13 +479,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if len(msg.items) == 0 {
-			m.err = "no backups found for " + msg.project + " (use :backup first)"
+			m.err = "no backups found for " + msg.name + " (use :backup first)"
 			m.mode = ModeNormal
 			return m, nil
 		}
 		m.err = ""
 		m.backupItems = msg.items
 		m.backupProject = msg.project
+		m.backupName = msg.name
 		m.backupConfirmDelete = ""
 		if m.backupCursor >= len(msg.items) {
 			m.backupCursor = 0
@@ -1248,7 +1249,7 @@ func (m Model) handleBackupPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			project := m.backupProject
 			m.mode = ModeNormal
 			m.backupConfirmDelete = ""
-			return m, restoreComposeCmd(m.backend, project, item.path)
+			return m, restoreComposeCmd(m.backend, project, m.backupName, item.path)
 		}
 	case "d":
 		if m.backupCursor >= len(m.backupItems) {
@@ -1267,7 +1268,7 @@ func (m Model) handleBackupPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		// Reload the catalog; an empty result drops back to the list automatically.
-		return m, listBackupsCmd(m.backupProject)
+		return m, listBackupsCmd(m.backupProject, m.backupName)
 	}
 	return m, nil
 }

@@ -54,12 +54,13 @@ func NewFakeBackend() *FakeBackend {
 			{Name: "cache", Driver: "local", Mountpoint: "/var/lib/docker/volumes/cache/_data", Created: now.Add(-20 * time.Hour).Format(time.RFC3339)},
 		},
 		Composes: []ComposeProject{
-			{Name: "webapp", WorkingDir: "/srv/webapp", ConfigFiles: "/srv/webapp/docker-compose.yml", Status: "running", Command: "docker compose up -d", Running: 3, Total: 3},
-			{Name: "monitoring", WorkingDir: "/srv/monitoring", ConfigFiles: "/srv/monitoring/compose.yaml", Status: "partial", Command: "docker compose up -d", Running: 1, Total: 2},
-			{Name: "legacy", WorkingDir: "/opt/legacy", ConfigFiles: "/opt/legacy/docker-compose.yaml", Status: "stopped", Command: "docker compose up -d", Running: 0, Total: 2},
+			{Project: "webapp", Name: "webapp", WorkingDir: "/srv/webapp", ConfigFiles: "/srv/webapp/docker-compose.yml", Status: "running", Command: "docker compose up -d", Running: 3, Total: 3},
+			{Project: "monitoring", Name: "monitoring", WorkingDir: "/srv/monitoring", ConfigFiles: "/srv/monitoring/compose.yaml", Status: "partial", Command: "docker compose up -d", Running: 1, Total: 2},
+			{Project: "legacy", Name: "legacy", WorkingDir: "/opt/legacy", ConfigFiles: "/opt/legacy/docker-compose.yaml", Status: "stopped", Command: "docker compose up -d", Running: 0, Total: 2},
 		},
 		ComposeFiles: map[string]string{
-			"webapp": "services:\n  web:\n    image: nginx:1.25\n    ports:\n      - 8080:80\n",
+			// Keyed by deployment identity (working_dir), matching ReadComposeFile.
+			"/srv/webapp": "services:\n  web:\n    image: nginx:1.25\n    ports:\n      - 8080:80\n",
 		},
 		LogLines: []string{
 			"2026-06-01T10:00:00Z INFO  server started on :8080",
@@ -573,7 +574,7 @@ func (f *FakeBackend) ListComposeProjects() ([]ComposeProject, error) { return f
 // ListComposeContainers returns the demo containers as the project's containers.
 func (f *FakeBackend) ListComposeContainers(project string) ([]Container, error) {
 	for _, c := range f.Composes {
-		if c.Name == project {
+		if composeIdentity(c.Project, c.WorkingDir) == project {
 			return f.Containers, nil
 		}
 	}
@@ -582,7 +583,7 @@ func (f *FakeBackend) ListComposeContainers(project string) ([]Container, error)
 
 func (f *FakeBackend) InspectComposeProject(project string) (*InspectResult, error) {
 	for _, p := range f.Composes {
-		if p.Name == project {
+		if composeIdentity(p.Project, p.WorkingDir) == project {
 			var b strings.Builder
 			fmt.Fprintf(&b, "project: %s\nworking_dir: %s\nstatus: %s\nservices:\n", p.Name, p.WorkingDir, p.Status)
 			for _, c := range f.Containers {
@@ -596,7 +597,7 @@ func (f *FakeBackend) InspectComposeProject(project string) (*InspectResult, err
 
 func (f *FakeBackend) ComposeLogs(project string, opts LogOptions) (<-chan string, func(), error) {
 	for _, p := range f.Composes {
-		if p.Name == project {
+		if composeIdentity(p.Project, p.WorkingDir) == project {
 			ch := make(chan string, len(f.LogLines))
 			for _, l := range f.LogLines {
 				ch <- "web | " + l
@@ -610,7 +611,7 @@ func (f *FakeBackend) ComposeLogs(project string, opts LogOptions) (<-chan strin
 
 func (f *FakeBackend) setComposeState(project, status string, running int) error {
 	for i := range f.Composes {
-		if f.Composes[i].Name == project {
+		if composeIdentity(f.Composes[i].Project, f.Composes[i].WorkingDir) == project {
 			f.Composes[i].Status = status
 			f.Composes[i].Running = running
 			return nil
@@ -633,7 +634,7 @@ func (f *FakeBackend) ComposeUnpause(p string) error {
 
 func (f *FakeBackend) ComposeRemove(project string) error {
 	for i := range f.Composes {
-		if f.Composes[i].Name == project {
+		if composeIdentity(f.Composes[i].Project, f.Composes[i].WorkingDir) == project {
 			f.Composes = append(f.Composes[:i], f.Composes[i+1:]...)
 			return nil
 		}
@@ -668,7 +669,7 @@ func (f *FakeBackend) ComposeUp(project string) (<-chan string, func(), error) {
 
 func (f *FakeBackend) ComposePull(project string) (<-chan string, func(), error) {
 	for _, p := range f.Composes {
-		if p.Name == project {
+		if composeIdentity(p.Project, p.WorkingDir) == project {
 			ch, stop := fakeProgress([]string{
 				"[+] Pulling 1/1",
 				" ⠿ web Pulling",
@@ -696,7 +697,7 @@ func (f *FakeBackend) ComposeDown(project string) (<-chan string, func(), error)
 
 func (f *FakeBackend) ComposeConfig(project string) (string, error) {
 	for _, p := range f.Composes {
-		if p.Name == project {
+		if composeIdentity(p.Project, p.WorkingDir) == project {
 			return fmt.Sprintf("name: %s\nservices:\n  web:\n    image: nginx:1.25\n    ports:\n      - 8080:80\n", project), nil
 		}
 	}
@@ -705,7 +706,7 @@ func (f *FakeBackend) ComposeConfig(project string) (string, error) {
 
 func (f *FakeBackend) ReadComposeFile(project string) (string, string, error) {
 	for _, p := range f.Composes {
-		if p.Name == project {
+		if composeIdentity(p.Project, p.WorkingDir) == project {
 			content := f.ComposeFiles[project]
 			if content == "" {
 				content = "services: {}\n"
@@ -718,7 +719,7 @@ func (f *FakeBackend) ReadComposeFile(project string) (string, string, error) {
 
 func (f *FakeBackend) WriteComposeFile(project, content string) error {
 	for _, p := range f.Composes {
-		if p.Name == project {
+		if composeIdentity(p.Project, p.WorkingDir) == project {
 			if f.ComposeFiles == nil {
 				f.ComposeFiles = map[string]string{}
 			}
@@ -742,13 +743,13 @@ func (f *FakeBackend) CreateComposeFile(dir, content string) (<-chan string, fun
 		name = "project"
 	}
 	f.Composes = append(f.Composes, ComposeProject{
-		Name: name, WorkingDir: dir, ConfigFiles: dir + "/docker-compose.yaml",
+		Project: name, Name: name, WorkingDir: dir, ConfigFiles: dir + "/docker-compose.yaml",
 		Status: "running", Command: "docker compose up -d", Running: 1, Total: 1,
 	})
 	if f.ComposeFiles == nil {
 		f.ComposeFiles = map[string]string{}
 	}
-	f.ComposeFiles[name] = content
+	f.ComposeFiles[dir] = content
 	ch, stop := fakeProgress([]string{
 		"[+] Running 1/1",
 		" ⠿ Network " + name + "_default  Created",
@@ -759,10 +760,10 @@ func (f *FakeBackend) CreateComposeFile(dir, content string) (<-chan string, fun
 
 func (f *FakeBackend) BackupComposeProject(project string) (string, error) {
 	for _, p := range f.Composes {
-		if p.Name == project {
-			path := backupFileName(project)
+		if composeIdentity(p.Project, p.WorkingDir) == project {
+			path := backupFileName(composeDisplayName(p.Project, p.WorkingDir))
 			// Demo: write a small placeholder so the saved path actually exists.
-			if err := os.WriteFile(path, []byte("demo backup of "+project+"\n"), 0o644); err != nil {
+			if err := os.WriteFile(path, []byte("demo backup of "+p.Name+"\n"), 0o644); err != nil {
 				return "", err
 			}
 			return path, nil
@@ -789,7 +790,7 @@ func (f *FakeBackend) RestoreComposeProject(project, backupPath string) (<-chan 
 
 func (f *FakeBackend) composeTotal(project string) int {
 	for _, c := range f.Composes {
-		if c.Name == project {
+		if composeIdentity(c.Project, c.WorkingDir) == project {
 			return c.Total
 		}
 	}
