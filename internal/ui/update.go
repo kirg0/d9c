@@ -151,6 +151,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.composes = msg.projects
 		if m.resource == ViewCompose {
 			m.table.SetCompose(m.composes, m.filter.Value())
+			// Restore the selection after returning from a drill-down.
+			if m.composeReselect != "" {
+				m.table.SelectComposeRow(m.composeReselect)
+				m.composeReselect = ""
+			}
 		}
 		return m, nil
 
@@ -618,8 +623,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.refreshTableRows()
 			return m, nil
 		}
-		// Esc in a compose drill-down (normal mode) pops back to the project list.
+		// Esc in a compose drill-down (normal mode) pops back to the project list,
+		// restoring the cursor to the deployment it was opened from.
 		if m.mode == ModeNormal && m.composeFilter != "" {
+			m.composeReselect = m.composeFilter
 			return m, func() tea.Msg { return switchResourceMsg{ViewCompose} }
 		}
 		// Detail handles its own esc (search). Logs likewise, but only while a

@@ -1,6 +1,7 @@
 package table
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -559,5 +560,36 @@ func TestContainerStatusStyle(t *testing.T) {
 func TestSummary(t *testing.T) {
 	if got := Summary(5, 5); got != " 5 container(s) " {
 		t.Errorf("Summary(5,5) = %q", got)
+	}
+}
+
+// TestShrinkRowsKeepsCursorInView reproduces the compose drill-down bug: after
+// scrolling far down a long list and then loading a much shorter one (e.g.
+// drilling from a 130-row compose list into a single container), bubbles'
+// SetRows leaves the cursor out of range, so UpdateViewport renders an empty
+// window and the list looks blank until an arrow key clamps the cursor back.
+// Setting the rows must keep the cursor within range so the rows render.
+func TestShrinkRowsKeepsCursorInView(t *testing.T) {
+	const w = 120
+	m := New()
+	m.SetSize(w, 12)
+	m.SetColumns(ContainerColumns(w))
+	m.SetColorizers(ContainerColorizers())
+
+	many := make([]docker.Container, 130)
+	for i := range many {
+		many[i] = docker.Container{ID: "id" + strconv.Itoa(i), Name: "c" + strconv.Itoa(i), State: "running"}
+	}
+	m.SetContainers(many, "", nil, false, nil, nil)
+	m.InnerTable().SetCursor(129) // scroll to the bottom of the long list
+
+	// Drill-down loads a single container.
+	m.SetContainers([]docker.Container{{ID: "solo", Name: "only-one", State: "running"}}, "", nil, false, nil, nil)
+
+	if c := m.InnerTable().Cursor(); c >= 1 {
+		t.Errorf("cursor = %d after shrinking to 1 row, want in [0,0]", c)
+	}
+	if plain := stripANSI(m.View()); !strings.Contains(plain, "only-one") {
+		t.Errorf("rendered view is blank after shrink, want the single row:\n%s", plain)
 	}
 }

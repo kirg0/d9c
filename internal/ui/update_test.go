@@ -243,6 +243,49 @@ func TestMergeStats(t *testing.T) {
 	}
 }
 
+// Leaving a compose drill-down (Esc) must return the cursor to the deployment
+// it was opened from, not jump to the top of the list.
+func TestComposeDrillDownRestoresSelection(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	step := func(msg tea.Msg) tea.Cmd { var c tea.Cmd; tm, c = tm.Update(msg); return c }
+	// exec drives a command and every message it (transitively) produces.
+	exec := func(c tea.Cmd) {
+		for c != nil {
+			c = step(c())
+		}
+	}
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+
+	// Open the compose list and select the last deployment (legacy, /opt/legacy)
+	// so a reset-to-top would be visible.
+	exec(step(switchResourceMsg{ViewCompose}))
+	m := tm.(Model)
+	m.table.InnerTable().SetCursor(len(m.composes) - 1)
+	tm = m
+	if got := tm.(Model).selectedID(); got != "/opt/legacy" {
+		t.Fatalf("precondition: selectedID = %q, want /opt/legacy", got)
+	}
+
+	// Drill in (Enter), then leave (Esc).
+	exec(step(tea.KeyMsg{Type: tea.KeyEnter}))
+	if m := tm.(Model); m.resource != ViewContainers || m.composeFilter != "/opt/legacy" {
+		t.Fatalf("after Enter: resource=%v composeFilter=%q, want Containers /opt/legacy", m.resource, m.composeFilter)
+	}
+	exec(step(tea.KeyMsg{Type: tea.KeyEsc}))
+
+	m = tm.(Model)
+	if m.resource != ViewCompose {
+		t.Fatalf("after Esc: resource = %v, want Compose", m.resource)
+	}
+	if got := m.selectedID(); got != "/opt/legacy" {
+		t.Errorf("selection after returning = %q, want /opt/legacy (stayed on the same row)", got)
+	}
+	if m.composeReselect != "" {
+		t.Errorf("composeReselect = %q, want cleared after applying", m.composeReselect)
+	}
+}
+
 // While a stats batch is in flight, refresh ticks must not launch another one;
 // the next batch starts only after the current one reports back.
 func TestStatsInFlightGuard(t *testing.T) {
