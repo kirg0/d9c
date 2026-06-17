@@ -54,7 +54,7 @@ func (m Model) buildHelpContent() string {
 		section(m.resource.String()+" — клавиши", rows)
 	}
 
-	if cmds := cmdline.CommandsFor(m.pluginScope()); len(cmds) > 0 {
+	if cmds := cmdline.CommandsFor(m.pluginScope(), m.composeHostOps); len(cmds) > 0 {
 		rows := make([]helpRow, 0, len(cmds))
 		for _, c := range cmds {
 			rows = append(rows, helpRow{":" + c.Name, c.Hint})
@@ -117,12 +117,16 @@ func (m Model) resourceKeyRows() []helpRow {
 			{k.Display(keymap.Select), "Отметить для массовой операции"},
 		}
 	case ViewCompose:
-		return []helpRow{
+		rows := []helpRow{
 			{"enter", "Открыть контейнеры проекта"},
 			{k.Display(keymap.Inspect), "Подробности (inspect)"},
 			{k.Display(keymap.Logs), "Логи проекта"},
-			{k.Display(keymap.Edit), "Редактировать compose-файл"},
 		}
+		// Editing the compose file needs host filesystem access (SSH only).
+		if m.composeHostOps {
+			rows = append(rows, helpRow{k.Display(keymap.Edit), "Редактировать compose-файл"})
+		}
+		return rows
 	case ViewHosts:
 		return []helpRow{
 			{"enter", "Подключиться к хосту"},

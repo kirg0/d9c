@@ -50,6 +50,29 @@ func TestBuildHelpContentCompose(t *testing.T) {
 	}
 }
 
+// Over a tcp:// connection the SSH-only compose commands (and the edit key row)
+// must be absent from the help screen, while the API-driven ops remain.
+func TestBuildHelpContentComposeOverTCP(t *testing.T) {
+	m := NewModel(&config.Config{}, &docker.FakeBackend{NoHostCompose: true}, nil, nil, false)
+	m.resource = ViewCompose
+	got := m.buildHelpContent()
+
+	if !strings.Contains(got, ":backups") {
+		t.Error("tcp compose help should still list the local :backups catalog")
+	}
+	if !strings.Contains(got, ":start") {
+		t.Error("tcp compose help should still list API lifecycle ops like :start")
+	}
+	for _, hidden := range []string{":up", ":down", ":pull", ":config", ":edit", ":backup ", ":restore", ":create"} {
+		if strings.Contains(got, hidden) {
+			t.Errorf("tcp compose help must NOT list SSH-only command %q:\n%s", hidden, got)
+		}
+	}
+	if strings.Contains(got, "Редактировать compose-файл") {
+		t.Error("tcp compose help must not show the edit key row")
+	}
+}
+
 // TestBuildHelpContentNoGluedWideGlyph guards against the (⚠) overlap class:
 // emoji-presentation glyphs (⚠ ⏸ ✖ ✔ ▶) are drawn 2 cells wide by many
 // terminals while runewidth counts them as 1, so a glyph glued to the next

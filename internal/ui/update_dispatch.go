@@ -381,6 +381,13 @@ func (m *Model) dispatchHostCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 // over the Docker API on the project's containers; compose-engine operations
 // (up/down/pull/edit/config) need SSH and arrive in a later iteration.
 func (m *Model) dispatchComposeCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
+	// Compose ops that exec `docker compose` or touch the project's files on the
+	// host need SSH; reject them up front on a tcp:// connection (rather than
+	// opening a modal that would fail on submit). They're also hidden from
+	// autocomplete/help, so this only fires when typed manually.
+	if !m.composeHostOps && cmdline.IsComposeHostOp(cmd.Name) {
+		return nil, fmt.Errorf("%s requires an SSH connection (use -H ssh://...)", cmd.Name)
+	}
 	// create authors a brand-new project; it needs a directory, not a selection.
 	if cmd.Name == "create" {
 		if len(cmd.Args) == 0 {

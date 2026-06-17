@@ -230,6 +230,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.backend.Close()
 		}
 		m.backend = msg.backend
+		m.applyComposeCapability()
 		m.cfg.Host = msg.host
 		// Forget the old host's samples and let the new host fetch immediately.
 		m.stats = nil
@@ -530,6 +531,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		old := m.backend
 		m.backend = msg.backend
+		m.applyComposeCapability()
 		m.reconnecting = false
 		m.reconnectAttempt = 0
 		// Invalidate pings still in flight against the dropped connection.
@@ -913,6 +915,11 @@ func (m Model) handleAction(action keymap.Action) (tea.Model, tea.Cmd) {
 		}
 	case keymap.Edit:
 		if m.resource == ViewCompose {
+			if !m.composeHostOps {
+				// Editing the compose file needs host filesystem access (SSH only).
+				m.err = "edit requires an SSH connection (use -H ssh://...)"
+				return m, nil
+			}
 			project := m.selectedID()
 			if project != "" {
 				return m, composeEditCmd(m.backend, project)
@@ -1251,6 +1258,14 @@ func (m Model) handleBackupPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.backupConfirmDelete = ""
 	case "enter":
+		// Restore reuploads the archive and runs `docker compose up` on the host —
+		// SSH only. Over tcp:// the catalog stays browsable (view/delete are local),
+		// but restore is unavailable, so Enter is a no-op with a friendly hint.
+		if !m.composeHostOps {
+			m.backupConfirmDelete = ""
+			m.err = "restore requires an SSH connection (use -H ssh://...)"
+			return m, nil
+		}
 		if m.backupCursor < len(m.backupItems) {
 			item := m.backupItems[m.backupCursor]
 			project := m.backupProject

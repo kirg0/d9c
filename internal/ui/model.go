@@ -344,6 +344,12 @@ type Model struct {
 	cfg     *config.Config
 	backend docker.Backend
 
+	// composeHostOps mirrors backend.SupportsHostCompose(): false on a tcp://
+	// connection, where the SSH-only compose commands (up/down/pull/config/edit/
+	// create/backup/restore) are unavailable and hidden from the UI. Refreshed
+	// whenever the backend is swapped (connect / auto-reconnect).
+	composeHostOps bool
+
 	mode     Mode
 	resource ResourceView
 
@@ -517,33 +523,36 @@ func NewModel(cfg *config.Config, backend docker.Backend, store *hosts.Store, co
 	if connectErr != nil && !docker.IsHostKeyError(connectErr) && !docker.IsHostNotFoundError(connectErr) {
 		errStr = connectErr.Error()
 	}
+	hostOps := backend.SupportsHostCompose()
 	cmd := cmdline.New()
 	cmd.SetResource(strings.ToLower(resource.String()))
+	cmd.SetHostCompose(hostOps)
 	m := Model{
-		cfg:         cfg,
-		backend:     backend,
-		hostStore:   store,
-		resource:    resource,
-		err:         errStr,
-		showAll:     cfg.ShowAll,
-		table:       table.New(),
-		detail:      detail.New(),
-		filter:      filter.New(),
-		cmdline:     cmd,
-		logs:        logs.New(),
-		hostForm:    hostform.New(),
-		composeEdit: composeedit.New(),
-		help:        help.New(),
-		shell:       shell.New(),
-		eventsModel: events.New(),
-		pushForm:    pushform.New(),
-		netForm:     netform.New(),
-		volForm:     volform.New(),
-		runForm:     runform.New(),
-		execForm:    execform.New(),
-		fsBrowser:   fsbrowser.New(),
-		pushAuth:    map[string]docker.RegistryAuth{},
-		keys:        keymap.Default(),
+		cfg:            cfg,
+		backend:        backend,
+		composeHostOps: hostOps,
+		hostStore:      store,
+		resource:       resource,
+		err:            errStr,
+		showAll:        cfg.ShowAll,
+		table:          table.New(),
+		detail:         detail.New(),
+		filter:         filter.New(),
+		cmdline:        cmd,
+		logs:           logs.New(),
+		hostForm:       hostform.New(),
+		composeEdit:    composeedit.New(),
+		help:           help.New(),
+		shell:          shell.New(),
+		eventsModel:    events.New(),
+		pushForm:       pushform.New(),
+		netForm:        netform.New(),
+		volForm:        volform.New(),
+		runForm:        runform.New(),
+		execForm:       execform.New(),
+		fsBrowser:      fsbrowser.New(),
+		pushAuth:       map[string]docker.RegistryAuth{},
+		keys:           keymap.Default(),
 		// The first periodic ping lands within one refresh tick and corrects
 		// this initial guess either way.
 		serverUp:        connectErr == nil && !startInHosts,
@@ -574,6 +583,15 @@ func NewModel(cfg *config.Config, backend docker.Backend, store *hosts.Store, co
 		m.startupNotice = &openNoticeMsg{title: title, body: body}
 	}
 	return m
+}
+
+// applyComposeCapability refreshes the host-compose capability from the current
+// backend and propagates it to the command line, so the SSH-only compose
+// commands appear or disappear after a backend swap (live :connect or
+// auto-reconnect, which may move between a tcp:// and an ssh:// host).
+func (m *Model) applyComposeCapability() {
+	m.composeHostOps = m.backend.SupportsHostCompose()
+	m.cmdline.SetHostCompose(m.composeHostOps)
 }
 
 func (m Model) Init() tea.Cmd {

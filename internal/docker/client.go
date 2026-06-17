@@ -93,6 +93,12 @@ type Backend interface {
 	CreateComposeFile(dir, content string) (lines <-chan string, stop func(), err error)
 	BackupComposeProject(project string) (string, error)
 	RestoreComposeProject(project, backupPath string) (lines <-chan string, stop func(), err error)
+	// SupportsHostCompose reports whether the backend can run the compose
+	// operations that need shell/filesystem access to the host —
+	// up/down/pull/config/edit/create/backup/restore. These require an SSH
+	// connection; a tcp:// connection returns false. Discovery and the
+	// container-level lifecycle ops (start/stop/restart/…) work regardless.
+	SupportsHostCompose() bool
 	// System-wide operations
 	// SystemDF reports the daemon's disk usage (`docker system df`).
 	SystemDF() (*InspectResult, error)

@@ -80,6 +80,19 @@ var composeCmds = []cmdDef{
 	{"remove", ""},
 }
 
+// composeHostOnly are the compose commands that need shell/filesystem access to
+// the host (running `docker compose` or reading/writing the project's files).
+// They only work over SSH — see docker.Backend.SupportsHostCompose — so they are
+// filtered out of the command set on a tcp:// connection.
+var composeHostOnly = map[string]bool{
+	"create": true, "up": true, "down": true, "pull": true,
+	"config": true, "edit": true, "backup": true, "restore": true,
+}
+
+// IsComposeHostOp reports whether name is a compose command that requires a host
+// shell (SSH). The dispatcher uses it to reject such commands early on tcp://.
+func IsComposeHostOp(name string) bool { return composeHostOnly[name] }
+
 // View-switching commands are always available, plus the global events feed
 // and system-wide operations.
 var viewCmds = []cmdDef{
@@ -107,12 +120,16 @@ type Model struct {
 	lastErr    string
 	resource   string // "containers" | "images" | "networks" | "volumes"
 	pluginCmds []cmdDef
+	// hostCompose mirrors docker.Backend.SupportsHostCompose: when false (a
+	// tcp:// connection) the SSH-only compose commands are hidden from
+	// autocomplete and the placeholder.
+	hostCompose bool
 }
 
 func New() Model {
 	ti := textinput.New()
 	ti.CharLimit = 256
-	m := Model{input: ti, resource: "containers"}
+	m := Model{input: ti, resource: "containers", hostCompose: true}
 	m.updatePlaceholder()
 	return m
 }
@@ -121,6 +138,14 @@ func New() Model {
 // right command set.
 func (m *Model) SetResource(r string) {
 	m.resource = r
+	m.updatePlaceholder()
+}
+
+// SetHostCompose records whether the active backend supports host-side compose
+// operations (SSH). On a tcp:// connection (false) the SSH-only compose commands
+// are dropped from autocomplete and the placeholder.
+func (m *Model) SetHostCompose(v bool) {
+	m.hostCompose = v
 	m.updatePlaceholder()
 }
 
@@ -155,7 +180,12 @@ func (m *Model) updatePlaceholder() {
 	case "hosts":
 		m.input.Placeholder = "connect  add <name> <url>  edit <name> <url>  rm…"
 	case "compose":
-		m.input.Placeholder = "create <dir>  up  down  pull  config  edit  backup  start  stop  restart  pause  unpause  remove…"
+		if m.hostCompose {
+			m.input.Placeholder = "create <dir>  up  down  pull  config  edit  backup  start  stop  restart  pause  unpause  remove…"
+		} else {
+			// tcp://: only the API-driven lifecycle ops and the local backup catalog.
+			m.input.Placeholder = "backups  start  stop  restart  pause  unpause  remove…"
+		}
 	default:
 		m.input.Placeholder = "run  start  stop  restart  logs  rm  kill  exec  events…"
 	}
@@ -212,8 +242,10 @@ type ghostResult struct {
 	hint       string
 }
 
-// resourceCmds returns the built-in command set specific to a resource view.
-func resourceCmds(resource string) []cmdDef {
+// resourceCmds returns the built-in command set specific to a resource view. For
+// compose on a tcp:// connection (hostCompose=false) the SSH-only commands are
+// filtered out so they never surface in autocomplete or help.
+func resourceCmds(resource string, hostCompose bool) []cmdDef {
 	switch resource {
 	case "images":
 		return imageCmds
@@ -224,7 +256,16 @@ func resourceCmds(resource string) []cmdDef {
 	case "hosts":
 		return hostCmds
 	case "compose":
-		return composeCmds
+		if hostCompose {
+			return composeCmds
+		}
+		out := make([]cmdDef, 0, len(composeCmds))
+		for _, c := range composeCmds {
+			if !composeHostOnly[c.name] {
+				out = append(out, c)
+			}
+		}
+		return out
 	default:
 		return containerCmds
 	}
@@ -233,7 +274,7 @@ func resourceCmds(resource string) []cmdDef {
 // builtinCommands returns the built-in command set for the current resource plus
 // the always-available view-switch commands.
 func (m Model) builtinCommands() []cmdDef {
-	specific := resourceCmds(m.resource)
+	specific := resourceCmds(m.resource, m.hostCompose)
 	out := make([]cmdDef, 0, len(specific)+len(viewCmds))
 	out = append(out, specific...)
 	out = append(out, viewCmds...)
@@ -247,9 +288,10 @@ type CmdHelp struct {
 }
 
 // CommandsFor returns the built-in commands specific to the given resource view
-// (excluding the global view-switch commands), for documentation/help.
-func CommandsFor(resource string) []CmdHelp {
-	specific := resourceCmds(resource)
+// (excluding the global view-switch commands), for documentation/help. For
+// compose, hostCompose=false hides the SSH-only commands (tcp:// connection).
+func CommandsFor(resource string, hostCompose bool) []CmdHelp {
+	specific := resourceCmds(resource, hostCompose)
 	out := make([]CmdHelp, 0, len(specific))
 	for _, c := range specific {
 		out = append(out, CmdHelp{Name: c.name, Hint: c.hint})

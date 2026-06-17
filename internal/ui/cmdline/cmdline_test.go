@@ -63,6 +63,72 @@ func TestParse_ExtraSpaces(t *testing.T) {
 	}
 }
 
+// On a tcp:// connection (hostCompose=false) the SSH-only compose commands must
+// disappear from the command set, while the API-driven lifecycle ops and the
+// local backup catalog stay.
+func TestComposeCommandsHiddenOverTCP(t *testing.T) {
+	hidden := []string{"create", "up", "down", "pull", "config", "edit", "backup", "restore"}
+	kept := []string{"start", "stop", "restart", "pause", "unpause", "remove", "backups"}
+
+	ssh := CommandsFor("compose", true)
+	for _, name := range append(append([]string{}, hidden...), kept...) {
+		if !containsCmd(ssh, name) {
+			t.Errorf("ssh compose help should list %q", name)
+		}
+	}
+
+	tcp := CommandsFor("compose", false)
+	for _, name := range hidden {
+		if containsCmd(tcp, name) {
+			t.Errorf("tcp compose help must NOT list SSH-only command %q", name)
+		}
+	}
+	for _, name := range kept {
+		if !containsCmd(tcp, name) {
+			t.Errorf("tcp compose help should still list API command %q", name)
+		}
+	}
+}
+
+// SetHostCompose must drive autocomplete: a hidden command yields no completion
+// over tcp:// but completes over ssh://.
+func TestSetHostComposeFiltersAutocomplete(t *testing.T) {
+	m := New()
+	m.SetResource("compose")
+	m.SetHostCompose(false)
+	m.input.SetValue("up")
+	if g := m.ghost(); g.completion != "" || g.hint != "" {
+		t.Errorf("tcp:// should not autocomplete hidden command 'up', got %+v", g)
+	}
+	m.SetHostCompose(true)
+	m.input.SetValue("dow")
+	if g := m.ghost(); g.completion != "n" {
+		t.Errorf("ssh:// should complete 'dow' -> 'down', got %+v", g)
+	}
+}
+
+func TestIsComposeHostOp(t *testing.T) {
+	for _, name := range []string{"up", "down", "pull", "config", "edit", "create", "backup", "restore"} {
+		if !IsComposeHostOp(name) {
+			t.Errorf("%q should be a host-only compose op", name)
+		}
+	}
+	for _, name := range []string{"start", "stop", "restart", "backups", "remove"} {
+		if IsComposeHostOp(name) {
+			t.Errorf("%q should NOT be a host-only compose op", name)
+		}
+	}
+}
+
+func containsCmd(cmds []CmdHelp, name string) bool {
+	for _, c := range cmds {
+		if c.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 // events is a global command and must be recognised as a builtin in every
 // resource view (so a same-named plugin can't shadow it and autocomplete
 // suggests it).
