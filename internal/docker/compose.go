@@ -450,6 +450,11 @@ func (b *dockerBackend) ComposeRemove(project string) error {
 	})
 }
 
+// SupportsHostCompose reports whether host-side compose operations are
+// available: true for ssh:// connections (where we can exec `docker compose`
+// and read/write the project's files on the host), false for tcp://.
+func (b *dockerBackend) SupportsHostCompose() bool { return b.sshClient != nil }
+
 // ── compose-engine ops over SSH (up / pull / down / config) ─────────────────
 
 // ComposeUp/Pull/Down run the corresponding `docker compose` action on the host

@@ -124,4 +124,5 @@ func (b *disconnectedBackend) ComposePause(string) error              { return b
 func (b *disconnectedBackend) ComposeUnpause(string) error            { return b.err() }
 func (b *disconnectedBackend) ComposeRemove(string) error             { return b.err() }
 func (b *disconnectedBackend) Events() (<-chan string, func(), error) { return nil, nil, b.err() }
+func (b *disconnectedBackend) SupportsHostCompose() bool              { return false }
 func (b *disconnectedBackend) Close()                                 {}

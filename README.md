@@ -10,7 +10,7 @@ Docker **по TCP или SSH**. Один бинарник, без агентов
 
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)
-![version](https://img.shields.io/badge/version-1.0.12-informational)
+![version](https://img.shields.io/badge/version-1.1.0-informational)
 ![platform](https://img.shields.io/badge/platform-linux%20%7C%20macOS%20%7C%20windows-lightgrey)
 
 <p align="center">
@@ -51,7 +51,8 @@ Docker **по TCP или SSH**. Один бинарник, без агентов
   (множественный выбор `Space`), `run`-мастер, создание сетей/томов, `build`/`tag`/`push`
   (в т. ч. в приватный реестр), `docker system df` и `prune` с подтверждением.
 - **Compose** — discovery по меткам, `up`/`pull`/`down` со стримингом, `config`, `edit`,
-  `create`, бэкап/восстановление, логи проекта, drill-down в контейнеры.
+  `create`, бэкап/восстановление, логи проекта, drill-down в контейнеры (операции с файлами
+  проекта и запуском `docker compose` — только по SSH; см. [Подключение к Docker](#подключение-к-docker)).
 - **Логи и метрики** — `--tail/--since/--until`, поиск, сохранение в файл; живые CPU/MEM/Net/Disk
   через Stats API.
 - **Встроенный терминал** — интерактивный `exec` в контейнер (vt10x-эмулятор), один путь для
@@ -83,10 +84,10 @@ go build -o d9c .
 Версию можно зашить в бинарник при сборке:
 
 ```sh
-go build -ldflags "-X d9c/internal/version.Version=1.0.12" -o d9c .
+go build -ldflags "-X d9c/internal/version.Version=1.1.0" -o d9c .
 ```
 
-Приложение следует [SemVer](https://semver.org); текущая версия показана в шапке (`d9c v1.0.12`)
+Приложение следует [SemVer](https://semver.org); текущая версия показана в шапке (`d9c v1.1.0`)
 и печатается флагом `-version`.
 
 ---
@@ -111,6 +112,17 @@ go run . -version              # вывести версию и выйти
 | --- | --- | --- |
 | TCP | `-H tcp://host:2375` | демон должен слушать TCP (`-H tcp://0.0.0.0:2375` на стороне сервера) |
 | SSH | `-H ssh://user@host` | туннель по SSH к локальному сокету демона; ключи из агента/`~/.ssh` |
+
+> **TCP против SSH — что доступно.** Почти всё (контейнеры, образы, сети, тома, exec,
+> обзор ФС контейнера, события, дашборд) работает по обоим транспортам через Docker Engine API.
+> Но операции Compose, которым нужен доступ к **файловой системе хоста** или запуск самого
+> `docker compose` как процесса, идут мимо API — только через SSH. Поэтому **при подключении по
+> TCP следующие команды Compose недоступны** (они не показываются ни в подсказках, ни в `?`):
+> `create`, `up`, `down`, `pull`, `config`, `edit`, `backup`, `restore` (и клавиша `e` — правка
+> файла). По TCP остаются discovery проектов, просмотр/инспекция/логи, локальный каталог
+> `backups` (только просмотр и удаление архивов — восстановление требует SSH) и управление
+> контейнерами проекта: `start` / `stop` / `restart` / `pause` / `unpause` / `remove`. Нужен
+> полный набор Compose — подключайтесь через `-H ssh://...`.
 
 Раздел **Hosts** — это и список сохранённых хостов, и мульти-хост дашборд: на каждый хост строка
 со статусом (● up/down) и агрегатом из `docker info` (контейнеры/запущено/образы/версия демона).

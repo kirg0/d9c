@@ -25,6 +25,12 @@ type FakeBackend struct {
 	// ComposeFiles maps project name -> compose file content (for edit demo).
 	ComposeFiles map[string]string
 
+	// NoHostCompose simulates a tcp:// connection, where host-side compose
+	// operations (up/down/pull/config/edit/create/backup/restore) are
+	// unavailable. The default (false) mirrors an ssh:// connection so the demo
+	// exercises every feature.
+	NoHostCompose bool
+
 	// LogLines is the canned log stream returned by ContainerLogs.
 	LogLines []string
 }
@@ -654,6 +660,10 @@ func fakeProgress(lines []string) (<-chan string, func()) {
 	close(ch)
 	return ch, func() {}
 }
+
+// SupportsHostCompose mirrors the real backend: true unless NoHostCompose is set
+// to simulate a tcp:// connection.
+func (f *FakeBackend) SupportsHostCompose() bool { return !f.NoHostCompose }
 
 func (f *FakeBackend) ComposeUp(project string) (<-chan string, func(), error) {
 	if err := f.setComposeState(project, "running", f.composeTotal(project)); err != nil {

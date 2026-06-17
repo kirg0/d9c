@@ -131,6 +131,37 @@ func TestBackupPickerRestore(t *testing.T) {
 	}
 }
 
+// Over a tcp:// connection the catalog stays browsable, but Enter (restore) is a
+// no-op with a friendly hint — restore needs SSH. Delete (local) still works.
+func TestBackupPickerRestoreHiddenOverTCP(t *testing.T) {
+	dir := t.TempDir()
+	p := writeBackup(t, dir, "webapp-20260101-120000.tar.gz", time.Now())
+
+	fb := &docker.FakeBackend{NoHostCompose: true}
+	var tm tea.Model = NewModel(&config.Config{Host: "tcp://h:2375"}, fb, nil, nil, false)
+	var lastCmd tea.Cmd
+	step := func(msg tea.Msg) { tm, lastCmd = tm.Update(msg) }
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+	step(backupsListedMsg{project: "/srv/webapp", name: "webapp", items: []backupEntry{{name: filepath.Base(p), path: p}}})
+
+	step(tea.KeyMsg{Type: tea.KeyEnter})
+	if tm.(Model).mode != ModeBackupPicker {
+		t.Errorf("over tcp:// Enter must keep the picker open, mode = %v", tm.(Model).mode)
+	}
+	if lastCmd != nil {
+		t.Errorf("over tcp:// Enter must not start a restore, got cmd %#v", lastCmd())
+	}
+	if tm.(Model).err == "" {
+		t.Error("over tcp:// Enter should set a friendly 'requires SSH' hint")
+	}
+	// Local delete still works over tcp://.
+	step(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	step(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	if _, err := os.Stat(p); !os.IsNotExist(err) {
+		t.Errorf("delete should work over tcp://: stat err = %v", err)
+	}
+}
+
 // TestBackupPickerDelete confirms the two-step delete removes the archive.
 func TestBackupPickerDelete(t *testing.T) {
 	dir := t.TempDir()

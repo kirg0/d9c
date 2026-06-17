@@ -21,6 +21,25 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// On a tcp:// connection, manually typing an SSH-only compose command must be
+// rejected up front with a friendly error — never opening a modal or hitting the
+// backend. The API-driven lifecycle ops still dispatch (a stream/action cmd).
+func TestDispatchComposeHostOpRejectedOverTCP(t *testing.T) {
+	m := NewModel(&config.Config{Host: "tcp://h:2375"}, &docker.FakeBackend{NoHostCompose: true}, nil, nil, false)
+	m.resource = ViewCompose
+
+	for _, name := range []string{"up", "down", "pull", "config", "edit", "backup", "restore", "create"} {
+		_, err := m.dispatchCommand(&cmdline.CommandMsg{Name: name, Args: []string{"x"}})
+		if err == nil {
+			t.Errorf("compose %q over tcp:// should be rejected, got nil error", name)
+			continue
+		}
+		if !strings.Contains(err.Error(), "SSH") {
+			t.Errorf("compose %q error should mention SSH, got %q", name, err.Error())
+		}
+	}
+}
+
 func TestParseLogOptions(t *testing.T) {
 	tests := []struct {
 		name string

@@ -239,7 +239,12 @@ func (m Model) viewFooter() string {
 		case ViewHosts:
 			sb.WriteString(styles.FooterDesc.Render("  connect · add <name> <url> · edit <name> <url> · rm  "))
 		case ViewCompose:
-			sb.WriteString(styles.FooterDesc.Render("  create <dir> · up · down · pull · config · edit · backup · backups · restore [file] · start · stop · restart · pause · unpause · remove  "))
+			if m.composeHostOps {
+				sb.WriteString(styles.FooterDesc.Render("  create <dir> · up · down · pull · config · edit · backup · backups · restore [file] · start · stop · restart · pause · unpause · remove  "))
+			} else {
+				// tcp://: SSH-only ops (create/up/down/pull/config/edit/backup/restore) hidden.
+				sb.WriteString(styles.FooterDesc.Render("  backups · start · stop · restart · pause · unpause · remove  "))
+			}
 		default:
 			sb.WriteString(styles.FooterDesc.Render("  run · start · stop · restart · kill · rm · logs · exec · files [path] · cp <local> <ctr-dir>  "))
 		}
@@ -261,7 +266,10 @@ func (m Model) viewFooter() string {
 			sb.WriteString(keyHint("esc", "Cancel"))
 		} else {
 			sb.WriteString(keyHint("↑↓", "Select"))
-			sb.WriteString(keyHint("enter", "Restore"))
+			// Restore is SSH-only; over tcp:// the catalog is view/delete only.
+			if m.composeHostOps {
+				sb.WriteString(keyHint("enter", "Restore"))
+			}
 			sb.WriteString(keyHint("d", "Delete"))
 			sb.WriteString(keyHint("esc", "Close"))
 		}
@@ -319,7 +327,9 @@ func (m Model) viewFooter() string {
 			sb.WriteString(keyHint("enter", "Containers"))
 			sb.WriteString(keyHint("i", "Inspect"))
 			sb.WriteString(keyHint("l", "Logs"))
-			sb.WriteString(keyHint("e", "Edit"))
+			if m.composeHostOps {
+				sb.WriteString(keyHint("e", "Edit"))
+			}
 		default:
 			sb.WriteString(keyHint("i", "Inspect"))
 		}

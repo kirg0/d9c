@@ -5,6 +5,22 @@ import (
 	"testing"
 )
 
+// SupportsHostCompose distinguishes ssh:// (host shell available) from tcp://.
+func TestSupportsHostCompose(t *testing.T) {
+	if (&dockerBackend{}).SupportsHostCompose() {
+		t.Error("tcp backend (no sshClient) must report SupportsHostCompose=false")
+	}
+	if NewDisconnected(nil).SupportsHostCompose() {
+		t.Error("disconnected backend must report SupportsHostCompose=false")
+	}
+	if !NewFakeBackend().SupportsHostCompose() {
+		t.Error("fake backend defaults to host compose supported (ssh-like)")
+	}
+	if (&FakeBackend{NoHostCompose: true}).SupportsHostCompose() {
+		t.Error("fake backend with NoHostCompose must report false (tcp-like)")
+	}
+}
+
 // groupComposeProjects must split independent deployments that share a project
 // name but live in different working_dirs (the real-world bug), while still
 // collapsing a normal single-dir project's services into one entry.
