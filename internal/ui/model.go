@@ -386,6 +386,11 @@ type Model struct {
 	// When set, the containers view is scoped to this compose project.
 	composeFilter string
 
+	// When set, the next compose-list refresh restores the cursor to this
+	// deployment (its working_dir) — so leaving a drill-down returns to the row
+	// it was opened from instead of jumping to the top. Cleared once applied.
+	composeReselect string
+
 	showAll bool
 
 	// refreshInterval is the auto-refresh cadence (configurable at runtime via

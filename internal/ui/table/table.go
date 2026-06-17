@@ -116,10 +116,24 @@ func (m *Model) SetColumns(cols []table.Column) {
 func (m *Model) SetContainers(containers []docker.Container, filter string, stats map[string]docker.ContainerStats, statsView bool, selected, alerted map[string]bool) {
 	containers = SortContainers(containers, stats, m.sortField, m.sortDesc)
 	if statsView {
-		m.table.SetRows(buildStatsRows(containers, filter, stats, selected, alerted))
+		m.setRows(buildStatsRows(containers, filter, stats, selected, alerted))
 		return
 	}
-	m.table.SetRows(buildRows(containers, filter, stats, selected, alerted))
+	m.setRows(buildRows(containers, filter, stats, selected, alerted))
+}
+
+// setRows installs rows and keeps the cursor in range. bubbles' SetRows leaves
+// the cursor untouched, so loading a much shorter list (e.g. drilling from a
+// long compose list into one container) would leave it pointing past the end —
+// UpdateViewport then renders an empty window and the list looks blank until an
+// arrow key clamps the cursor. Re-clamping here keeps the rows visible. A cursor
+// already within range is preserved, so a periodic refresh doesn't jump the
+// selection.
+func (m *Model) setRows(rows []table.Row) {
+	m.table.SetRows(rows)
+	if m.table.Cursor() >= len(rows) {
+		m.table.SetCursor(len(rows) - 1) // SetCursor clamps to ≥0 and re-runs UpdateViewport
+	}
 }
 
 // SetSort selects the column the containers view is ordered by. SortNone keeps
@@ -199,25 +213,37 @@ func alertMarker(id string, alerted map[string]bool) string {
 }
 
 func (m *Model) SetImages(images []docker.Image, filter string) {
-	m.table.SetRows(buildImageRows(images, filter))
+	m.setRows(buildImageRows(images, filter))
 }
 
 func (m *Model) SetNetworks(networks []docker.Network, filter string) {
-	m.table.SetRows(buildNetworkRows(networks, filter))
+	m.setRows(buildNetworkRows(networks, filter))
 }
 
 func (m *Model) SetVolumes(volumes []docker.Volume, filter string) {
-	m.table.SetRows(buildVolumeRows(volumes, filter))
+	m.setRows(buildVolumeRows(volumes, filter))
 }
 
 // SetHosts fills the unified hosts/dashboard view; summaries holds per-host
 // daemon snapshots keyed by host URL (absent = probe pending).
 func (m *Model) SetHosts(hostList []hosts.Host, filter string, summaries map[string]docker.HostSummary) {
-	m.table.SetRows(buildHostRows(hostList, filter, summaries))
+	m.setRows(buildHostRows(hostList, filter, summaries))
 }
 
 func (m *Model) SetCompose(projects []docker.ComposeProject, filter string) {
-	m.table.SetRows(buildComposeRows(projects, filter))
+	m.setRows(buildComposeRows(projects, filter))
+}
+
+// SelectComposeRow moves the cursor to the compose row whose identity column
+// (working_dir) equals id; it's a no-op if no row matches. Used to restore the
+// selection when returning from a drill-down to the deployment list.
+func (m *Model) SelectComposeRow(id string) {
+	for i, r := range m.table.Rows() {
+		if len(r) > ComposeIDColumn && r[ComposeIDColumn] == id {
+			m.table.SetCursor(i)
+			return
+		}
+	}
 }
 
 // SelectedID returns the last column of the selected row (the resource ID for
