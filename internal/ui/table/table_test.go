@@ -145,6 +145,55 @@ func TestSortContainers(t *testing.T) {
 	}
 }
 
+func TestSortByName(t *testing.T) {
+	in := []docker.Network{
+		{ID: "1", Name: "Zeta"},
+		{ID: "2", Name: "alpha"},
+		{ID: "3", Name: "beta"},
+	}
+	got := sortByName(in, func(n docker.Network) string { return n.Name })
+	want := []string{"alpha", "beta", "Zeta"} // case-insensitive ascending
+	for i, w := range want {
+		if got[i].Name != w {
+			t.Errorf("order[%d] = %q, want %q", i, got[i].Name, w)
+		}
+	}
+	// The input slice must not be mutated.
+	if in[0].Name != "Zeta" {
+		t.Errorf("input slice was mutated: first = %q, want Zeta", in[0].Name)
+	}
+}
+
+func TestBuildNetworkRows_SortedByName(t *testing.T) {
+	networks := []docker.Network{
+		{ID: "1", Name: "web"},
+		{ID: "2", Name: "db"},
+		{ID: "3", Name: "app"},
+	}
+	rows := buildNetworkRows(networks, "")
+	want := []string{"app", "db", "web"}
+	for i, w := range want {
+		if strings.TrimSpace(rows[i][0]) != w {
+			t.Errorf("row[%d] NAME = %q, want %q", i, rows[i][0], w)
+		}
+	}
+}
+
+func TestBuildVolumeRows_SortedByName(t *testing.T) {
+	volumes := []docker.Volume{
+		{Name: "data"},
+		{Name: "cache"},
+		{Name: "backups"},
+	}
+	rows := buildVolumeRows(volumes, "")
+	want := []string{"backups", "cache", "data"}
+	for i, w := range want {
+		if rows[i][0] != w {
+			t.Errorf("row[%d] NAME = %q, want %q", i, rows[i][0], w)
+		}
+	}
+}
+
 func TestBuildRows_NoFilter(t *testing.T) {
 	containers := []docker.Container{
 		{ID: "abc123", Name: "web", Image: "nginx", Status: "Up 2h", State: "running"},

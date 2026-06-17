@@ -587,7 +587,25 @@ func buildStatsRows(containers []docker.Container, filterStr string, stats map[s
 	return rows
 }
 
+// sortByName returns items reordered by the key extracted from each element,
+// ascending and case-insensitively (stable; the input slice is not mutated).
+// Network/Volume/Image/Compose lists come back from the daemon in an unstable
+// order, so without this a periodic refresh reshuffles the rows under the
+// cursor. Equal keys keep their relative order, so the result stays steady.
+func sortByName[T any](items []T, key func(T) string) []T {
+	if len(items) < 2 {
+		return items
+	}
+	out := make([]T, len(items))
+	copy(out, items)
+	sort.SliceStable(out, func(i, j int) bool {
+		return strings.ToLower(key(out[i])) < strings.ToLower(key(out[j]))
+	})
+	return out
+}
+
 func buildImageRows(images []docker.Image, filterStr string) []table.Row {
+	images = sortByName(images, func(i docker.Image) string { return i.Tags })
 	rows := make([]table.Row, 0, len(images))
 	matcher := filter.Compile(filterStr)
 	for _, img := range images {
@@ -605,6 +623,7 @@ func buildImageRows(images []docker.Image, filterStr string) []table.Row {
 }
 
 func buildNetworkRows(networks []docker.Network, filterStr string) []table.Row {
+	networks = sortByName(networks, func(n docker.Network) string { return n.Name })
 	rows := make([]table.Row, 0, len(networks))
 	matcher := filter.Compile(filterStr)
 	for _, n := range networks {
@@ -623,6 +642,7 @@ func buildNetworkRows(networks []docker.Network, filterStr string) []table.Row {
 }
 
 func buildVolumeRows(volumes []docker.Volume, filterStr string) []table.Row {
+	volumes = sortByName(volumes, func(v docker.Volume) string { return v.Name })
 	rows := make([]table.Row, 0, len(volumes))
 	matcher := filter.Compile(filterStr)
 	for _, v := range volumes {
@@ -703,6 +723,9 @@ func hostStatusStyle(token string) (lipgloss.Style, bool) {
 }
 
 func buildComposeRows(projects []docker.ComposeProject, filterStr string) []table.Row {
+	// PROJECT is the first column but not unique; tie-break by working_dir (the
+	// row identity) so deployments sharing a project keep a steady order.
+	projects = sortByName(projects, func(p docker.ComposeProject) string { return p.Project + "\x00" + p.WorkingDir })
 	rows := make([]table.Row, 0, len(projects))
 	matcher := filter.Compile(filterStr)
 	for _, p := range projects {

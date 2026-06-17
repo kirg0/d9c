@@ -169,12 +169,13 @@ func TestComposeSelectedIDIsWorkingDir(t *testing.T) {
 	projects, _ := fb.ListComposeProjects()
 	step(composeUpdatedMsg{projects})
 
+	// Rows are sorted by PROJECT, so the cursor lands on legacy (/opt/legacy).
 	m := tm.(Model)
-	if got := m.selectedID(); got != "/srv/webapp" {
-		t.Errorf("selectedID = %q, want the working_dir /srv/webapp", got)
+	if got := m.selectedID(); got != "/opt/legacy" {
+		t.Errorf("selectedID = %q, want the working_dir /opt/legacy", got)
 	}
-	if got := m.composeNameFor("/srv/webapp"); got != "webapp" {
-		t.Errorf("composeNameFor = %q, want webapp", got)
+	if got := m.composeNameFor("/opt/legacy"); got != "legacy" {
+		t.Errorf("composeNameFor = %q, want legacy", got)
 	}
 }
 
