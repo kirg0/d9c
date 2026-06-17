@@ -257,20 +257,21 @@ func TestComposeDrillDownRestoresSelection(t *testing.T) {
 	}
 	step(tea.WindowSizeMsg{Width: 120, Height: 30})
 
-	// Open the compose list and select the last deployment (legacy, /opt/legacy)
-	// so a reset-to-top would be visible.
+	// Open the compose list and select the last deployment. Rows are sorted by
+	// PROJECT (legacy, monitoring, webapp), so the last is webapp (/srv/webapp);
+	// it is not the top row, so a reset-to-top would be visible.
 	exec(step(switchResourceMsg{ViewCompose}))
 	m := tm.(Model)
 	m.table.InnerTable().SetCursor(len(m.composes) - 1)
 	tm = m
-	if got := tm.(Model).selectedID(); got != "/opt/legacy" {
-		t.Fatalf("precondition: selectedID = %q, want /opt/legacy", got)
+	if got := tm.(Model).selectedID(); got != "/srv/webapp" {
+		t.Fatalf("precondition: selectedID = %q, want /srv/webapp", got)
 	}
 
 	// Drill in (Enter), then leave (Esc).
 	exec(step(tea.KeyMsg{Type: tea.KeyEnter}))
-	if m := tm.(Model); m.resource != ViewContainers || m.composeFilter != "/opt/legacy" {
-		t.Fatalf("after Enter: resource=%v composeFilter=%q, want Containers /opt/legacy", m.resource, m.composeFilter)
+	if m := tm.(Model); m.resource != ViewContainers || m.composeFilter != "/srv/webapp" {
+		t.Fatalf("after Enter: resource=%v composeFilter=%q, want Containers /srv/webapp", m.resource, m.composeFilter)
 	}
 	exec(step(tea.KeyMsg{Type: tea.KeyEsc}))
 
@@ -278,8 +279,8 @@ func TestComposeDrillDownRestoresSelection(t *testing.T) {
 	if m.resource != ViewCompose {
 		t.Fatalf("after Esc: resource = %v, want Compose", m.resource)
 	}
-	if got := m.selectedID(); got != "/opt/legacy" {
-		t.Errorf("selection after returning = %q, want /opt/legacy (stayed on the same row)", got)
+	if got := m.selectedID(); got != "/srv/webapp" {
+		t.Errorf("selection after returning = %q, want /srv/webapp (stayed on the same row)", got)
 	}
 	if m.composeReselect != "" {
 		t.Errorf("composeReselect = %q, want cleared after applying", m.composeReselect)
@@ -918,6 +919,19 @@ func imagesModel(t *testing.T) (tea.Model, *docker.FakeBackend) {
 	return tm, fb
 }
 
+// selectImageRow moves the cursor to the image row whose REPOSITORY:TAG column
+// equals tag. Image rows are sorted by tag, so the default cursor (row 0) is the
+// dangling <none> image; tests that need a real reference pick one explicitly.
+func selectImageRow(m *Model, tag string) {
+	it := m.table.InnerTable()
+	for i, r := range it.Rows() {
+		if strings.TrimSpace(r[0]) == tag {
+			it.SetCursor(i)
+			return
+		}
+	}
+}
+
 func TestDispatchImageBuild(t *testing.T) {
 	tm, _ := imagesModel(t)
 	m := tm.(Model)
@@ -1221,6 +1235,7 @@ func TestDispatchRunOpensForm(t *testing.T) {
 func TestDispatchRunFromImagesPrefills(t *testing.T) {
 	tm, _ := imagesModel(t)
 	m := tm.(Model)
+	selectImageRow(&m, "nginx:1.25") // rows are sorted by tag; pick a real image
 	cmd, err := m.dispatchCommand(&cmdline.CommandMsg{Name: "run"})
 	if err != nil {
 		t.Fatalf("dispatch run: %v", err)
@@ -1304,6 +1319,7 @@ func TestRunFormBackendErrorStaysOpen(t *testing.T) {
 func TestDispatchExecFromImagesOpensForm(t *testing.T) {
 	tm, _ := imagesModel(t)
 	m := tm.(Model)
+	selectImageRow(&m, "nginx:1.25") // rows are sorted by tag; pick a real image
 	cmd, err := m.dispatchCommand(&cmdline.CommandMsg{Name: "exec"})
 	if err != nil {
 		t.Fatalf("dispatch exec: %v", err)

@@ -136,14 +136,20 @@ func TestDemo_RemoveImageFriendlyError(t *testing.T) {
 	tm := newTestModel(t)
 	waitFor(t, tm, "web")
 
-	// Switch to the images view; default selection is the first image (nginx:1.25),
-	// which the fake backend reports as having a dependent child. Wait for the
-	// images-only column header: "nginx:1.25" alone also matches the IMAGE
-	// column of a late containers frame, and firing :rm before the async view
-	// switch lands would remove a container instead.
+	// Switch to the images view. Wait for the images-only column header:
+	// "nginx:1.25" alone also matches the IMAGE column of a late containers frame,
+	// and firing :rm before the async view switch lands would remove a container
+	// instead.
 	tm.Type(":images")
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 	waitFor(t, tm, "REPOSITORY:TAG")
+
+	// Rows are sorted by tag, so the default selection is the dangling <none>
+	// image; filter down to nginx:1.25 (which the fake backend reports as having a
+	// dependent child) so it's the only — and therefore selected — row.
+	tm.Type("/nginx")
+	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+	waitFor(t, tm, "nginx:1.25")
 
 	tm.Type(":rm")
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
@@ -251,9 +257,7 @@ func TestDemo_ComposeUp(t *testing.T) {
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 	waitFor(t, tm, "legacy", "stopped 0/2")
 
-	// Move the cursor to the third row (legacy) and bring it up.
-	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
-	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+	// Rows are sorted by PROJECT, so legacy is the first row; bring it up.
 	tm.Type(":up")
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 
@@ -275,6 +279,9 @@ func TestDemo_ComposePull(t *testing.T) {
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 	waitFor(t, tm, "webapp")
 
+	// Rows are sorted by PROJECT (legacy, monitoring, webapp); move onto webapp.
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 	tm.Type(":pull")
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 	waitFor(t, tm, "compose pull: webapp", "Pull complete", "готово")
@@ -291,6 +298,9 @@ func TestDemo_ComposeDown(t *testing.T) {
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 	waitFor(t, tm, "webapp", "running 3/3")
 
+	// Rows are sorted by PROJECT (legacy, monitoring, webapp); move onto webapp.
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 	tm.Type(":down")
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 	waitFor(t, tm, "compose down: webapp", "Removed", "готово")
@@ -333,6 +343,9 @@ func TestDemo_ComposeBackup(t *testing.T) {
 	tm.Type(":compose")
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 	waitFor(t, tm, "webapp")
+	// Rows are sorted by PROJECT (legacy, monitoring, webapp); move onto webapp.
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 	tm.Type(":backup")
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 	waitFor(t, tm, "backup saved:", "webapp-")
@@ -358,6 +371,9 @@ func TestDemo_ComposeRestore(t *testing.T) {
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 	waitFor(t, tm, "webapp")
 
+	// Rows are sorted by PROJECT (legacy, monitoring, webapp); move onto webapp.
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 	tm.Type(":restore webapp.tar.gz")
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 	waitFor(t, tm, "compose restore: webapp", "Started", "готово")
@@ -365,8 +381,7 @@ func TestDemo_ComposeRestore(t *testing.T) {
 }
 
 // TestDemo_BackupCatalog opens the backup catalog for the selected project and
-// checks an existing archive is listed. Uses the default-selected project so no
-// navigation is needed.
+// checks an existing archive is listed.
 func TestDemo_BackupCatalog(t *testing.T) {
 	dir := t.TempDir()
 	old, _ := os.Getwd()
@@ -384,6 +399,9 @@ func TestDemo_BackupCatalog(t *testing.T) {
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 	waitFor(t, tm, "webapp")
 
+	// Rows are sorted by PROJECT (legacy, monitoring, webapp); move onto webapp.
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 	tm.Type(":backups")
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 	waitFor(t, tm, "Backups", "webapp-20260101-120000.tar.gz")
@@ -416,6 +434,9 @@ func TestDemo_ComposeEdit(t *testing.T) {
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 	waitFor(t, tm, "webapp")
 
+	// Rows are sorted by PROJECT (legacy, monitoring, webapp); move onto webapp.
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 	tm.Type(":edit")
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 	waitFor(t, tm, "image: nginx:1.25") // editor loaded the file
@@ -456,6 +477,9 @@ func TestDemo_ComposeDetail(t *testing.T) {
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 	waitFor(t, tm, "webapp")
 
+	// Rows are sorted by PROJECT (legacy, monitoring, webapp); move onto webapp.
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 	tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
 	waitFor(t, tm, "project: webapp", "nginx:1.25")
 	tm.Quit()
