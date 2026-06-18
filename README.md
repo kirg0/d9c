@@ -12,6 +12,7 @@ Docker **по TCP или SSH**. Один бинарник, без агентов
 ![go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)
 ![version](https://img.shields.io/badge/version-1.1.0-informational)
 ![platform](https://img.shields.io/badge/platform-linux%20%7C%20macOS%20%7C%20windows-lightgrey)
+[![donate](https://img.shields.io/badge/donate-dalink.to-ff5e5b)](https://dalink.to/kirg08)
 
 <p align="center">
   <img src="docs/demo.png" alt="d9c — раздел Containers: колонки STATUS/HEALTH/PORTS/CPU%/MEM, индикатор соединения и подсказки клавиш" width="900">
@@ -38,6 +39,7 @@ Docker **по TCP или SSH**. Один бинарник, без агентов
 - [Алерты по порогам ресурсов](#алерты-по-порогам-ресурсов)
 - [Плагины](#плагины)
 - [Разработка](#разработка)
+- [Поддержать проект](#поддержать-проект)
 - [Лицензия](#лицензия)
 
 ---
@@ -504,6 +506,17 @@ go test -race ./...      # для конкурентного кода
 
 ---
 
+## Поддержать проект
+
+d9c развивается в свободное время. Если инструмент оказался полезен, поддержать
+разработку можно донатом — это помогает находить время на новые фичи:
+
+➡️ **[dalink.to/kirg08](https://dalink.to/kirg08)**
+
+Звезда репозиторию ⭐ тоже мотивирует. Спасибо!
+
+---
+
 ## Лицензия
 
-[MIT](LICENSE) © kiril
+[MIT](LICENSE) © kirg0
