@@ -1138,7 +1138,12 @@ func (m Model) handleShell(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if msg.String() == "ctrl+\\" { // force-detach escape hatch
+	switch msg.String() {
+	case "ctrl+d", "ctrl+\\":
+		// Ctrl-D exits the shell, Ctrl+\ force-detaches; both tear the session
+		// down locally. Handling Ctrl-D here (rather than forwarding 0x04 and
+		// relying on the remote shell to honour EOF) makes "exit" reliable across
+		// shells and platforms, matching the on-screen hint.
 		return m.closeShell()
 	}
 	m.shell.SendKey(msg) // enqueued in order; the pump writes to the session

@@ -35,6 +35,8 @@ var (
 
 	matchLineStyle   = lipgloss.NewStyle().Background(lipgloss.Color("#2D3250"))
 	currentLineStyle = lipgloss.NewStyle().Background(lipgloss.Color("#BB9AF7")).Foreground(lipgloss.Color("#1A1B26")).Bold(true)
+
+	followBadge = lipgloss.NewStyle().Background(lipgloss.Color("#1A1B26")).Foreground(lipgloss.Color("#9ECE6A")).Bold(true)
 )
 
 type levelDef struct {
@@ -139,6 +141,9 @@ func (m Model) IsSearching() bool { return m.searching }
 // HasSearch reports whether a search query is active (highlights shown).
 func (m Model) HasSearch() bool { return m.searchQuery != "" }
 
+// IsFollowing reports whether new log lines auto-scroll the view (follow mode).
+func (m Model) IsFollowing() bool { return m.autoScroll }
+
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	if key, ok := msg.(tea.KeyMsg); ok {
 		return m.handleKey(key)
@@ -176,6 +181,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.searching = true
 		m.searchInput.Focus()
 		m.viewport.Height = m.vpHeight()
+		return m, nil
+	case "f":
+		// Toggle follow (auto-scroll): when re-enabled, jump to the latest line.
+		m.autoScroll = !m.autoScroll
+		if m.autoScroll {
+			m.viewport.GotoBottom()
+		}
 		return m, nil
 	case "n":
 		m.autoScroll = false
@@ -241,11 +253,16 @@ func (m Model) View() string {
 	if m.viewport.ScrollPercent() >= 1.0 {
 		pctStr = " END "
 	}
-	dashLen := m.viewport.Width - lipgloss.Width(pctStr)
+	followTag := ""
+	if m.autoScroll {
+		followTag = " FOLLOW "
+	}
+	dashLen := m.viewport.Width - lipgloss.Width(pctStr) - lipgloss.Width(followTag)
 	if dashLen < 0 {
 		dashLen = 0
 	}
-	scrollBar := styles.StatusBar.Render(strings.Repeat("─", dashLen)) +
+	scrollBar := followBadge.Render(followTag) +
+		styles.StatusBar.Render(strings.Repeat("─", dashLen)) +
 		lipgloss.NewStyle().
 			Background(lipgloss.Color("#1A1B26")).
 			Foreground(lipgloss.Color("#565F89")).

@@ -70,6 +70,39 @@ func TestColorizeLogLineCaseWidthChange(t *testing.T) {
 	}
 }
 
+func TestLogsFollowToggle(t *testing.T) {
+	m := New()
+	m.SetSize(80, 5)
+	m.Open("web")
+	if !m.IsFollowing() {
+		t.Fatal("logs should follow by default")
+	}
+	if v := m.View(); !strings.Contains(v, "FOLLOW") {
+		t.Errorf("expected FOLLOW badge while following:\n%s", v)
+	}
+
+	// Scrolling stops follow; the badge disappears.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if m.IsFollowing() {
+		t.Error("scrolling should disable follow")
+	}
+	if v := m.View(); strings.Contains(v, "FOLLOW") {
+		t.Errorf("FOLLOW badge should be hidden once follow is off:\n%s", v)
+	}
+
+	// 'f' re-enables follow and snaps to the bottom.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("f")})
+	if !m.IsFollowing() {
+		t.Error("'f' should re-enable follow")
+	}
+
+	// 'f' again toggles it back off.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("f")})
+	if m.IsFollowing() {
+		t.Error("'f' should toggle follow off")
+	}
+}
+
 func TestLogsSearchNoMatch(t *testing.T) {
 	m := New()
 	m.SetSize(80, 20)

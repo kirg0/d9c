@@ -220,6 +220,11 @@ func (m Model) viewFooter() string {
 			sb.WriteString(keyHint("q", "Back"))
 		default:
 			sb.WriteString(keyHint("↑↓", "Scroll"))
+			follow := "Follow: off"
+			if m.logs.IsFollowing() {
+				follow = "Follow: on"
+			}
+			sb.WriteString(keyHint("f", follow))
 			sb.WriteString(keyHint("/", "Search"))
 			sb.WriteString(keyHint("s", "Save"))
 			sb.WriteString(keyHint("q/esc", "Back"))
@@ -312,7 +317,7 @@ func (m Model) viewFooter() string {
 	case ModeFSBrowser:
 		sb.WriteString(keyHint("↑↓", "Navigate"))
 		sb.WriteString(keyHint("enter/l", "Open"))
-		sb.WriteString(keyHint("⌫/h", "Up"))
+		sb.WriteString(keyHint("bksp/h", "Up"))
 		sb.WriteString(keyHint("d", "Download"))
 		sb.WriteString(keyHint("q/esc", "Back"))
 	default:
