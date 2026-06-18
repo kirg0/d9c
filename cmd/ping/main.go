@@ -11,10 +11,11 @@ import (
 )
 
 func main() {
-	host := "ssh://kirg@192.168.1.172"
-	if len(os.Args) > 1 {
-		host = os.Args[1]
+	if len(os.Args) < 2 {
+		fmt.Fprintln(os.Stderr, "usage: ping <ssh://user@host | tcp://host:port>")
+		os.Exit(2)
 	}
+	host := os.Args[1]
 
 	// SSH diagnostic first
 	fmt.Printf("Connecting to %s ...\n", host)

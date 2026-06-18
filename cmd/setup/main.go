@@ -13,10 +13,11 @@ import (
 )
 
 func main() {
-	host := "ssh://kirg@192.168.1.172"
-	if len(os.Args) > 1 {
-		host = os.Args[1]
+	if len(os.Args) < 2 {
+		fmt.Fprintln(os.Stderr, "usage: setup <ssh://user@host>")
+		os.Exit(2)
 	}
+	host := os.Args[1]
 
 	home, _ := os.UserHomeDir()
 	pubKeyPath := filepath.Join(home, ".ssh", "id_ed25519.pub")
@@ -81,5 +82,5 @@ func main() {
 	}
 
 	fmt.Println("\nDone! Run the TUI with:")
-	fmt.Printf("  .\\d9c.exe -H ssh://kirg@192.168.1.172\n")
+	fmt.Printf("  d9c -H %s\n", host)
 }

@@ -1,4 +1,6 @@
-// One-shot tool: adds kirg to docker group via root SSH.
+// One-shot tool: adds a user to the docker group via root SSH.
+//
+// usage: addgroup <ssh://root@host> <user> [root-password]
 package main
 
 import (
@@ -9,10 +11,15 @@ import (
 )
 
 func main() {
-	rootHost := "ssh://root@192.168.1.172"
+	if len(os.Args) < 3 {
+		fmt.Fprintln(os.Stderr, "usage: addgroup <ssh://root@host> <user> [root-password]")
+		os.Exit(2)
+	}
+	rootHost := os.Args[1]
+	user := os.Args[2]
 	rootPassword := ""
-	if len(os.Args) > 1 {
-		rootPassword = os.Args[1]
+	if len(os.Args) > 3 {
+		rootPassword = os.Args[3]
 	}
 
 	client, err := docker.SSHClient(rootHost, "", rootPassword)
@@ -24,8 +31,8 @@ func main() {
 	fmt.Println("Connected as root")
 
 	cmds := []string{
-		"usermod -aG docker kirg",
-		"id kirg",
+		fmt.Sprintf("usermod -aG docker %s", user),
+		fmt.Sprintf("id %s", user),
 		"grep docker /etc/group",
 	}
 	for _, cmd := range cmds {
