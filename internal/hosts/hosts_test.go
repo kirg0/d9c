@@ -46,21 +46,21 @@ func TestAddEditRemove(t *testing.T) {
 func TestUpsertByHost(t *testing.T) {
 	s := &Store{path: "x"}
 
-	if added := s.UpsertByHost("ssh://kirg@192.168.1.172"); !added {
+	if added := s.UpsertByHost("ssh://deploy@10.0.0.5"); !added {
 		t.Fatal("expected first upsert to add")
 	}
-	if added := s.UpsertByHost("ssh://kirg@192.168.1.172"); added {
+	if added := s.UpsertByHost("ssh://deploy@10.0.0.5"); added {
 		t.Error("expected duplicate URL not to be added again")
 	}
-	if got := s.Hosts[0].Name; got != "kirg@192.168.1.172" {
-		t.Errorf("derived name = %q, want kirg@192.168.1.172", got)
+	if got := s.Hosts[0].Name; got != "deploy@10.0.0.5" {
+		t.Errorf("derived name = %q, want deploy@10.0.0.5", got)
 	}
 
 	// A second host that derives the same base name gets a numeric suffix.
-	s2 := &Store{path: "x", Hosts: []Host{{Name: "192.168.1.172", Host: "tcp://192.168.1.172:2375"}}}
-	s2.UpsertByHost("tcp://192.168.1.172:2376")
-	if got := s2.Hosts[1].Name; got != "192.168.1.172-2" {
-		t.Errorf("suffixed name = %q, want 192.168.1.172-2", got)
+	s2 := &Store{path: "x", Hosts: []Host{{Name: "10.0.0.5", Host: "tcp://10.0.0.5:2375"}}}
+	s2.UpsertByHost("tcp://10.0.0.5:2376")
+	if got := s2.Hosts[1].Name; got != "10.0.0.5-2" {
+		t.Errorf("suffixed name = %q, want 10.0.0.5-2", got)
 	}
 }
 
