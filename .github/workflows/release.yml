@@ -74,12 +74,19 @@ jobs:
           VERSION: ${{ steps.v.outputs.version }}
         run: |
           set -euo pipefail
-          if [ -f CHANGELOG.md ]; then
+          # Read CHANGELOG from the default branch, not the checked-out tag:
+          # a tag can predate CHANGELOG.md (or a later edit to its section),
+          # e.g. when releasing an existing tag via workflow_dispatch.
+          branch="${{ github.event.repository.default_branch }}"
+          git fetch --no-tags --depth=1 origin "$branch" 2>/dev/null || true
+          git show "origin/${branch}:CHANGELOG.md" > CHANGELOG.src 2>/dev/null \
+            || cp CHANGELOG.md CHANGELOG.src 2>/dev/null || true
+          if [ -f CHANGELOG.src ]; then
             awk -v ver="$VERSION" '
               index($0, "## [" ver "]") == 1 { grab=1; next }
               grab && /^## / { exit }
               grab { print }
-            ' CHANGELOG.md > notes.md
+            ' CHANGELOG.src > notes.md
           fi
           if [ -s notes.md ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"
