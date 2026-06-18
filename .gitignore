@@ -20,6 +20,9 @@ coverage.*
 # Claude Code workspace (settings + memory) — not tracked by git
 /.claude/
 
+# Internal roadmap — kept local, not published
+/PLANE.md
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db

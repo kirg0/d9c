@@ -19,9 +19,7 @@ Docker **по TCP или SSH**. Один бинарник, без агентов
 </p>
 
 > Хотите посмотреть без настройки Docker? Запустите демо на фейковых данных:
-> `go run . -demo`. Анимированную версию обзора можно собрать через
-> [VHS](https://github.com/charmbracelet/vhs): `vhs docs/demo.tape`
-> (см. [docs/README.md](docs/README.md)).
+> `go run . -demo`.
 
 ---
 
