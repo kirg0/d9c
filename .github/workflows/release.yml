@@ -1,0 +1,97 @@
+name: Release
+
+# Build cross-platform binaries and publish a GitHub Release.
+#
+# Fires automatically when a SemVer tag (vX.Y.Z) is pushed. For a tag that
+# already exists on the remote (e.g. v1.1.0), trigger it by hand from the
+# Actions tab via "Run workflow" and enter the tag in the `tag` input.
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release (e.g. v1.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Resolve version
+        id: v
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build binaries
+        env:
+          CGO_ENABLED: "0"
+          VERSION: ${{ steps.v.outputs.version }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          LDFLAGS="-s -w -X d9c/internal/version.Version=${VERSION}"
+          targets="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64"
+          for t in $targets; do
+            export GOOS="${t%/*}" GOARCH="${t#*/}"
+            bin="d9c"
+            [ "$GOOS" = "windows" ] && bin="d9c.exe"
+            echo "building $GOOS/$GOARCH"
+            go build -trimpath -ldflags "$LDFLAGS" -o "$bin" .
+            stage="d9c_${TAG}_${GOOS}_${GOARCH}"
+            mkdir -p "$stage"
+            cp "$bin" README.md LICENSE "$stage"/
+            if [ "$GOOS" = "windows" ]; then
+              zip -qr "dist/${stage}.zip" "$stage"
+            else
+              tar -czf "dist/${stage}.tar.gz" "$stage"
+            fi
+            rm -rf "$stage" "$bin"
+          done
+          (cd dist && sha256sum * > checksums.txt)
+          ls -la dist
+
+      - name: Extract release notes
+        id: notes
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -f CHANGELOG.md ]; then
+            awk -v ver="$VERSION" '
+              index($0, "## [" ver "]") == 1 { grab=1; next }
+              grab && /^## / { exit }
+              grab { print }
+            ' CHANGELOG.md > notes.md
+          fi
+          if [ -s notes.md ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.v.outputs.tag }}
+          name: ${{ steps.v.outputs.tag }}
+          body_path: ${{ steps.notes.outputs.found == 'true' && 'notes.md' || '' }}
+          generate_release_notes: ${{ steps.notes.outputs.found != 'true' }}
+          files: dist/*
