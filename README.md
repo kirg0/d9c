@@ -67,10 +67,63 @@ Docker **по TCP или SSH**. Один бинарник, без агентов
 
 ## Установка
 
-Нужен [Go 1.25+](https://go.dev/dl/). Сборка из исходников:
+### Готовые бинарники (рекомендуется)
+
+Не нужны ни Go, ни компилятор — на удалённом хосте тоже ничего ставить не надо.
+Скачайте архив под свою ОС со страницы
+[**Releases**](https://github.com/kirg0/d9c/releases/latest):
+
+| ОС | Файл |
+|----|------|
+| Linux (x86-64) | `d9c_vX.Y.Z_linux_amd64.tar.gz` |
+| Linux (ARM64) | `d9c_vX.Y.Z_linux_arm64.tar.gz` |
+| macOS (Intel) | `d9c_vX.Y.Z_darwin_amd64.tar.gz` |
+| macOS (Apple Silicon) | `d9c_vX.Y.Z_darwin_arm64.tar.gz` |
+| Windows (x86-64) | `d9c_vX.Y.Z_windows_amd64.zip` |
+
+Внутри архива — один исполняемый файл (`d9c` или `d9c.exe`) плюс `README.md` и `LICENSE`.
+
+**Linux / macOS:**
 
 ```sh
-git clone <url-репозитория> d9c
+# распаковать и поставить в PATH (пример для Linux amd64)
+tar -xzf d9c_vX.Y.Z_linux_amd64.tar.gz
+sudo install d9c_vX.Y.Z_linux_amd64/d9c /usr/local/bin/d9c
+
+d9c -version          # проверить
+```
+
+> macOS может заблокировать неподписанный бинарник при первом запуске
+> («cannot be opened because the developer cannot be verified»). Снимите карантин:
+> `xattr -d com.apple.quarantine ./d9c`.
+
+**Windows (PowerShell):**
+
+```powershell
+# распакуйте zip и запускайте d9c.exe из этой папки,
+# либо положите его в каталог из %PATH%
+Expand-Archive d9c_vX.Y.Z_windows_amd64.zip
+.\d9c_vX.Y.Z_windows_amd64\d9c.exe -version
+```
+
+**Проверка контрольной суммы (необязательно).** К каждому релизу приложен
+`checksums.txt` (SHA-256):
+
+```sh
+sha256sum -c checksums.txt 2>/dev/null | grep d9c_vX.Y.Z_linux_amd64.tar.gz
+```
+
+```powershell
+# Windows
+(Get-FileHash .\d9c_vX.Y.Z_windows_amd64.zip -Algorithm SHA256).Hash
+```
+
+### Сборка из исходников
+
+Нужен [Go 1.25+](https://go.dev/dl/):
+
+```sh
+git clone https://github.com/kirg0/d9c.git
 cd d9c
 make build          # бинарник ./d9c (или d9c.exe на Windows)
 ```
@@ -81,13 +134,13 @@ make build          # бинарник ./d9c (или d9c.exe на Windows)
 go build -o d9c .
 ```
 
-Версию можно зашить в бинарник при сборке:
+Версию можно зашить в бинарник при сборке (релизные сборки делают это автоматически):
 
 ```sh
-go build -ldflags "-X d9c/internal/version.Version=1.1.0" -o d9c .
+go build -ldflags "-X d9c/internal/version.Version=1.2.3" -o d9c .
 ```
 
-Приложение следует [SemVer](https://semver.org); текущая версия показана в шапке (`d9c v1.1.0`)
+Приложение следует [SemVer](https://semver.org); текущая версия показана в шапке (`d9c vX.Y.Z`)
 и печатается флагом `-version`.
 
 ---
@@ -100,6 +153,9 @@ go run . -H tcp://host:2375    # удалённый демон по TCP
 go run . -H ssh://user@host    # удалённый демон по SSH-туннелю
 go run . -version              # вывести версию и выйти
 ```
+
+> Примеры выше — для запуска из исходников. Если вы поставили готовый бинарник,
+> используйте `d9c` вместо `go run .` (например, `d9c -demo`, `d9c -H ssh://user@host`).
 
 Если хост не указан, d9c открывается на разделе **Hosts**, где можно выбрать сохранённый хост
 или добавить новый — подключение произойдёт по `Enter` / `:connect`.
