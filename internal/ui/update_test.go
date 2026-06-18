@@ -826,6 +826,30 @@ func TestShellModeFlow(t *testing.T) {
 	}
 }
 
+// TestShellCtrlDExits checks that Ctrl-D closes a live embedded shell and
+// returns to the table, matching the on-screen "Ctrl-D — выход" hint.
+func TestShellCtrlDExits(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{Host: "tcp://h:2375"}, fb, nil, nil, false)
+	var lastCmd tea.Cmd
+	step := func(msg tea.Msg) { tm, lastCmd = tm.Update(msg) }
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+	cs, _ := fb.ListContainers(false)
+	step(containersUpdatedMsg{cs})
+
+	step(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	step(lastCmd()) // execMsg → ModeShell
+	if tm.(Model).mode != ModeShell {
+		t.Fatalf("mode = %v, want ModeShell", tm.(Model).mode)
+	}
+
+	// Ctrl-D tears the session down locally and returns to the table.
+	step(tea.KeyMsg{Type: tea.KeyCtrlD})
+	if m := tm.(Model); m.mode != ModeNormal {
+		t.Errorf("mode after Ctrl-D = %v, want ModeNormal", m.mode)
+	}
+}
+
 // TestExecDoneError surfaces a failed session in the footer error.
 func TestExecDoneError(t *testing.T) {
 	fb := docker.NewFakeBackend()

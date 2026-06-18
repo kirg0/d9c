@@ -109,7 +109,7 @@ func (m Model) resourceKeyRows() []helpRow {
 			{k.Display(keymap.Inspect), "Подробности (inspect)"},
 			{k.Display(keymap.Logs), "Логи"},
 			{k.Display(keymap.Exec), "Shell в контейнере (встроенный терминал; exit/Ctrl-D — выход, Ctrl+\\ — отсоединить)"},
-			{"f", "Обзор файловой системы (enter/l — войти, ⌫/h — вверх, d — скачать)"},
+			{"f", "Обзор файловой системы (enter/l — войти, bksp/h — вверх, d — скачать)"},
 			{":cp <local> <ctr-dir>", "Загрузить файл/каталог в контейнер (docker cp)"},
 			{k.Display(keymap.Stats), "Метрики CPU/MEM (stats)"},
 			{"⇧N ⇧S ⇧C ⇧M", "Сортировка: имя/статус/CPU/MEM (повтор — реверс)"},
