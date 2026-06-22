@@ -1274,6 +1274,30 @@ func TestPullFormOpensWhenNoImageSelected(t *testing.T) {
 	}
 }
 
+// :pull with an explicit image argument (pull nginx) pulls it directly without
+// opening the modal, even when nothing is selected.
+func TestPullWithArgSkipsModal(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	step := func(msg tea.Msg) tea.Cmd { var c tea.Cmd; tm, c = tm.Update(msg); return c }
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+	step(switchResourceMsg{ViewImages})
+
+	// Nothing selected, but an argument is given → pull directly, no modal.
+	m := tm.(Model)
+	cmd, err := m.dispatchCommand(&cmdline.CommandMsg{Name: "pull", Args: []string{"nginx"}})
+	if err != nil {
+		t.Fatalf("dispatch pull nginx: %v", err)
+	}
+	if _, ok := cmd().(openPullFormMsg); ok {
+		t.Fatal("pull with an argument must not open the modal")
+	}
+	res, ok := findActionResult(t, cmd)
+	if !ok || res.err != nil {
+		t.Fatalf("pull result = %#v, want success", res)
+	}
+}
+
 // findActionResult runs cmd and returns the actionResultMsg it produces, drilling
 // into a tea.Batch when the command bundles other commands (e.g. a spinner start).
 func findActionResult(t *testing.T, cmd tea.Cmd) (actionResultMsg, bool) {

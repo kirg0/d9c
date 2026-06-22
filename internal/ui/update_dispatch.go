@@ -196,9 +196,13 @@ func (m *Model) dispatchCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 		if m.resource != ViewImages {
 			return nil, fmt.Errorf("pull is only available for images")
 		}
-		// Pull the selected image directly; with nothing selected, open a modal
-		// so the user can type the image reference to pull.
-		ref := m.selectedImageRef()
+		// An explicit argument (pull nginx) wins; otherwise pull the selected
+		// image directly. With neither, open a modal so the user can type the
+		// image reference to pull.
+		ref := strings.TrimSpace(strings.Join(cmd.Args, " "))
+		if ref == "" {
+			ref = m.selectedImageRef()
+		}
 		if ref == "" {
 			return func() tea.Msg { return openPullFormMsg{} }, nil
 		}
