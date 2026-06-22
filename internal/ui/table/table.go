@@ -212,8 +212,8 @@ func alertMarker(id string, alerted map[string]bool) string {
 	return "  "
 }
 
-func (m *Model) SetImages(images []docker.Image, filter string) {
-	m.setRows(buildImageRows(images, filter))
+func (m *Model) SetImages(images []docker.Image, filter string, selected map[string]bool) {
+	m.setRows(buildImageRows(images, filter, selected))
 }
 
 func (m *Model) SetNetworks(networks []docker.Network, filter string) {
@@ -604,7 +604,7 @@ func sortByName[T any](items []T, key func(T) string) []T {
 	return out
 }
 
-func buildImageRows(images []docker.Image, filterStr string) []table.Row {
+func buildImageRows(images []docker.Image, filterStr string, selected map[string]bool) []table.Row {
 	images = sortByName(images, func(i docker.Image) string { return i.Tags })
 	rows := make([]table.Row, 0, len(images))
 	matcher := filter.Compile(filterStr)
@@ -613,7 +613,9 @@ func buildImageRows(images []docker.Image, filterStr string) []table.Row {
 			continue
 		}
 		rows = append(rows, table.Row{
-			truncate(img.Tags, 55),
+			// Identity is the ID column (last), so prefixing the selection marker
+			// to REPOSITORY:TAG keeps selectedID()/the cell-count invariant intact.
+			selMarker(img.ID, selected) + truncate(img.Tags, 55),
 			img.Size,
 			timeAgo(img.Created),
 			img.ID,

@@ -144,7 +144,7 @@ func (m Model) viewHeader() string {
 			}
 			resName += " · " + arrow + m.sortField.String()
 		}
-		if m.resource == ViewContainers && len(m.selected) > 0 {
+		if (m.resource == ViewContainers || m.resource == ViewImages) && len(m.selected) > 0 {
 			resName += fmt.Sprintf(" · %d selected", len(m.selected))
 		}
 		shown := len(m.table.Table().Rows())
@@ -366,6 +366,9 @@ func (m Model) viewFooter() string {
 			if m.composeFilter != "" {
 				sb.WriteString(keyHint("esc", "Back"))
 			}
+		}
+		if m.resource == ViewImages {
+			sb.WriteString(keyHint("space", "Select"))
 		}
 		for _, p := range m.scopedPluginsWithKeys() {
 			sb.WriteString(keyHint(p.Key, p.Name))

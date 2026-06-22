@@ -391,6 +391,28 @@ func TestBuildRows_SelectionMarker(t *testing.T) {
 	}
 }
 
+// TestBuildImageRows_SelectionMarker checks the ● marker is prefixed to the
+// REPOSITORY:TAG cell of selected images (keyed by image ID) and absent otherwise.
+func TestBuildImageRows_SelectionMarker(t *testing.T) {
+	images := []docker.Image{
+		{ID: "id-nginx", Tags: "nginx:1.25"},
+		{ID: "id-pg", Tags: "postgres:16"},
+	}
+	selected := map[string]bool{"id-nginx": true}
+	rows := buildImageRows(images, "", selected)
+	// Rows are sorted by tag: nginx < postgres.
+	if !strings.HasPrefix(rows[0][0], "●") {
+		t.Errorf("selected row REPO = %q, want a ● marker", rows[0][0])
+	}
+	if strings.Contains(rows[1][0], "●") {
+		t.Errorf("unselected row REPO = %q, should have no marker", rows[1][0])
+	}
+	// The ID column (identity) stays untouched so selectedID() keeps working.
+	if rows[0][3] != "id-nginx" {
+		t.Errorf("ID cell = %q, want id-nginx", rows[0][3])
+	}
+}
+
 // TestBuildRows_AlertMarker checks the ⚠ NAME marker is added only for breaching
 // containers and only when the alerted set is non-nil (feature active), keeping
 // names aligned with a fixed-width slot otherwise.

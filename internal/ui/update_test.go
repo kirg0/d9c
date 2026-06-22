@@ -1895,6 +1895,102 @@ func TestBulkAction(t *testing.T) {
 	})
 }
 
+// TestTargetImageRefs checks the bulk selection resolves each image ID to its
+// remove reference (first real tag, ID for dangling images), and that an empty
+// model targets nothing.
+func TestTargetImageRefs(t *testing.T) {
+	imgs := []docker.Image{
+		{ID: "id1", Tags: "nginx:1.25"},
+		{ID: "id2", Tags: "<none>:<none>"}, // dangling → falls back to ID
+		{ID: "id3", Tags: "postgres:16"},
+	}
+	m := Model{images: imgs, selected: map[string]bool{"id1": true, "id2": true}}
+	got := m.targetImageRefs()
+	sort.Strings(got)
+	if len(got) != 2 || got[0] != "id2" || got[1] != "nginx:1.25" {
+		t.Errorf("refs = %v, want [id2 nginx:1.25]", got)
+	}
+
+	// No selection and no table rows → nothing to target.
+	empty := Model{images: imgs}
+	if refs := empty.targetImageRefs(); len(refs) != 0 {
+		t.Errorf("empty = %v, want none", refs)
+	}
+}
+
+// TestBulkImageRemoveViaDispatch drives a real model into the Images view, marks
+// two images, and dispatches :rm — asserting both are removed from the backend.
+func TestBulkImageRemoveViaDispatch(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	run := func(msg tea.Msg) {
+		var cmd tea.Cmd
+		tm, cmd = tm.Update(msg)
+		for i := 0; cmd != nil && i < 10; i++ {
+			next := cmd()
+			if next == nil {
+				break
+			}
+			tm, cmd = tm.Update(next)
+		}
+	}
+	run(tea.WindowSizeMsg{Width: 120, Height: 30})
+	run(switchResourceMsg{ViewImages})
+
+	before, _ := fb.ListImages()
+	m := tm.(Model)
+	// postgres:16 and the dangling <none> image — both removable without force.
+	m.selected = map[string]bool{"c7e8a2b4d6f1": true, "b1d3f9e7c4a2": true}
+	cmd, err := m.dispatchCommand(&cmdline.CommandMsg{Name: "rm"})
+	if err != nil {
+		t.Fatalf("dispatch rm: %v", err)
+	}
+	msg, ok := cmd().(actionResultMsg)
+	if !ok || msg.err != nil {
+		t.Fatalf("msg = %#v, want actionResultMsg{nil}", msg)
+	}
+
+	after, _ := fb.ListImages()
+	if len(after) != len(before)-2 {
+		t.Errorf("images = %d, want %d", len(after), len(before)-2)
+	}
+	for _, img := range after {
+		if img.ID == "c7e8a2b4d6f1" || img.ID == "b1d3f9e7c4a2" {
+			t.Errorf("image %s (%s) still present, want removed", img.ID, img.Tags)
+		}
+	}
+}
+
+// TestImageSelectViaSpace checks Space toggles bulk selection in the Images view
+// and the header reports the count.
+func TestImageSelectViaSpace(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	run := func(msg tea.Msg) {
+		var cmd tea.Cmd
+		tm, cmd = tm.Update(msg)
+		for i := 0; cmd != nil && i < 10; i++ {
+			next := cmd()
+			if next == nil {
+				break
+			}
+			tm, cmd = tm.Update(next)
+		}
+	}
+	run(tea.WindowSizeMsg{Width: 120, Height: 30})
+	run(switchResourceMsg{ViewImages})
+
+	run(tea.KeyMsg{Type: tea.KeySpace})
+	run(tea.KeyMsg{Type: tea.KeyDown})
+	run(tea.KeyMsg{Type: tea.KeySpace})
+	if n := len(tm.(Model).selected); n != 2 {
+		t.Fatalf("selected = %d, want 2", n)
+	}
+	if view := tm.(Model).View(); !strings.Contains(view, "2 selected") {
+		t.Errorf("header missing '2 selected'")
+	}
+}
+
 type errString string
 
 func (e errString) Error() string { return string(e) }
