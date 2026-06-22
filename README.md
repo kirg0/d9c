@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" width="200" alt="d9c">
+</p>
+
 # d9c
 
 **Терминальный (TUI) менеджер Docker для удалённого хоста** — в духе [`k9s`](https://k9scli.io/)
