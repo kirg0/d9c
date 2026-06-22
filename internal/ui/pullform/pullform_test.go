@@ -48,3 +48,40 @@ func TestViewShowsError(t *testing.T) {
 		t.Error("view should render the error message")
 	}
 }
+
+func TestPullingShowsBusyStatus(t *testing.T) {
+	m := New()
+	m.Open()
+	m.image.SetValue("nginx:latest")
+	if cmd := m.Pulling(); cmd == nil {
+		t.Fatal("Pulling should return a spinner tick command")
+	}
+	if !m.Busy() {
+		t.Fatal("form should report busy after Pulling")
+	}
+	got := m.View(80, 24)
+	if !strings.Contains(got, "pulling") || !strings.Contains(got, "nginx:latest") {
+		t.Errorf("busy view should mention pulling the image, got:\n%s", got)
+	}
+}
+
+func TestBusyIgnoresTyping(t *testing.T) {
+	m := New()
+	m.Open()
+	m.image.SetValue("redis")
+	m.Pulling()
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	if got := m.Image(); got != "redis" {
+		t.Errorf("image changed while busy = %q, want redis", got)
+	}
+}
+
+func TestSetErrorClearsBusy(t *testing.T) {
+	m := New()
+	m.Open()
+	m.Pulling()
+	m.SetError("denied")
+	if m.Busy() {
+		t.Error("SetError should clear the busy state so the user can retry")
+	}
+}

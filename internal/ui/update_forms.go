@@ -139,13 +139,19 @@ func (m Model) handleVolForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // Esc (handled globally) cancels. A backend failure is shown inside the form via
 // the actionResultMsg branch.
 func (m Model) handlePullForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// While a pull is in flight, swallow keys so a second Enter can't fire a
+	// duplicate pull (esc is handled globally and still cancels the modal).
+	if m.pullForm.Busy() {
+		return m, nil
+	}
 	if msg.String() == "enter" {
 		ref := m.pullForm.Image()
 		if ref == "" {
 			m.pullForm.SetError("image is required")
 			return m, nil
 		}
-		return m, containerAction(func() error { return m.backend.PullImage(ref) })
+		spin := m.pullForm.Pulling()
+		return m, tea.Batch(spin, containerAction(func() error { return m.backend.PullImage(ref) }))
 	}
 	updated, cmd := m.pullForm.Update(msg)
 	m.pullForm = updated
