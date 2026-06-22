@@ -197,16 +197,15 @@ func (m *Model) dispatchCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 			return nil, fmt.Errorf("pull is only available for images")
 		}
 		// An explicit argument (pull nginx) wins; otherwise pull the selected
-		// image directly. With neither, open a modal so the user can type the
-		// image reference to pull.
+		// image. With neither, open an editable modal so the user can type the
+		// reference. A known reference opens the modal in its busy/spinner state
+		// (image arg, image string set) so the pull shows progress instead of a
+		// frozen-looking window.
 		ref := strings.TrimSpace(strings.Join(cmd.Args, " "))
 		if ref == "" {
 			ref = m.selectedImageRef()
 		}
-		if ref == "" {
-			return func() tea.Msg { return openPullFormMsg{} }, nil
-		}
-		return containerAction(func() error { return m.backend.PullImage(ref) }), nil
+		return func() tea.Msg { return openPullFormMsg{image: ref} }, nil
 	}
 
 	// ── resource remove (works for all views) ─────────────────────────────────

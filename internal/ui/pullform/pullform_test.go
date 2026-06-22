@@ -65,6 +65,23 @@ func TestPullingShowsBusyStatus(t *testing.T) {
 	}
 }
 
+func TestOpenPullingPrefillsAndBusies(t *testing.T) {
+	m := New()
+	if cmd := m.OpenPulling("alpine:3.20"); cmd == nil {
+		t.Fatal("OpenPulling should return a spinner tick command")
+	}
+	if !m.Busy() {
+		t.Fatal("form should report busy after OpenPulling")
+	}
+	if got := m.Image(); got != "alpine:3.20" {
+		t.Errorf("image = %q, want alpine:3.20", got)
+	}
+	got := m.View(80, 24)
+	if !strings.Contains(got, "pulling") || !strings.Contains(got, "alpine:3.20") {
+		t.Errorf("busy view should mention pulling the image, got:\n%s", got)
+	}
+}
+
 func TestBusyIgnoresTyping(t *testing.T) {
 	m := New()
 	m.Open()

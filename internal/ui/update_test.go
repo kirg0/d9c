@@ -1274,27 +1274,41 @@ func TestPullFormOpensWhenNoImageSelected(t *testing.T) {
 	}
 }
 
-// :pull with an explicit image argument (pull nginx) pulls it directly without
-// opening the modal, even when nothing is selected.
-func TestPullWithArgSkipsModal(t *testing.T) {
+// :pull with an explicit image argument (pull nginx) opens the modal already in
+// its busy/spinner state and pulls that reference — no typing step — so the pull
+// shows progress instead of a frozen-looking window.
+func TestPullWithArgShowsBusyModal(t *testing.T) {
 	fb := docker.NewFakeBackend()
 	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
 	step := func(msg tea.Msg) tea.Cmd { var c tea.Cmd; tm, c = tm.Update(msg); return c }
 	step(tea.WindowSizeMsg{Width: 120, Height: 30})
 	step(switchResourceMsg{ViewImages})
 
-	// Nothing selected, but an argument is given → pull directly, no modal.
+	// Nothing selected, but an argument is given → open the busy modal for nginx.
 	m := tm.(Model)
 	cmd, err := m.dispatchCommand(&cmdline.CommandMsg{Name: "pull", Args: []string{"nginx"}})
 	if err != nil {
 		t.Fatalf("dispatch pull nginx: %v", err)
 	}
-	if _, ok := cmd().(openPullFormMsg); ok {
-		t.Fatal("pull with an argument must not open the modal")
+	open, ok := cmd().(openPullFormMsg)
+	if !ok || open.image != "nginx" {
+		t.Fatalf("pull msg = %#v, want openPullFormMsg{image: nginx}", cmd())
+	}
+
+	// Delivering it opens the modal busy (spinner shown, input ignored) and starts
+	// the pull in one batch.
+	cmd = step(open)
+	if m := tm.(Model); m.mode != ModePullForm || !m.pullForm.Busy() {
+		t.Fatalf("mode = %v busy = %v, want ModePullForm busy", tm.(Model).mode, tm.(Model).pullForm.Busy())
 	}
 	res, ok := findActionResult(t, cmd)
 	if !ok || res.err != nil {
 		t.Fatalf("pull result = %#v, want success", res)
+	}
+	// A successful result closes the modal.
+	step(res)
+	if m := tm.(Model); m.mode != ModeNormal {
+		t.Fatalf("mode = %v, want ModeNormal after a successful pull", m.mode)
 	}
 }
 
