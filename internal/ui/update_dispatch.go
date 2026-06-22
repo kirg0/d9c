@@ -216,10 +216,14 @@ func (m *Model) dispatchCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 		force := len(cmd.Args) > 0 && cmd.Args[0] == "-f"
 		switch m.resource {
 		case ViewImages:
-			// Use tag reference so Docker can remove a single repo reference;
-			// fall back to short ID for untagged images.
-			ref := m.selectedImageRef()
-			return containerAction(func() error { return m.backend.RemoveImage(ref, force) }), nil
+			// Bulk-remove the selected images (or the cursor image when nothing is
+			// marked). Each ref is a tag so Docker can drop a single repo reference;
+			// untagged images fall back to their short ID.
+			refs := m.targetImageRefs()
+			if len(refs) == 0 {
+				return nil, fmt.Errorf("no image selected")
+			}
+			return bulkAction(refs, func(ref string) error { return m.backend.RemoveImage(ref, force) }), nil
 		case ViewNetworks:
 			id := m.selectedID()
 			return containerAction(func() error { return m.backend.RemoveNetwork(id) }), nil
@@ -595,16 +599,39 @@ func bulkAction(ids []string, fn func(id string) error) tea.Cmd {
 	}
 }
 
-// selectedImageRef returns the pull reference (tag or ID) for the selected image.
-func (m Model) selectedImageRef() string {
-	id := m.selectedID()
-	if id == "" {
-		return ""
+// targetImageRefs returns the remove references images commands apply to: the
+// bulk selection if any (each ID resolved to a tag/ID ref), otherwise the single
+// image under the cursor. The order is unspecified, matching the bulk semantics.
+func (m Model) targetImageRefs() []string {
+	if len(m.selected) > 0 {
+		refs := make([]string, 0, len(m.selected))
+		for id := range m.selected {
+			refs = append(refs, m.imageRefForID(id))
+		}
+		return refs
 	}
+	if ref := m.selectedImageRef(); ref != "" {
+		return []string{ref}
+	}
+	return nil
+}
+
+// imageRefForID resolves an image ID to its remove reference (first real tag,
+// else the ID itself), the same rule selectedImageRef uses for the cursor row.
+func (m Model) imageRefForID(id string) string {
 	for _, img := range m.images {
 		if img.ID == id {
 			return imageRefFromTags(img.Tags, img.ID)
 		}
 	}
 	return id
+}
+
+// selectedImageRef returns the pull reference (tag or ID) for the cursor image.
+func (m Model) selectedImageRef() string {
+	id := m.selectedID()
+	if id == "" {
+		return ""
+	}
+	return m.imageRefForID(id)
 }

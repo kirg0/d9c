@@ -142,6 +142,8 @@ func (m Model) resourceKeyRows() []helpRow {
 			{":tag <new-ref>", "Назначить тег выбранному образу"},
 			{":push", "Запушить образ в реестр (форма логина/пароля, стриминг)"},
 			{":history", "История слоёв образа"},
+			{k.Display(keymap.Select), "Отметить для массового удаления (:rm)"},
+			{":rm [-f]", "Удалить выбранные образы (без выбора — под курсором)"},
 		}
 	case ViewNetworks, ViewVolumes:
 		return []helpRow{

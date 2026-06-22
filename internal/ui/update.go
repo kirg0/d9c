@@ -113,7 +113,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case imagesUpdatedMsg:
 		m.images = msg.images
 		if m.resource == ViewImages {
-			m.table.SetImages(m.images, m.filter.Value())
+			m.table.SetImages(m.images, m.filter.Value(), m.selected)
 		}
 		return m, nil
 
@@ -616,7 +616,7 @@ func (m Model) fetchCurrentResource() tea.Cmd {
 func (m *Model) refreshTableRows() {
 	switch m.resource {
 	case ViewImages:
-		m.table.SetImages(m.images, m.filter.Value())
+		m.table.SetImages(m.images, m.filter.Value(), m.selected)
 	case ViewNetworks:
 		m.table.SetNetworks(m.networks, m.filter.Value())
 	case ViewVolumes:
@@ -1000,8 +1000,8 @@ func (m Model) handleAction(action keymap.Action) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	case keymap.Select:
-		// Toggle bulk selection of the container under the cursor.
-		if m.resource == ViewContainers {
+		// Toggle bulk selection of the row under the cursor (containers and images).
+		if m.resource == ViewContainers || m.resource == ViewImages {
 			if id := m.selectedID(); id != "" {
 				if m.selected == nil {
 					m.selected = map[string]bool{}
