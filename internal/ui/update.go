@@ -16,6 +16,7 @@ import (
 	uitbl "d9c/internal/ui/table"
 
 	"github.com/atotto/clipboard"
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -29,6 +30,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// A live shell needs the remote TTY resized to the new grid.
 		if m.mode == ModeShell {
 			return m, m.shell.ResizeRemoteCmd()
+		}
+		return m, nil
+
+	case spinner.TickMsg:
+		// Drive the pull-image modal's spinner while a pull is in flight; the
+		// spinner stops ticking once the form leaves the busy state.
+		if m.mode == ModePullForm && m.pullForm.Busy() {
+			var cmd tea.Cmd
+			m.pullForm, cmd = m.pullForm.Tick(msg)
+			return m, cmd
 		}
 		return m, nil
 

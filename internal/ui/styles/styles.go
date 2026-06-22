@@ -156,6 +156,7 @@ var (
 	FormLabelActive lipgloss.Style
 	FormHint        lipgloss.Style
 	FormError       lipgloss.Style
+	FormBusy        lipgloss.Style
 
 	// ── embedded shell (interactive exec terminal) ───────────────────────────
 	ShellBorder lipgloss.Style
@@ -421,6 +422,10 @@ func Apply(p Palette) {
 
 	FormError = lipgloss.NewStyle().
 		Foreground(colorDanger).
+		Bold(true)
+
+	FormBusy = lipgloss.NewStyle().
+		Foreground(colorSecondary).
 		Bold(true)
 
 	// ── embedded shell (interactive exec terminal) ───────────────────────────

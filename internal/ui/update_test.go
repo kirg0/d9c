@@ -1254,9 +1254,59 @@ func TestPullFormOpensWhenNoImageSelected(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected a pull command")
 	}
-	res, ok := cmd().(actionResultMsg)
+	// Enter batches the spinner-start with the backend pull; the form should now
+	// be busy (spinner shown, input ignored) until the result arrives.
+	if m := tm.(Model); !m.pullForm.Busy() {
+		t.Fatal("form should be busy while the pull runs")
+	}
+	res, ok := findActionResult(t, cmd)
 	if !ok || res.err != nil {
 		t.Fatalf("pull result = %#v, want success", res)
+	}
+	// Delivering the successful result closes the modal.
+	step(res)
+	if m := tm.(Model); m.mode != ModeNormal {
+		t.Fatalf("mode = %v, want ModeNormal after a successful pull", m.mode)
+	}
+}
+
+// findActionResult runs cmd and returns the actionResultMsg it produces, drilling
+// into a tea.Batch when the command bundles other commands (e.g. a spinner start).
+func findActionResult(t *testing.T, cmd tea.Cmd) (actionResultMsg, bool) {
+	t.Helper()
+	switch v := cmd().(type) {
+	case actionResultMsg:
+		return v, true
+	case tea.BatchMsg:
+		for _, c := range v {
+			if c == nil {
+				continue
+			}
+			if res, ok := findActionResult(t, c); ok {
+				return res, true
+			}
+		}
+	}
+	return actionResultMsg{}, false
+}
+
+// While a pull is in flight, a second Enter must not fire another backend call.
+func TestPullFormBusyIgnoresInput(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	step := func(msg tea.Msg) tea.Cmd { var c tea.Cmd; tm, c = tm.Update(msg); return c }
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+	step(switchResourceMsg{ViewImages})
+	step(openPullFormMsg{})
+	for _, r := range "alpine:3.20" {
+		step(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	step(tea.KeyMsg{Type: tea.KeyEnter})
+	if m := tm.(Model); !m.pullForm.Busy() {
+		t.Fatal("form should be busy after the first Enter")
+	}
+	if cmd := step(tea.KeyMsg{Type: tea.KeyEnter}); cmd != nil {
+		t.Fatal("a second Enter while busy must not issue a command")
 	}
 }
 
