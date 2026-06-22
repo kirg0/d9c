@@ -2049,6 +2049,45 @@ func TestImageBulkRemoveKeyConfirms(t *testing.T) {
 	}
 }
 
+// TestImageBulkRemoveConfirmKeepsList checks the confirmation overlay is drawn
+// over the image list rather than a blank body, so the list stays visible behind
+// the modal (regression: the list used to disappear).
+func TestImageBulkRemoveConfirmKeepsList(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	run := func(msg tea.Msg) {
+		var cmd tea.Cmd
+		tm, cmd = tm.Update(msg)
+		for i := 0; cmd != nil && i < 10; i++ {
+			next := cmd()
+			if next == nil {
+				break
+			}
+			tm, cmd = tm.Update(next)
+		}
+	}
+	run(tea.WindowSizeMsg{Width: 120, Height: 30})
+	run(switchResourceMsg{ViewImages})
+
+	m := tm.(Model)
+	m.selected = map[string]bool{"c7e8a2b4d6f1": true}
+	tm = m
+
+	run(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	if got := tm.(Model); got.mode != ModeConfirm {
+		t.Fatalf("mode = %v, want ModeConfirm", got.mode)
+	}
+
+	view := tm.(Model).View()
+	if !strings.Contains(view, "Удалить выбранные образы") {
+		t.Errorf("confirm prompt missing from view")
+	}
+	// The image list must remain visible behind the modal.
+	if !strings.Contains(view, "postgres") {
+		t.Errorf("image list hidden behind confirm overlay; want a row (postgres) visible")
+	}
+}
+
 // TestImageBulkRemoveKeyCancel checks that declining the confirmation keeps the
 // images and the selection intact.
 func TestImageBulkRemoveKeyCancel(t *testing.T) {

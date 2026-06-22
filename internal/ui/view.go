@@ -457,8 +457,8 @@ func (m Model) viewCopyOverlay() string {
 	return lipgloss.Place(m.width, bodyH, lipgloss.Center, lipgloss.Center, panel)
 }
 
-// viewConfirmOverlay renders the generic confirmation panel centered in the
-// body area: the prompt plus a y/esc hint.
+// viewConfirmOverlay renders the generic confirmation panel centered over the
+// current resource view, so the underlying list stays visible around the modal.
 func (m Model) viewConfirmOverlay() string {
 	bodyH := m.height - 2 // header + footer
 
@@ -467,7 +467,7 @@ func (m Model) viewConfirmOverlay() string {
 	content := title + "\n\n" + m.confirmPrompt + "\n\n" + hint
 
 	panel := styles.OverlayPanel.Render(content)
-	return lipgloss.Place(m.width, bodyH, lipgloss.Center, lipgloss.Center, panel)
+	return overlayCenter(m.viewNormal(), panel, m.width, bodyH)
 }
 
 // viewNoticeOverlay renders the informational modal centered in the body area:
