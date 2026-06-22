@@ -384,9 +384,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case openPullFormMsg:
-		m.pullForm.Open()
 		m.mode = ModePullForm
 		m.relayout()
+		if msg.image != "" {
+			// Reference known up front: open busy and start the pull immediately,
+			// showing the spinner so the window doesn't look frozen.
+			spin := m.pullForm.OpenPulling(msg.image)
+			ref := msg.image
+			return m, tea.Batch(spin, containerAction(func() error { return m.backend.PullImage(ref) }))
+		}
+		m.pullForm.Open()
 		return m, nil
 
 	case openBuildFormMsg:

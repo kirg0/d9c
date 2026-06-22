@@ -42,6 +42,15 @@ func (m *Model) Open() {
 	m.image.CursorEnd()
 }
 
+// OpenPulling opens the form already pulling the given reference: it pre-fills
+// the image and enters the busy state without an input step, used when the
+// reference is known up front (pull <image> or pulling the selected image).
+// Returns the spinner-start command.
+func (m *Model) OpenPulling(ref string) tea.Cmd {
+	m.image.SetValue(ref)
+	return m.Pulling()
+}
+
 // Pulling marks the form busy while the pull runs: it clears any error, blurs
 // the input and returns the command that starts the spinner animation. Render
 // continues to show the image being pulled.

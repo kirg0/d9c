@@ -294,8 +294,11 @@ type openNetFormMsg struct{}
 // openVolFormMsg requests the create-volume modal form.
 type openVolFormMsg struct{}
 
-// openPullFormMsg requests the pull-image modal form (images view).
-type openPullFormMsg struct{}
+// openPullFormMsg requests the pull-image modal form (images view). When image
+// is set, the reference is already known (pull <image> or a selected image), so
+// the modal opens directly in its busy/spinner state and starts the pull; when
+// empty, it opens an editable form for the user to type the reference.
+type openPullFormMsg struct{ image string }
 
 // openBuildFormMsg requests the build-image modal form (images view),
 // optionally pre-filling the context directory and tag from command arguments.
