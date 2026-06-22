@@ -338,6 +338,15 @@ func (m Model) viewFooter() string {
 		sb.WriteString(keyHint("d", "Download"))
 		sb.WriteString(keyHint("q/esc", "Back"))
 	default:
+		// While images are bulk-selected, collapse the footer to the actions that
+		// apply to the selection: navigate, remove (with confirmation), clear, quit.
+		if m.resource == ViewImages && len(m.selected) > 0 {
+			sb.WriteString(keyHint("↑↓", "Navigate"))
+			sb.WriteString(keyHint("r", "Remove"))
+			sb.WriteString(keyHint("esc", "Clear"))
+			sb.WriteString(keyHint("q", "Quit"))
+			break
+		}
 		sb.WriteString(keyHint("↑↓", "Navigate"))
 		switch m.resource {
 		case ViewHosts:

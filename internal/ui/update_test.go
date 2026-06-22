@@ -1989,6 +1989,100 @@ func TestImageSelectViaSpace(t *testing.T) {
 	if view := tm.(Model).View(); !strings.Contains(view, "2 selected") {
 		t.Errorf("header missing '2 selected'")
 	}
+
+	// Footer collapses to the selection actions only.
+	view := tm.(Model).View()
+	if !strings.Contains(view, "Remove") || !strings.Contains(view, "Navigate") {
+		t.Errorf("footer missing Remove/Navigate hints while selected")
+	}
+	if strings.Contains(view, "Cmd") || strings.Contains(view, "Copy") {
+		t.Errorf("collapsed footer should hide Cmd/Copy hints")
+	}
+}
+
+// TestImageBulkRemoveKeyConfirms checks that `r` while images are selected opens
+// the confirmation overlay (not a refresh), and accepting it removes the marked
+// images and clears the selection.
+func TestImageBulkRemoveKeyConfirms(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	run := func(msg tea.Msg) {
+		var cmd tea.Cmd
+		tm, cmd = tm.Update(msg)
+		for i := 0; cmd != nil && i < 10; i++ {
+			next := cmd()
+			if next == nil {
+				break
+			}
+			tm, cmd = tm.Update(next)
+		}
+	}
+	run(tea.WindowSizeMsg{Width: 120, Height: 30})
+	run(switchResourceMsg{ViewImages})
+
+	before, _ := fb.ListImages()
+	// Select two removable images directly (postgres:16 + dangling <none>).
+	m := tm.(Model)
+	m.selected = map[string]bool{"c7e8a2b4d6f1": true, "b1d3f9e7c4a2": true}
+	tm = m
+
+	// `r` must open the confirmation overlay rather than refresh.
+	run(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	if got := tm.(Model); got.mode != ModeConfirm {
+		t.Fatalf("mode = %v, want ModeConfirm after r", got.mode)
+	}
+
+	// Accept the confirmation.
+	run(tea.KeyMsg{Type: tea.KeyEnter})
+
+	after, _ := fb.ListImages()
+	if len(after) != len(before)-2 {
+		t.Errorf("images = %d, want %d", len(after), len(before)-2)
+	}
+	for _, img := range after {
+		if img.ID == "c7e8a2b4d6f1" || img.ID == "b1d3f9e7c4a2" {
+			t.Errorf("image %s still present, want removed", img.ID)
+		}
+	}
+	if n := len(tm.(Model).selected); n != 0 {
+		t.Errorf("selection = %d after remove, want 0 (cleared)", n)
+	}
+}
+
+// TestImageBulkRemoveKeyCancel checks that declining the confirmation keeps the
+// images and the selection intact.
+func TestImageBulkRemoveKeyCancel(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	run := func(msg tea.Msg) {
+		var cmd tea.Cmd
+		tm, cmd = tm.Update(msg)
+		for i := 0; cmd != nil && i < 10; i++ {
+			next := cmd()
+			if next == nil {
+				break
+			}
+			tm, cmd = tm.Update(next)
+		}
+	}
+	run(tea.WindowSizeMsg{Width: 120, Height: 30})
+	run(switchResourceMsg{ViewImages})
+
+	before, _ := fb.ListImages()
+	m := tm.(Model)
+	m.selected = map[string]bool{"c7e8a2b4d6f1": true}
+	tm = m
+
+	run(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	run(tea.KeyMsg{Type: tea.KeyEsc}) // cancel
+
+	after, _ := fb.ListImages()
+	if len(after) != len(before) {
+		t.Errorf("images = %d, want unchanged %d", len(after), len(before))
+	}
+	if n := len(tm.(Model).selected); n != 1 {
+		t.Errorf("selection = %d after cancel, want 1 (kept)", n)
+	}
 }
 
 type errString string

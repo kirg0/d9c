@@ -879,6 +879,15 @@ func (m Model) handleNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// In the Images view with a pending bulk selection, `r` removes the marked
+	// images after a confirmation. Resolved before the keymap so it overrides the
+	// global Refresh binding while a selection is active.
+	if m.resource == ViewImages && len(m.selected) > 0 {
+		if handled, model, cmd := m.handleImageSelectionKey(key); handled {
+			return model, cmd
+		}
+	}
+
 	// Resolve the key to a configurable action. Built-in actions always win over
 	// a same-key plugin binding.
 	if action, ok := m.keys.ActionFor(key); ok {
@@ -1232,6 +1241,24 @@ func (m Model) handleHostKey(key string) (handled bool, model tea.Model, cmd tea
 		return true, m, func() tea.Msg {
 			return openConfirmMsg{prompt: "Удалить хост " + name + " из списка?", action: remove}
 		}
+	}
+	return false, m, nil
+}
+
+// handleImageSelectionKey handles keys active only while images are bulk-selected
+// in the Images view. `r` opens a confirmation overlay that, on accept, removes
+// every marked image. handled is false for other keys so handleNormal falls
+// through to the normal keymap resolution.
+func (m Model) handleImageSelectionKey(key string) (handled bool, model tea.Model, cmd tea.Cmd) {
+	switch key {
+	case "r":
+		refs := m.targetImageRefs()
+		if len(refs) == 0 {
+			return true, m, nil
+		}
+		remove := bulkAction(refs, func(ref string) error { return m.backend.RemoveImage(ref, false) })
+		prompt := fmt.Sprintf("Удалить выбранные образы (%d)?", len(refs))
+		return true, m, func() tea.Msg { return openConfirmMsg{prompt: prompt, action: remove} }
 	}
 	return false, m, nil
 }
