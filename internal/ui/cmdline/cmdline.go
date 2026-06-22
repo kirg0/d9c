@@ -33,7 +33,7 @@ var containerCmds = []cmdDef{
 }
 
 var imageCmds = []cmdDef{
-	{"build", "<dir> [tag]"},
+	{"build", "[dir] [tag] (modal if no dir)"},
 	{"exec", "(one-off --rm -it container form)"},
 	{"tag", "<new-ref>"},
 	{"push", ""},

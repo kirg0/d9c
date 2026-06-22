@@ -158,6 +158,33 @@ func (m Model) handlePullForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// handleBuildForm drives the build-image modal: Tab/arrows switch fields, Enter
+// starts the build in the streaming progress console, Esc (handled globally)
+// cancels. A blank context directory keeps the form open with an error.
+func (m Model) handleBuildForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		dir := m.buildForm.Dir()
+		if dir == "" {
+			m.buildForm.SetError("context dir is required")
+			return m, nil
+		}
+		tag := m.buildForm.Tag()
+		m.mode = ModeNormal
+		m.relayout()
+		return m, streamOpCmd(func() (<-chan string, func(), error) { return m.backend.BuildImage(dir, tag) }, "build: "+dir)
+	case "tab", "down":
+		m.buildForm.Next()
+		return m, nil
+	case "shift+tab", "up":
+		m.buildForm.Prev()
+		return m, nil
+	}
+	updated, cmd := m.buildForm.Update(msg)
+	m.buildForm = updated
+	return m, cmd
+}
+
 // handleRunForm drives the run-container wizard: Tab/arrows switch fields,
 // Enter creates and starts the container, Esc (handled globally) cancels. A
 // backend failure is shown inside the form via the actionResultMsg branch.

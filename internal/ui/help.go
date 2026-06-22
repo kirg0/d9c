@@ -138,7 +138,7 @@ func (m Model) resourceKeyRows() []helpRow {
 	case ViewImages:
 		return []helpRow{
 			{k.Display(keymap.Inspect), "Подробности (inspect)"},
-			{":build <dir> [tag]", "Собрать образ (стриминг)"},
+			{":build [dir] [tag]", "Собрать образ (без dir — модалка; стриминг)"},
 			{":tag <new-ref>", "Назначить тег выбранному образу"},
 			{":push", "Запушить образ в реестр (форма логина/пароля, стриминг)"},
 			{":history", "История слоёв образа"},

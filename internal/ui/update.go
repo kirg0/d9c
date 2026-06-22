@@ -389,6 +389,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.relayout()
 		return m, nil
 
+	case openBuildFormMsg:
+		m.buildForm.Open(msg.dir, msg.tag)
+		m.mode = ModeBuildForm
+		m.relayout()
+		return m, nil
+
 	case openRunFormMsg:
 		m.runForm.Open(msg.image)
 		m.mode = ModeRunForm
@@ -711,6 +717,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleVolForm(msg)
 	case ModePullForm:
 		return m.handlePullForm(msg)
+	case ModeBuildForm:
+		return m.handleBuildForm(msg)
 	case ModeRunForm:
 		return m.handleRunForm(msg)
 	case ModeExecForm:
