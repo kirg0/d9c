@@ -979,13 +979,17 @@ func TestDispatchImageBuild(t *testing.T) {
 	tm, _ := imagesModel(t)
 	m := tm.(Model)
 
-	// build with no args errors.
-	if _, err := m.dispatchCommand(&cmdline.CommandMsg{Name: "build"}); err == nil {
-		t.Error("build with no dir should error")
+	// build with no args opens the build modal so the user can type a context dir.
+	cmd, err := m.dispatchCommand(&cmdline.CommandMsg{Name: "build"})
+	if err != nil {
+		t.Fatalf("dispatch build (no args): %v", err)
+	}
+	if _, ok := cmd().(openBuildFormMsg); !ok {
+		t.Fatalf("build (no args) msg = %#v, want openBuildFormMsg", cmd())
 	}
 
 	// build <dir> opens the streaming operation console.
-	cmd, err := m.dispatchCommand(&cmdline.CommandMsg{Name: "build", Args: []string{"/ctx", "myapp:1"}})
+	cmd, err = m.dispatchCommand(&cmdline.CommandMsg{Name: "build", Args: []string{"/ctx", "myapp:1"}})
 	if err != nil {
 		t.Fatalf("dispatch build: %v", err)
 	}
@@ -1326,6 +1330,55 @@ func TestPullFormEmptyImageStaysOpen(t *testing.T) {
 	}
 	if m := tm.(Model); m.mode != ModePullForm {
 		t.Fatalf("mode = %v, want ModePullForm (stays open)", m.mode)
+	}
+}
+
+// :build with no context dir opens the modal; entering a dir and pressing Enter
+// closes it and starts the streaming build console.
+func TestBuildFormOpensAndStartsConsole(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	step := func(msg tea.Msg) tea.Cmd { var c tea.Cmd; tm, c = tm.Update(msg); return c }
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+	step(switchResourceMsg{ViewImages})
+	step(openBuildFormMsg{})
+	if m := tm.(Model); m.mode != ModeBuildForm {
+		t.Fatalf("mode = %v, want ModeBuildForm", m.mode)
+	}
+	for _, r := range "./ctx" {
+		step(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	cmd := step(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("expected a build command")
+	}
+	if m := tm.(Model); m.mode != ModeNormal {
+		t.Fatalf("mode = %v, want ModeNormal after submitting the build", m.mode)
+	}
+	op, ok := cmd().(opStartedMsg)
+	if !ok {
+		t.Fatalf("build msg = %#v, want opStartedMsg", cmd())
+	}
+	if !strings.Contains(op.title, "build: ./ctx") {
+		t.Errorf("title = %q, want it to contain 'build: ./ctx'", op.title)
+	}
+}
+
+// Submitting the build form with no context dir keeps it open with an error.
+func TestBuildFormEmptyDirStaysOpen(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	step := func(msg tea.Msg) tea.Cmd { var c tea.Cmd; tm, c = tm.Update(msg); return c }
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+	step(switchResourceMsg{ViewImages})
+	step(openBuildFormMsg{})
+
+	cmd := step(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd != nil {
+		t.Fatal("empty submit should not issue a command")
+	}
+	if m := tm.(Model); m.mode != ModeBuildForm {
+		t.Fatalf("mode = %v, want ModeBuildForm (stays open)", m.mode)
 	}
 }
 

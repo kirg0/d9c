@@ -450,13 +450,18 @@ func (m *Model) dispatchImageCommand(cmd *cmdline.CommandMsg) (bool, tea.Cmd, er
 	switch cmd.Name {
 	case "build":
 		// build authors a new image from a local context dir; no selection needed.
-		if len(cmd.Args) == 0 {
-			return true, nil, fmt.Errorf("build: directory required (usage: build <dir> [tag])")
-		}
-		dir := cmd.Args[0]
+		// With nothing supplied, open a modal so the user can type the context
+		// directory and tag; the build itself still runs in the progress console.
+		dir := ""
 		tag := ""
+		if len(cmd.Args) > 0 {
+			dir = cmd.Args[0]
+		}
 		if len(cmd.Args) > 1 {
 			tag = cmd.Args[1]
+		}
+		if dir == "" {
+			return true, func() tea.Msg { return openBuildFormMsg{tag: tag} }, nil
 		}
 		return true, streamOpCmd(func() (<-chan string, func(), error) { return m.backend.BuildImage(dir, tag) }, "build: "+dir), nil
 
