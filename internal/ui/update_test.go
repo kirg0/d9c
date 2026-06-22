@@ -1223,6 +1223,62 @@ func TestVolFormSubmit(t *testing.T) {
 	}
 }
 
+// :pull in the images view with nothing selected opens the pull-image modal;
+// submitting it pulls the typed image reference.
+func TestPullFormOpensWhenNoImageSelected(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	step := func(msg tea.Msg) tea.Cmd { var c tea.Cmd; tm, c = tm.Update(msg); return c }
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+	step(switchResourceMsg{ViewImages})
+
+	// No resources fetched yet, so nothing is selected → pull opens the modal
+	// instead of erroring with "no image selected".
+	m := tm.(Model)
+	cmd, err := m.dispatchCommand(&cmdline.CommandMsg{Name: "pull"})
+	if err != nil {
+		t.Fatalf("dispatch pull: %v", err)
+	}
+	if _, ok := cmd().(openPullFormMsg); !ok {
+		t.Fatalf("pull msg = %#v, want openPullFormMsg", cmd())
+	}
+
+	step(openPullFormMsg{})
+	if m := tm.(Model); m.mode != ModePullForm {
+		t.Fatalf("mode = %v, want ModePullForm", m.mode)
+	}
+	for _, r := range "alpine:3.20" {
+		step(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	cmd = step(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("expected a pull command")
+	}
+	res, ok := cmd().(actionResultMsg)
+	if !ok || res.err != nil {
+		t.Fatalf("pull result = %#v, want success", res)
+	}
+}
+
+// Submitting an empty pull form keeps it open with a validation error rather
+// than issuing a backend call.
+func TestPullFormEmptyImageStaysOpen(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	step := func(msg tea.Msg) tea.Cmd { var c tea.Cmd; tm, c = tm.Update(msg); return c }
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+	step(switchResourceMsg{ViewImages})
+	step(openPullFormMsg{})
+
+	cmd := step(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd != nil {
+		t.Fatal("empty submit should not issue a command")
+	}
+	if m := tm.(Model); m.mode != ModePullForm {
+		t.Fatalf("mode = %v, want ModePullForm (stays open)", m.mode)
+	}
+}
+
 func TestSplitList(t *testing.T) {
 	tests := []struct {
 		name string

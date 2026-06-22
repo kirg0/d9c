@@ -28,6 +28,7 @@ import (
 	"d9c/internal/ui/hostform"
 	"d9c/internal/ui/logs"
 	"d9c/internal/ui/netform"
+	"d9c/internal/ui/pullform"
 	"d9c/internal/ui/pushform"
 	"d9c/internal/ui/runform"
 	"d9c/internal/ui/shell"
@@ -84,6 +85,7 @@ const (
 	ModePushForm          // registry-credentials modal for image push
 	ModeNetForm           // create-network modal form
 	ModeVolForm           // create-volume modal form
+	ModePullForm          // pull-image modal form (images view)
 	ModeRunForm           // run-container wizard modal form
 	ModeExecForm          // one-off interactive run wizard (`run --rm -it`)
 	ModeConfirm           // generic y/esc confirmation overlay
@@ -290,6 +292,9 @@ type openNetFormMsg struct{}
 // openVolFormMsg requests the create-volume modal form.
 type openVolFormMsg struct{}
 
+// openPullFormMsg requests the pull-image modal form (images view).
+type openPullFormMsg struct{}
+
 // openRunFormMsg requests the run-container wizard, optionally pre-filling the
 // image reference (e.g. when invoked from the images view).
 type openRunFormMsg struct{ image string }
@@ -419,6 +424,7 @@ type Model struct {
 	pushForm    pushform.Model
 	netForm     netform.Model
 	volForm     volform.Model
+	pullForm    pullform.Model
 	runForm     runform.Model
 	execForm    execform.Model
 	fsBrowser   fsbrowser.Model
@@ -548,6 +554,7 @@ func NewModel(cfg *config.Config, backend docker.Backend, store *hosts.Store, co
 		pushForm:       pushform.New(),
 		netForm:        netform.New(),
 		volForm:        volform.New(),
+		pullForm:       pullform.New(),
 		runForm:        runform.New(),
 		execForm:       execform.New(),
 		fsBrowser:      fsbrowser.New(),

@@ -45,6 +45,8 @@ func (m Model) View() string {
 		body = m.netForm.View(m.width, m.height-2)
 	case ModeVolForm:
 		body = m.volForm.View(m.width, m.height-2)
+	case ModePullForm:
+		body = m.pullForm.View(m.width, m.height-2)
 	case ModeRunForm:
 		body = m.runForm.View(m.width, m.height-2)
 	case ModeExecForm:
@@ -113,6 +115,9 @@ func (m Model) viewHeader() string {
 	case ModeVolForm:
 		breadcrumb = styles.HeaderResource.Render(" Volumes ") +
 			sep + styles.HeaderResource.Render(" create ")
+	case ModePullForm:
+		breadcrumb = styles.HeaderResource.Render(" Images ") +
+			sep + styles.HeaderResource.Render(" pull ")
 	case ModeRunForm:
 		breadcrumb = styles.HeaderResource.Render(" Containers ") +
 			sep + styles.HeaderResource.Render(" run ")
@@ -293,6 +298,9 @@ func (m Model) viewFooter() string {
 	case ModeRunForm, ModeExecForm:
 		sb.WriteString(keyHint("tab", "Switch field"))
 		sb.WriteString(keyHint("enter", "Run"))
+		sb.WriteString(keyHint("esc", "Cancel"))
+	case ModePullForm:
+		sb.WriteString(keyHint("enter", "Pull"))
 		sb.WriteString(keyHint("esc", "Cancel"))
 	case ModeComposeEdit:
 		sb.WriteString(keyHint("ctrl+s", "Save"))

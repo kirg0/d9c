@@ -135,6 +135,23 @@ func (m Model) handleVolForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// handlePullForm drives the pull-image modal: Enter pulls the entered image,
+// Esc (handled globally) cancels. A backend failure is shown inside the form via
+// the actionResultMsg branch.
+func (m Model) handlePullForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.String() == "enter" {
+		ref := m.pullForm.Image()
+		if ref == "" {
+			m.pullForm.SetError("image is required")
+			return m, nil
+		}
+		return m, containerAction(func() error { return m.backend.PullImage(ref) })
+	}
+	updated, cmd := m.pullForm.Update(msg)
+	m.pullForm = updated
+	return m, cmd
+}
+
 // handleRunForm drives the run-container wizard: Tab/arrows switch fields,
 // Enter creates and starts the container, Esc (handled globally) cancels. A
 // backend failure is shown inside the form via the actionResultMsg branch.
