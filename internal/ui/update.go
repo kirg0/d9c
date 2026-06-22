@@ -372,6 +372,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.relayout()
 		return m, nil
 
+	case openPullFormMsg:
+		m.pullForm.Open()
+		m.mode = ModePullForm
+		m.relayout()
+		return m, nil
+
 	case openRunFormMsg:
 		m.runForm.Open(msg.image)
 		m.mode = ModeRunForm
@@ -446,6 +452,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case ModeVolForm:
 				m.volForm.SetError(msg.err.Error())
+				return m, nil
+			case ModePullForm:
+				m.pullForm.SetError(msg.err.Error())
 				return m, nil
 			case ModeRunForm:
 				m.runForm.SetError(msg.err.Error())
@@ -689,6 +698,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleNetForm(msg)
 	case ModeVolForm:
 		return m.handleVolForm(msg)
+	case ModePullForm:
+		return m.handlePullForm(msg)
 	case ModeRunForm:
 		return m.handleRunForm(msg)
 	case ModeExecForm:

@@ -196,9 +196,11 @@ func (m *Model) dispatchCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 		if m.resource != ViewImages {
 			return nil, fmt.Errorf("pull is only available for images")
 		}
+		// Pull the selected image directly; with nothing selected, open a modal
+		// so the user can type the image reference to pull.
 		ref := m.selectedImageRef()
 		if ref == "" {
-			return nil, fmt.Errorf("no image selected")
+			return func() tea.Msg { return openPullFormMsg{} }, nil
 		}
 		return containerAction(func() error { return m.backend.PullImage(ref) }), nil
 	}
