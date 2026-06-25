@@ -94,6 +94,21 @@ var builtins = map[string]styles.Palette{
 		Fg:        "#CDD6F4",
 		Border:    "#45475A",
 	},
+	// k9s evokes the stock k9s skin: a true-black body with a vivid aqua accent,
+	// an orange logo/highlight color, and bright, saturated status colors on a
+	// dodgerblue border.
+	"k9s": {
+		Primary:   "#00E5FF", // aqua accents / active keys
+		Secondary: "#FF9800", // orange logo / labels & headers
+		Success:   "#00E676", // bright green (running / healthy)
+		Warning:   "#FFD600", // bright yellow (transitional)
+		Danger:    "#FF1744", // bright red (errors / stopped)
+		Muted:     "#5F9EA0", // cadetblue dim text
+		Bg:        "#000000", // true-black body
+		BgAlt:     "#1A1A1A", // raised surfaces (selection, modals)
+		Fg:        "#E0F7FA", // light cyan-white text
+		Border:    "#1E90FF", // dodgerblue rules
+	},
 }
 
 // Config is the on-disk config-file format read by this package. The same file
