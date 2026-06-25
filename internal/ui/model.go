@@ -20,6 +20,7 @@ import (
 	"d9c/internal/ui/buildform"
 	"d9c/internal/ui/cmdline"
 	"d9c/internal/ui/composeedit"
+	"d9c/internal/ui/cpform"
 	"d9c/internal/ui/detail"
 	"d9c/internal/ui/events"
 	"d9c/internal/ui/execform"
@@ -93,6 +94,7 @@ const (
 	ModeConfirm           // generic y/esc confirmation overlay
 	ModeFSBrowser         // container filesystem browser ('f' / :files)
 	ModeNotice            // informational modal (e.g. SSH known_hosts mismatch)
+	ModeCpForm            // upload-to-container wizard (`:cp` with no args)
 )
 
 // copyItem is one selectable entry in the copy overlay.
@@ -312,6 +314,22 @@ type openRunFormMsg struct{ image string }
 // pre-filling the image reference.
 type openExecFormMsg struct{ image string }
 
+// openCpFormMsg requests the upload-to-container wizard (`:cp` with no args),
+// carrying the target container (the cursor container).
+type openCpFormMsg struct {
+	containerID string
+	name        string
+}
+
+// cpListedMsg carries a local directory listing for the upload wizard: it both
+// opens the picker (first listing) and refreshes it on navigation. On error the
+// message is shown inside the form, leaving the previous listing visible.
+type cpListedMsg struct {
+	dir     string
+	entries []cpform.Entry
+	err     error
+}
+
 // openConfirmMsg requests the generic confirmation overlay: prompt is shown
 // centered, and action runs when the user confirms (y/enter).
 type openConfirmMsg struct {
@@ -438,6 +456,7 @@ type Model struct {
 	runForm     runform.Model
 	execForm    execform.Model
 	fsBrowser   fsbrowser.Model
+	cpForm      cpform.Model
 
 	// pushAuth remembers registry credentials for the session (keyed by registry
 	// host), so the push form pre-fills after the first push. Never persisted.
@@ -569,6 +588,7 @@ func NewModel(cfg *config.Config, backend docker.Backend, store *hosts.Store, co
 		runForm:        runform.New(),
 		execForm:       execform.New(),
 		fsBrowser:      fsbrowser.New(),
+		cpForm:         cpform.New(),
 		pushAuth:       map[string]docker.RegistryAuth{},
 		keys:           keymap.Default(),
 		// The first periodic ping lands within one refresh tick and corrects
@@ -1132,6 +1152,14 @@ func fsListCmd(b docker.Backend, containerID, name, dir string) tea.Cmd {
 	return func() tea.Msg {
 		entries, err := b.ListPath(containerID, dir)
 		return fsListedMsg{containerID: containerID, name: name, path: dir, entries: entries, err: err}
+	}
+}
+
+// cpListCmd lists a local directory for the upload wizard, off the event loop.
+func cpListCmd(dir string) tea.Cmd {
+	return func() tea.Msg {
+		abs, entries, err := cpform.ReadLocalDir(dir)
+		return cpListedMsg{dir: abs, entries: entries, err: err}
 	}
 }
 

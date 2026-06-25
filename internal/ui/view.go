@@ -59,6 +59,8 @@ func (m Model) View() string {
 		body = m.eventsModel.View()
 	case ModeFSBrowser:
 		body = m.fsBrowser.View()
+	case ModeCpForm:
+		body = m.cpForm.View(m.width, m.height-2)
 	default:
 		body = m.viewNormal()
 	}
@@ -129,6 +131,9 @@ func (m Model) viewHeader() string {
 	case ModeExecForm:
 		breadcrumb = styles.HeaderResource.Render(" Images ") +
 			sep + styles.HeaderResource.Render(" exec (one-off) ")
+	case ModeCpForm:
+		breadcrumb = styles.HeaderResource.Render(" Containers ") +
+			sep + styles.HeaderResource.Render(" cp: "+m.cpForm.Name()+" ")
 	default:
 		resName := m.resource.String()
 		if m.resource == ViewContainers && m.showAll {
@@ -310,6 +315,10 @@ func (m Model) viewFooter() string {
 		sb.WriteString(keyHint("esc", "Cancel"))
 	case ModePullForm:
 		sb.WriteString(keyHint("enter", "Pull"))
+		sb.WriteString(keyHint("esc", "Cancel"))
+	case ModeCpForm:
+		sb.WriteString(keyHint("tab", "Switch field"))
+		sb.WriteString(keyHint("enter", "Open/Upload"))
 		sb.WriteString(keyHint("esc", "Cancel"))
 	case ModeComposeEdit:
 		sb.WriteString(keyHint("ctrl+s", "Save"))

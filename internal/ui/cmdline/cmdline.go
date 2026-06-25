@@ -20,7 +20,7 @@ type cmdDef struct {
 // ── per-resource command sets ─────────────────────────────────────────────────
 
 var containerCmds = []cmdDef{
-	{"cp", "<local-path> <container-dir> (upload)"},
+	{"cp", "[<local-path> <container-dir>] (upload; no args = picker)"},
 	{"exec", "[command] (default: shell)"},
 	{"files", "[path] (filesystem browser)"},
 	{"kill", "[signal]"},
