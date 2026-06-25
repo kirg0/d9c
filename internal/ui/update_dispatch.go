@@ -282,10 +282,12 @@ func (m *Model) dispatchCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 		}
 		return fsListCmd(m.backend, id, m.containerName(id), firstNonEmpty(dir, "/")), nil
 	case "cp":
-		// Upload a local file/dir into the cursor container:
-		//   cp <local-path> <container-dir>
+		// Upload a local file/dir into the cursor container. With both arguments
+		// it runs directly (cp <local-path> <container-dir>); without them it
+		// opens the modal wizard with a local file picker.
 		if len(cmd.Args) < 2 {
-			return nil, fmt.Errorf("usage: cp <local-path> <container-dir>")
+			name := m.containerName(id)
+			return func() tea.Msg { return openCpFormMsg{containerID: id, name: name} }, nil
 		}
 		local, dest := cmd.Args[0], cmd.Args[1]
 		return containerAction(func() error { return m.backend.CopyToContainer(id, local, dest) }), nil

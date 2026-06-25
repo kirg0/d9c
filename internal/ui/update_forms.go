@@ -1,9 +1,11 @@
 package ui
 
 import (
+	"path/filepath"
 	"strings"
 
 	"d9c/internal/docker"
+	"d9c/internal/ui/cpform"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -247,6 +249,62 @@ func (m Model) handleExecForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	updated, cmd := m.execForm.Update(msg)
 	m.execForm = updated
+	return m, cmd
+}
+
+// handleCpForm drives the upload-to-container wizard: Tab switches between the
+// local file picker and the destination field. In the picker, Enter/l descends
+// into a directory (Enter on a file jumps to the destination field), Backspace/h
+// ascends, and arrows move the cursor. With the destination field focused, Enter
+// uploads the highlighted local entry into the typed container directory. Esc is
+// handled globally; a backend failure lands inside the form (actionResultMsg).
+func (m Model) handleCpForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// While an upload is in flight, swallow keys so a second Enter can't fire a
+	// duplicate upload (esc is handled globally and still cancels the modal).
+	if m.cpForm.Busy() {
+		return m, nil
+	}
+	if s := msg.String(); s == "tab" || s == "shift+tab" {
+		m.cpForm.ToggleFocus()
+		return m, nil
+	}
+
+	if m.cpForm.OnBrowser() {
+		switch msg.String() {
+		case "enter", "l", "right":
+			e := m.cpForm.Selected()
+			if e.IsDir {
+				return m, cpListCmd(filepath.Join(m.cpForm.CurrentDir(), e.Name))
+			}
+			// A file is chosen: move to the destination field to confirm.
+			m.cpForm.ToggleFocus()
+			return m, nil
+		case "backspace", "h", "left", "-":
+			return m, cpListCmd(cpform.Parent(m.cpForm.CurrentDir()))
+		}
+		updated, cmd := m.cpForm.Update(msg)
+		m.cpForm = updated
+		return m, cmd
+	}
+
+	// Destination field focused.
+	if msg.String() == "enter" {
+		src := m.cpForm.SourcePath()
+		if src == "" {
+			m.cpForm.SetError("select a local file or directory")
+			return m, nil
+		}
+		dest := m.cpForm.Dest()
+		if dest == "" {
+			m.cpForm.SetError("container directory is required")
+			return m, nil
+		}
+		id := m.cpForm.ContainerID()
+		spin := m.cpForm.Running()
+		return m, tea.Batch(spin, containerAction(func() error { return m.backend.CopyToContainer(id, src, dest) }))
+	}
+	updated, cmd := m.cpForm.Update(msg)
+	m.cpForm = updated
 	return m, cmd
 }
 

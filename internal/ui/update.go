@@ -46,6 +46,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.runForm, cmd = m.runForm.Tick(msg)
 			return m, cmd
 		}
+		if m.mode == ModeCpForm && m.cpForm.Busy() {
+			var cmd tea.Cmd
+			m.cpForm, cmd = m.cpForm.Tick(msg)
+			return m, cmd
+		}
 		return m, nil
 
 	case tickMsg:
@@ -419,6 +424,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.relayout()
 		return m, nil
 
+	case openCpFormMsg:
+		m.cpForm.Open(msg.containerID, msg.name)
+		m.mode = ModeCpForm
+		m.relayout()
+		// Load the initial local listing (working directory) off the event loop.
+		return m, cpListCmd(".")
+
+	case cpListedMsg:
+		if msg.err != nil {
+			m.cpForm.SetError(msg.err.Error())
+			return m, nil
+		}
+		m.cpForm.Show(msg.dir, msg.entries)
+		return m, nil
+
 	case openConfirmMsg:
 		m.confirmPrompt = msg.prompt
 		m.confirmAction = msg.action
@@ -487,6 +507,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case ModeRunForm:
 				m.runForm.SetError(msg.err.Error())
+				return m, nil
+			case ModeCpForm:
+				m.cpForm.SetError(msg.err.Error())
 				return m, nil
 			}
 			m.err = msg.err.Error()
@@ -741,6 +764,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleNotice(msg)
 	case ModeFSBrowser:
 		return m.handleFSBrowser(msg)
+	case ModeCpForm:
+		return m.handleCpForm(msg)
 	}
 	return m, nil
 }
@@ -1431,6 +1456,8 @@ func (m *Model) relayout() {
 		m.eventsModel.SetSize(w, h)
 	case ModeFSBrowser:
 		m.fsBrowser.SetSize(w, h)
+	case ModeCpForm:
+		m.cpForm.SetSize(w, h)
 	default:
 		m.table.SetSize(w, tableHeight)
 		m.applyColumns(w)

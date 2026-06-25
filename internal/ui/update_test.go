@@ -13,6 +13,7 @@ import (
 	"d9c/internal/docker"
 	"d9c/internal/theme"
 	"d9c/internal/ui/cmdline"
+	"d9c/internal/ui/cpform"
 	"d9c/internal/ui/logs"
 	"d9c/internal/ui/shell"
 	"d9c/internal/ui/styles"
@@ -2152,6 +2153,78 @@ func TestImageBulkRemoveKeyCancel(t *testing.T) {
 	}
 	if n := len(tm.(Model).selected); n != 1 {
 		t.Errorf("selection = %d after cancel, want 1 (kept)", n)
+	}
+}
+
+// :cp with no arguments opens the upload wizard on the cursor container;
+// choosing a local file and confirming uploads it via CopyToContainer.
+func TestCpFormOpensAndUploads(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	step := func(msg tea.Msg) tea.Cmd { var c tea.Cmd; tm, c = tm.Update(msg); return c }
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+	cs, _ := fb.ListContainers(false)
+	step(containersUpdatedMsg{cs})
+
+	// No arguments → the dispatch returns an openCpFormMsg for the cursor container.
+	m := tm.(Model)
+	cmd, err := m.dispatchCommand(&cmdline.CommandMsg{Name: "cp"})
+	if err != nil {
+		t.Fatalf("dispatch cp: %v", err)
+	}
+	open, ok := cmd().(openCpFormMsg)
+	if !ok || open.containerID == "" {
+		t.Fatalf("cp msg = %#v, want openCpFormMsg with a container", cmd())
+	}
+
+	step(openCpFormMsg{containerID: open.containerID, name: open.name})
+	if m := tm.(Model); m.mode != ModeCpForm {
+		t.Fatalf("mode = %v, want ModeCpForm", m.mode)
+	}
+
+	// Feed a deterministic local listing containing a real file to upload.
+	tmp := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmp, "hello.txt"), []byte("hi"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	step(cpListedMsg{dir: tmp, entries: []cpform.Entry{{Name: "hello.txt"}}})
+
+	// Enter on a file jumps to the destination field; Enter there uploads.
+	step(tea.KeyMsg{Type: tea.KeyEnter})
+	cmd = step(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("expected an upload command")
+	}
+	if m := tm.(Model); !m.cpForm.Busy() {
+		t.Fatal("form should be busy while the upload runs")
+	}
+	res, ok := findActionResult(t, cmd)
+	if !ok || res.err != nil {
+		t.Fatalf("upload result = %#v, want success", res)
+	}
+	step(res)
+	if m := tm.(Model); m.mode != ModeNormal {
+		t.Fatalf("mode = %v, want ModeNormal after a successful upload", m.mode)
+	}
+}
+
+// Confirming the upload with an empty listing (no source selected) keeps the
+// form open with an error instead of calling the backend.
+func TestCpFormEmptySourceStaysOpen(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	step := func(msg tea.Msg) tea.Cmd { var c tea.Cmd; tm, c = tm.Update(msg); return c }
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+
+	step(openCpFormMsg{containerID: "abc123", name: "web"})
+	step(cpListedMsg{dir: t.TempDir(), entries: nil})
+	step(tea.KeyMsg{Type: tea.KeyTab})          // focus destination
+	cmd := step(tea.KeyMsg{Type: tea.KeyEnter}) // confirm with no source
+	if cmd != nil {
+		t.Fatalf("expected no upload command, got %#v", cmd())
+	}
+	if m := tm.(Model); m.mode != ModeCpForm {
+		t.Fatalf("mode = %v, want ModeCpForm (stays open)", m.mode)
 	}
 }
 
