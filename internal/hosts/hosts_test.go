@@ -1,12 +1,12 @@
 package hosts
 
 import (
-	"path/filepath"
+	"reflect"
 	"testing"
 )
 
 func TestAddEditRemove(t *testing.T) {
-	s := &Store{path: "x"}
+	s := &Store{}
 
 	if err := s.Add("prod", "ssh://user@host"); err != nil {
 		t.Fatalf("Add: %v", err)
@@ -44,7 +44,7 @@ func TestAddEditRemove(t *testing.T) {
 }
 
 func TestUpsertByHost(t *testing.T) {
-	s := &Store{path: "x"}
+	s := &Store{}
 
 	if added := s.UpsertByHost("ssh://deploy@10.0.0.5"); !added {
 		t.Fatal("expected first upsert to add")
@@ -57,38 +57,35 @@ func TestUpsertByHost(t *testing.T) {
 	}
 
 	// A second host that derives the same base name gets a numeric suffix.
-	s2 := &Store{path: "x", Hosts: []Host{{Name: "10.0.0.5", Host: "tcp://10.0.0.5:2375"}}}
+	s2 := &Store{Hosts: []Host{{Name: "10.0.0.5", Host: "tcp://10.0.0.5:2375"}}}
 	s2.UpsertByHost("tcp://10.0.0.5:2376")
 	if got := s2.Hosts[1].Name; got != "10.0.0.5-2" {
 		t.Errorf("suffixed name = %q, want 10.0.0.5-2", got)
 	}
 }
 
-func TestLoadSaveRoundTrip(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "hosts.json")
-
-	s, err := Load(path) // missing file → empty store
-	if err != nil {
-		t.Fatalf("Load missing: %v", err)
+// TestPersistCallback verifies Save forwards the current list to the injected
+// callback, and that a zero-value store (no callback) treats Save as a no-op.
+func TestPersistCallback(t *testing.T) {
+	var saved []Host
+	s := NewStore([]Host{{Name: "seed", Host: "tcp://seed:2375"}}, func(list []Host) error {
+		saved = list
+		return nil
+	})
+	if _, ok := s.Find("seed"); !ok {
+		t.Fatal("NewStore did not seed initial hosts")
 	}
-	if len(s.List()) != 0 {
-		t.Fatalf("expected empty store for missing file")
-	}
-
-	_ = s.Add("local", "tcp://localhost:2375")
 	_ = s.Add("prod", "ssh://user@host")
 	if err := s.Save(); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
+	want := []Host{{Name: "seed", Host: "tcp://seed:2375"}, {Name: "prod", Host: "ssh://user@host"}}
+	if !reflect.DeepEqual(saved, want) {
+		t.Errorf("persisted = %+v, want %+v", saved, want)
+	}
 
-	reloaded, err := Load(path)
-	if err != nil {
-		t.Fatalf("reload: %v", err)
-	}
-	if len(reloaded.List()) != 2 {
-		t.Fatalf("expected 2 hosts, got %d", len(reloaded.List()))
-	}
-	if h, ok := reloaded.Find("prod"); !ok || h.Host != "ssh://user@host" {
-		t.Errorf("round-trip mismatch: %+v ok=%v", h, ok)
+	// Zero-value store: Save must not panic and must be a no-op.
+	if err := (&Store{}).Save(); err != nil {
+		t.Errorf("zero-value Save: %v", err)
 	}
 }

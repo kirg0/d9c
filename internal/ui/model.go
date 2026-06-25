@@ -17,6 +17,7 @@ import (
 	"d9c/internal/hosts"
 	"d9c/internal/keymap"
 	"d9c/internal/plugins"
+	"d9c/internal/settings"
 	"d9c/internal/ui/buildform"
 	"d9c/internal/ui/cmdline"
 	"d9c/internal/ui/composeedit"
@@ -425,6 +426,10 @@ type Model struct {
 
 	// Saved-hosts store (persisted next to the binary)
 	hostStore *hosts.Store
+
+	// settings is the unified config store; used to persist runtime changes such
+	// as the theme picked live via the theme picker. May be nil in tests.
+	settings *settings.Store
 
 	// When set, the containers view is scoped to this compose project.
 	composeFilter string

@@ -11,9 +11,16 @@ import (
 	"d9c/internal/alerts"
 	"d9c/internal/keymap"
 	"d9c/internal/plugins"
+	"d9c/internal/settings"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+// SetSettings installs the unified config store, used to persist runtime changes
+// (e.g. the theme chosen via the picker). Safe to call with a nil store.
+func (m *Model) SetSettings(s *settings.Store) {
+	m.settings = s
+}
 
 // SetPlugins installs the user-defined plugin set and refreshes command
 // autocomplete for the current view. Safe to call with a nil set.

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -196,10 +195,7 @@ func TestModel_NoHostStartsInHostsWithoutError(t *testing.T) {
 // (showing the connection error and saved hosts) instead of exiting when the
 // initial Docker connection fails.
 func TestDemo_StartsInHostsOnConnectError(t *testing.T) {
-	store, err := hosts.Load(filepath.Join(t.TempDir(), "hosts.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	store := &hosts.Store{}
 	_ = store.Add("prod", "ssh://user@example")
 
 	connErr := errors.New("dial tcp: connection refused")
@@ -504,10 +500,7 @@ func TestDemo_ComposeLogs(t *testing.T) {
 // types a name (keeping the default host), saves, and checks the host is listed
 // and persisted.
 func TestDemo_HostsAddViaForm(t *testing.T) {
-	store, err := hosts.Load(filepath.Join(t.TempDir(), "hosts.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	store := &hosts.Store{}
 	tm := newTestModelStore(t, store)
 	waitFor(t, tm, "web")
 
@@ -538,10 +531,7 @@ func TestDemo_HostsAddViaForm(t *testing.T) {
 // opens the same view. Counts come from the stubbed summarizer in demo mode, so
 // no network is touched.
 func TestDemo_HostsDashboard(t *testing.T) {
-	store, err := hosts.Load(filepath.Join(t.TempDir(), "hosts.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	store := &hosts.Store{}
 	_ = store.Add("prod", "ssh://user@example")
 
 	tm := newTestModelStore(t, store)
@@ -560,10 +550,7 @@ func TestDemo_HostsDashboard(t *testing.T) {
 // is first-class in the merged hosts/dashboard view), saves a host and checks it
 // is listed and persisted.
 func TestDemo_HostsAddViaKey(t *testing.T) {
-	store, err := hosts.Load(filepath.Join(t.TempDir(), "hosts.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	store := &hosts.Store{}
 	tm := newTestModelStore(t, store)
 	waitFor(t, tm, "web")
 
@@ -588,10 +575,7 @@ func TestDemo_HostsAddViaKey(t *testing.T) {
 // TestDemo_HostsDeleteViaKey removes the selected host with the `d` key and the
 // confirmation overlay, then checks it is gone and not persisted.
 func TestDemo_HostsDeleteViaKey(t *testing.T) {
-	store, err := hosts.Load(filepath.Join(t.TempDir(), "hosts.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	store := &hosts.Store{}
 	_ = store.Add("prod", "ssh://user@example")
 
 	tm := newTestModelStore(t, store)
@@ -616,10 +600,7 @@ func TestDemo_HostsDeleteViaKey(t *testing.T) {
 // TestDemo_HostsEditViaForm opens the edit form for the selected host (pre-filled),
 // appends to the name, saves, and verifies the rename persisted.
 func TestDemo_HostsEditViaForm(t *testing.T) {
-	store, err := hosts.Load(filepath.Join(t.TempDir(), "hosts.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	store := &hosts.Store{}
 	_ = store.Add("prod", "ssh://user@example")
 
 	tm := newTestModelStore(t, store)
