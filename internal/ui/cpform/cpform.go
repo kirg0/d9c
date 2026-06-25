@@ -218,7 +218,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 // listHeight is the number of picker rows that fit; conservative so the
 // destination field, title and hints always stay visible.
 func (m Model) listHeight() int {
-	h := m.height - 9 // title, blank, dir header, dest label+field, hints
+	h := m.height - 12 // title, dir header, selected line, dest label+field, hints
 	if h < 3 {
 		return 3
 	}
@@ -261,6 +261,10 @@ func (m Model) View(width, height int) string {
 	b.WriteString(m.pickerBody())
 	b.WriteString("\n\n")
 
+	// Chosen source, shown regardless of focus so the upload target is clear.
+	b.WriteString("  " + styles.FormLabel.Render("Selected: ") + styles.CopyMenuValue.Render(m.sourceLabel()))
+	b.WriteString("\n\n")
+
 	// ── destination field ──────────────────────────────────────────────────
 	b.WriteString(m.destLabel() + "\n  " + m.dest.View())
 	b.WriteString("\n\n")
@@ -298,6 +302,19 @@ func (m Model) dirHeader() string {
 	return "  " + styles.CopyMenuHint.Render(m.dir)
 }
 
+// sourceLabel names the highlighted local entry (the upload source), or "(none)"
+// when the listing is empty.
+func (m Model) sourceLabel() string {
+	e := m.Selected()
+	if e.Name == "" {
+		return "(none)"
+	}
+	if e.IsDir {
+		return e.Name + "/"
+	}
+	return e.Name
+}
+
 // pickerBody renders the windowed local listing (or an empty marker).
 func (m Model) pickerBody() string {
 	if len(m.entries) == 0 {
@@ -312,20 +329,25 @@ func (m Model) pickerBody() string {
 	return strings.Join(rows, "\n")
 }
 
-// renderRow renders one entry, marking directories and highlighting the cursor.
+// renderRow renders one entry, marking directories and the chosen source. The
+// cursor row stays marked even when focus moves to the destination field (a
+// dimmer ● instead of the active ▶), so the picked source is always visible.
 func (m Model) renderRow(i int) string {
 	e := m.entries[i]
 	label := e.Name
 	if e.IsDir {
 		label += "/"
 	}
-	if i == m.cursor && m.focus == focusBrowser {
+	switch {
+	case i == m.cursor && m.focus == focusBrowser:
 		return " ▶ " + styles.TableSelected.Render(" "+label+" ")
-	}
-	if e.IsDir {
+	case i == m.cursor:
+		return " ● " + styles.CopyMenuSelected.Render(" "+label+" ")
+	case e.IsDir:
 		return "   " + styles.StatusRunning.Render(label)
+	default:
+		return "   " + styles.TableCell.Render(label)
 	}
-	return "   " + styles.TableCell.Render(label)
 }
 
 func (m Model) hint() string {
