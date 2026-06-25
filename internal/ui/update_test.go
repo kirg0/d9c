@@ -1699,7 +1699,8 @@ func TestDispatchSystemDF(t *testing.T) {
 }
 
 // :theme switches the color scheme on the fly: a known name re-themes styles
-// and notifies the footer; an unknown name errors and leaves styles untouched.
+// and notifies the footer; an unknown name errors and leaves styles untouched;
+// no args opens the interactive picker.
 func TestThemeCommand(t *testing.T) {
 	t.Cleanup(func() { styles.Apply(styles.DefaultPalette()) })
 
@@ -1708,9 +1709,16 @@ func TestThemeCommand(t *testing.T) {
 	tm, _ = tm.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m := tm.(Model)
 
-	// no args → usage error, styles unchanged
-	if _, err := m.dispatchCommand(&cmdline.CommandMsg{Name: "theme"}); err == nil {
-		t.Error("theme without args should error with usage")
+	// no args → opens the picker (no error), styles unchanged until a choice
+	cmd, err := m.dispatchCommand(&cmdline.CommandMsg{Name: "theme"})
+	if err != nil {
+		t.Fatalf("theme without args should not error: %v", err)
+	}
+	if cmd == nil {
+		t.Fatal("theme without args should return a command opening the picker")
+	}
+	if _, ok := cmd().(openThemePickerMsg); !ok {
+		t.Error("theme without args should open the theme picker")
 	}
 
 	// unknown name → error, styles unchanged
@@ -1723,7 +1731,7 @@ func TestThemeCommand(t *testing.T) {
 	}
 
 	// known name → palette applied, footer notified
-	cmd, err := m.dispatchCommand(&cmdline.CommandMsg{Name: "theme", Args: []string{"Dracula"}})
+	cmd, err = m.dispatchCommand(&cmdline.CommandMsg{Name: "theme", Args: []string{"Dracula"}})
 	if err != nil {
 		t.Fatalf("dispatch theme dracula: %v", err)
 	}
@@ -1736,6 +1744,64 @@ func TestThemeCommand(t *testing.T) {
 	}
 	if cmd == nil {
 		t.Error("theme switch should return a clear-notif command")
+	}
+}
+
+// The theme picker previews the highlighted scheme live as the cursor moves,
+// keeps it on Enter, and rolls back to the original palette on cancel.
+func TestThemePicker(t *testing.T) {
+	t.Cleanup(func() { styles.Apply(styles.DefaultPalette()) })
+
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	tm, _ = tm.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+
+	original := styles.Active()
+
+	// Open the picker (as the no-arg :theme command does).
+	tm, _ = tm.Update(openThemePickerMsg{})
+	m := tm.(Model)
+	if m.mode != ModeThemePicker {
+		t.Fatalf("mode = %v, want ModeThemePicker", m.mode)
+	}
+	if len(m.themeNames) == 0 {
+		t.Fatal("picker should be populated with theme names")
+	}
+
+	// Moving the cursor previews the highlighted theme live.
+	tm, _ = tm.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = tm.(Model)
+	want, _ := theme.ByName(m.themeNames[m.themeCursor])
+	if styles.Active() != want {
+		t.Error("moving the cursor should apply the highlighted theme as a preview")
+	}
+
+	// Esc cancels: the original palette is restored and the modal closes.
+	tm, _ = tm.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = tm.(Model)
+	if m.mode != ModeNormal {
+		t.Errorf("mode = %v, want ModeNormal after cancel", m.mode)
+	}
+	if styles.Active() != original {
+		t.Error("cancel should restore the original palette")
+	}
+
+	// Reopen, move, and confirm with Enter: the preview is kept.
+	tm, _ = tm.Update(openThemePickerMsg{})
+	tm, _ = tm.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = tm.(Model)
+	chosen, _ := theme.ByName(m.themeNames[m.themeCursor])
+	name := m.themeNames[m.themeCursor]
+	tm, _ = tm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = tm.(Model)
+	if m.mode != ModeNormal {
+		t.Errorf("mode = %v, want ModeNormal after apply", m.mode)
+	}
+	if styles.Active() != chosen {
+		t.Error("Enter should keep the previewed theme")
+	}
+	if m.copyNotif != "тема: "+name {
+		t.Errorf("copyNotif = %q, want %q", m.copyNotif, "тема: "+name)
 	}
 }
 

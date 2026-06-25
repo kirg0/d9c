@@ -439,6 +439,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cpForm.Show(msg.dir, msg.entries)
 		return m, nil
 
+	case openThemePickerMsg:
+		m.openThemePicker()
+		return m, nil
+
 	case openConfirmMsg:
 		m.confirmPrompt = msg.prompt
 		m.confirmAction = msg.action
@@ -680,6 +684,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.mode = ModeNormal
 			return m, nil
 		}
+		// Cancel the theme picker: roll the live preview back to the palette that
+		// was active when it opened.
+		if m.mode == ModeThemePicker {
+			m.cancelThemePicker()
+			return m, nil
+		}
 		// Esc first clears a pending bulk selection (before popping any view).
 		if m.mode == ModeNormal && len(m.selected) > 0 {
 			m.selected = nil
@@ -734,6 +744,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleLogs(msg)
 	case ModeCopy:
 		return m.handleCopyMode(msg)
+	case ModeThemePicker:
+		return m.handleThemePicker(msg)
 	case ModeBackupPicker:
 		return m.handleBackupPicker(msg)
 	case ModeHelp:

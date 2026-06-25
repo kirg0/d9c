@@ -104,7 +104,7 @@ var viewCmds = []cmdDef{
 	{"compose", ""},
 	{"events", "(live daemon events)"},
 	{"system", "df | prune (полная очистка с подтверждением)"},
-	{"theme", "<name> (сменить цветовую тему на лету)"},
+	{"theme", "[name] (сменить тему; без имени — выбор из списка с превью)"},
 	{"interval", "<dur> | pause | resume (интервал автообновления)"},
 	{"alert", "cpu <%> | mem <%> | off (пороги CPU/MEM)"},
 }

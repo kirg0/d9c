@@ -1,6 +1,10 @@
 package styles
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 // Palette is the set of base colors every style in this package is derived from.
 // Swapping the palette (via Apply) re-themes the whole UI; see DefaultPalette for
@@ -496,6 +500,19 @@ func HealthColor(health string) lipgloss.Style {
 	default: // no healthcheck
 		return StatusStopped
 	}
+}
+
+// Swatch renders a short row of solid color blocks from a palette, used by the
+// theme picker to preview a scheme's accent colors next to its name. The colors
+// are taken straight from p (not the active palette), so every row shows its own
+// theme regardless of which one is currently applied.
+func Swatch(p Palette) string {
+	block := "███"
+	var b strings.Builder
+	for _, c := range []lipgloss.Color{p.Primary, p.Secondary, p.Success, p.Warning, p.Danger} {
+		b.WriteString(lipgloss.NewStyle().Foreground(c).Render(block))
+	}
+	return b.String()
 }
 
 // ComposeStatusColor returns a style matching a compose project status.

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"d9c/internal/theme"
 	"d9c/internal/ui/styles"
 	uitbl "d9c/internal/ui/table"
 	"d9c/internal/version"
@@ -27,6 +28,8 @@ func (m Model) View() string {
 		body = m.detail.View()
 	case ModeCopy:
 		body = m.viewCopyOverlay()
+	case ModeThemePicker:
+		body = m.viewThemeOverlay()
 	case ModeConfirm:
 		body = m.viewConfirmOverlay()
 	case ModeNotice:
@@ -274,6 +277,10 @@ func (m Model) viewFooter() string {
 		sb.WriteString(keyHint("↑↓", "Select"))
 		sb.WriteString(keyHint("enter", "Copy"))
 		sb.WriteString(keyHint("esc", "Cancel"))
+	case ModeThemePicker:
+		sb.WriteString(keyHint("↑↓", "Preview"))
+		sb.WriteString(keyHint("enter", "Apply"))
+		sb.WriteString(keyHint("q/esc", "Cancel"))
 	case ModeConfirm:
 		sb.WriteString(keyHint("y/enter", "Confirm"))
 		sb.WriteString(keyHint("n/esc", "Cancel"))
@@ -464,6 +471,43 @@ func (m Model) viewCopyOverlay() string {
 	panel := styles.OverlayPanel.Render(content)
 
 	return lipgloss.Place(m.width, bodyH, lipgloss.Center, lipgloss.Center, panel)
+}
+
+// viewThemeOverlay renders the theme picker centered over the current view, so
+// the live preview (header/footer/list re-colored by the highlighted theme)
+// stays visible around the modal.
+func (m Model) viewThemeOverlay() string {
+	bodyH := m.height - 2 // header + footer
+
+	maxName := 0
+	for _, name := range m.themeNames {
+		if len(name) > maxName {
+			maxName = len(name)
+		}
+	}
+
+	var rows []string
+	for i, name := range m.themeNames {
+		swatch := ""
+		if pal, ok := theme.ByName(name); ok {
+			swatch = styles.Swatch(pal)
+		}
+		label := fmt.Sprintf("%-*s", maxName, name)
+		if i == m.themeCursor {
+			rows = append(rows, " ▶  "+styles.CopyMenuSelected.Render(" "+label+" ")+"  "+swatch)
+		} else {
+			rows = append(rows, "    "+styles.CopyMenuLabel.Render(label)+"  "+swatch)
+		}
+	}
+
+	hint := styles.CopyMenuHint.Render("  ↑/↓ превью   enter применить   q/esc отмена")
+	title := styles.CopyMenuTitle.Render(" Тема ")
+	content := title + "\n\n" +
+		strings.Join(rows, "\n") +
+		"\n\n" + hint
+
+	panel := styles.OverlayPanel.Render(content)
+	return overlayCenter(m.viewNormal(), panel, m.width, bodyH)
 }
 
 // viewConfirmOverlay renders the generic confirmation panel centered over the
