@@ -4,13 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"d9c/internal/alerts"
 	"d9c/internal/config"
 	"d9c/internal/docker"
 	"d9c/internal/hosts"
-	"d9c/internal/keymap"
 	"d9c/internal/plugins"
-	"d9c/internal/theme"
+	"d9c/internal/settings"
 	"d9c/internal/ui"
 	"d9c/internal/ui/styles"
 	"d9c/internal/version"
@@ -31,14 +29,18 @@ func run() error {
 		return nil
 	}
 
-	hostsPath := cfg.HostsFile
-	if hostsPath == "" {
-		hostsPath = hosts.DefaultPath()
+	configPath := cfg.ConfigFile
+	if configPath == "" {
+		configPath = settings.DefaultPath()
 	}
-	store, err := hosts.Load(hostsPath)
+	set, err := settings.Load(configPath)
 	if err != nil {
-		return fmt.Errorf("loading saved hosts: %w", err)
+		return fmt.Errorf("loading config: %w", err)
 	}
+	if err := migrateLegacyHosts(set, cfg); err != nil {
+		return fmt.Errorf("migrating saved hosts: %w", err)
+	}
+	store := set.Hosts()
 
 	pluginsPath := cfg.PluginsFile
 	if pluginsPath == "" {
@@ -49,22 +51,18 @@ func run() error {
 		return fmt.Errorf("loading plugins: %w", err)
 	}
 
-	configPath := cfg.ConfigFile
-	if configPath == "" {
-		configPath = theme.DefaultPath()
-	}
-	palette, err := theme.Load(configPath)
+	palette, err := set.Palette()
 	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
+		return fmt.Errorf("loading theme: %w", err)
 	}
 	styles.Apply(palette)
 
-	keys, err := keymap.Load(configPath)
+	keys, err := set.Keymap()
 	if err != nil {
 		return fmt.Errorf("loading keybindings: %w", err)
 	}
 
-	alertThresholds, err := alerts.Load(configPath)
+	alertThresholds, err := set.Alerts()
 	if err != nil {
 		return fmt.Errorf("loading alerts: %w", err)
 	}
@@ -97,7 +95,36 @@ func run() error {
 	}
 	defer backend.Close()
 
-	return ui.Run(cfg, backend, store, pluginSet, keys, alertThresholds, connectErr, startInHosts)
+	return ui.Run(cfg, backend, store, set, pluginSet, keys, alertThresholds, connectErr, startInHosts)
+}
+
+// migrateLegacyHosts imports hosts from the old standalone d9c-hosts.json into
+// the unified config, once: only when the config has no hosts yet. The legacy
+// file is renamed to *.migrated so it is read at most once and the user can see
+// where the data came from. Honors -hosts-file as the legacy source override.
+func migrateLegacyHosts(set *settings.Store, cfg *config.Config) error {
+	if set.HasHosts() {
+		return nil
+	}
+	legacyPath := cfg.HostsFile
+	if legacyPath == "" {
+		legacyPath = hosts.LegacyDefaultPath()
+	}
+	list, err := hosts.LoadLegacy(legacyPath)
+	if err != nil {
+		return err
+	}
+	if len(list) == 0 {
+		return nil
+	}
+	set.SetHosts(list)
+	if err := set.Save(); err != nil {
+		return err
+	}
+	if err := os.Rename(legacyPath, legacyPath+".migrated"); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: migrated hosts into %s but could not rename %s: %v\n", set.Path(), legacyPath, err)
+	}
+	return nil
 }
 
 // hostConfigured reports whether the user explicitly provided a Docker host

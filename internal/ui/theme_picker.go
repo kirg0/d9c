@@ -71,7 +71,13 @@ func (m Model) handleThemePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "enter":
 		if m.themeCursor < len(m.themeNames) {
-			m.copyNotif = "тема: " + m.themeNames[m.themeCursor]
+			name := m.themeNames[m.themeCursor]
+			m.copyNotif = "тема: " + name
+			if m.settings != nil {
+				if err := m.settings.SetTheme(name); err != nil {
+					m.copyNotif = "тема применена, но не сохранена: " + err.Error()
+				}
+			}
 			m.mode = ModeNormal
 			return m, clearCopyNotifCmd()
 		}

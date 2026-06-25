@@ -1,5 +1,8 @@
-// Package hosts persists the list of Docker hosts the user has connected to,
-// in a small JSON file stored next to the d9c binary.
+// Package hosts manages the list of Docker hosts the user has connected to.
+// The in-memory store is the same regardless of where the data lives; it
+// persists through an injected callback so the actual file format (today the
+// unified d9c-config.yaml owned by internal/settings) stays out of this package.
+// A legacy JSON reader is kept only to migrate the old standalone d9c-hosts.json.
 package hosts
 
 import (
@@ -13,23 +16,27 @@ import (
 
 // Host is a single saved connection target.
 type Host struct {
-	Name string `json:"name"`
-	Host string `json:"host"`
+	Name string `json:"name" yaml:"name"`
+	Host string `json:"host" yaml:"host"`
 }
 
-// Store holds the saved hosts and the file they are persisted to.
+// Store holds the saved hosts and a callback that persists them. The zero value
+// is a usable in-memory store with no persistence (Save is a no-op), which suits
+// tests and demo mode.
 type Store struct {
-	path  string
-	Hosts []Host
+	Hosts   []Host
+	persist func([]Host) error
 }
 
-type fileFormat struct {
-	Hosts []Host `json:"hosts"`
+// NewStore builds a store seeded with initial hosts that persists changes via
+// the given callback. A nil callback yields an in-memory-only store.
+func NewStore(initial []Host, persist func([]Host) error) *Store {
+	return &Store{Hosts: append([]Host(nil), initial...), persist: persist}
 }
 
-// DefaultPath returns the hosts file location next to the running binary,
-// falling back to the current directory if the executable path is unavailable.
-func DefaultPath() string {
+// LegacyDefaultPath returns the location of the old standalone hosts file next
+// to the running binary, used only for one-time migration into the config.
+func LegacyDefaultPath() string {
 	const name = "d9c-hosts.json"
 	exe, err := os.Executable()
 	if err != nil {
@@ -38,39 +45,36 @@ func DefaultPath() string {
 	return filepath.Join(filepath.Dir(exe), name)
 }
 
-// Load reads the hosts file at path. A missing file yields an empty store
-// bound to that path (so a later Save creates it); malformed JSON is an error.
-func Load(path string) (*Store, error) {
-	s := &Store{path: path}
+type legacyFile struct {
+	Hosts []Host `json:"hosts"`
+}
+
+// LoadLegacy reads the old standalone JSON hosts file at path. A missing file
+// yields no hosts (not an error); malformed JSON is an error. It is used to
+// migrate pre-unified-config installs.
+func LoadLegacy(path string) ([]Host, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return s, nil
+			return nil, nil
 		}
 		return nil, fmt.Errorf("read hosts file: %w", err)
 	}
-	var ff fileFormat
+	var ff legacyFile
 	if err := json.Unmarshal(data, &ff); err != nil {
 		return nil, fmt.Errorf("parse hosts file %s: %w", path, err)
 	}
-	s.Hosts = ff.Hosts
-	return s, nil
+	return ff.Hosts, nil
 }
 
-// Save writes the store back to its file.
+// Save persists the current hosts through the store's callback. With no callback
+// (zero-value store) it is a no-op.
 func (s *Store) Save() error {
-	data, err := json.MarshalIndent(fileFormat{Hosts: s.Hosts}, "", "  ")
-	if err != nil {
-		return fmt.Errorf("encode hosts: %w", err)
+	if s.persist == nil {
+		return nil
 	}
-	if err := os.WriteFile(s.path, data, 0o600); err != nil {
-		return fmt.Errorf("write hosts file: %w", err)
-	}
-	return nil
+	return s.persist(s.List())
 }
-
-// Path returns the file the store is bound to.
-func (s *Store) Path() string { return s.path }
 
 // List returns a copy of the saved hosts.
 func (s *Store) List() []Host {

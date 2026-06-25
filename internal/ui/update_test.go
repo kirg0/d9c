@@ -11,6 +11,7 @@ import (
 
 	"d9c/internal/config"
 	"d9c/internal/docker"
+	"d9c/internal/settings"
 	"d9c/internal/theme"
 	"d9c/internal/ui/cmdline"
 	"d9c/internal/ui/cpform"
@@ -1802,6 +1803,38 @@ func TestThemePicker(t *testing.T) {
 	}
 	if m.copyNotif != "тема: "+name {
 		t.Errorf("copyNotif = %q, want %q", m.copyNotif, "тема: "+name)
+	}
+}
+
+// TestThemePickerPersists verifies that confirming a theme writes it to the
+// unified config store, so the choice survives a restart.
+func TestThemePickerPersists(t *testing.T) {
+	t.Cleanup(func() { styles.Apply(styles.DefaultPalette()) })
+
+	path := filepath.Join(t.TempDir(), "d9c-config.yaml")
+	set, err := settings.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fb := docker.NewFakeBackend()
+	m := NewModel(&config.Config{}, fb, nil, nil, false)
+	m.SetSettings(set)
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+
+	tm, _ = tm.Update(openThemePickerMsg{})
+	tm, _ = tm.Update(tea.KeyMsg{Type: tea.KeyDown})
+	mm := tm.(Model)
+	name := mm.themeNames[mm.themeCursor]
+	_, _ = tm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	reloaded, err := settings.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.File.Theme != name {
+		t.Errorf("persisted theme = %q, want %q", reloaded.File.Theme, name)
 	}
 }
 
