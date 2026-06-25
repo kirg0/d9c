@@ -113,11 +113,26 @@ func TestFakeRunContainer(t *testing.T) {
 		}
 	})
 
-	t.Run("missing image gets a pull hint", func(t *testing.T) {
+	t.Run("missing image is pulled automatically", func(t *testing.T) {
 		f := NewFakeBackend()
-		err := f.RunContainer(RunOptions{Image: "ghost:0.0"})
-		if err == nil || !strings.Contains(err.Error(), "pull") {
-			t.Errorf("err = %v, want pull hint", err)
+		before := len(f.Containers)
+		err := f.RunContainer(RunOptions{Image: "ghost:0.0", Name: "ghost1"})
+		if err != nil {
+			t.Fatalf("run: %v", err)
+		}
+		if len(f.Containers) != before+1 {
+			t.Fatalf("container count = %d, want %d", len(f.Containers), before+1)
+		}
+		// The pulled image should now be present in the image list.
+		found := false
+		for _, img := range f.Images {
+			if strings.Contains(img.Tags, "ghost:0.0") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected ghost:0.0 to be added to the image list after auto-pull")
 		}
 	})
 

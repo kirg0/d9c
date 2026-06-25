@@ -1528,21 +1528,26 @@ func TestRunFormSubmit(t *testing.T) {
 	}
 }
 
-// A backend failure (missing image) keeps the wizard open with the error inside.
+// A backend failure (name conflict) keeps the wizard open with the error inside.
 func TestRunFormBackendErrorStaysOpen(t *testing.T) {
 	fb := docker.NewFakeBackend()
 	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
 	step := func(msg tea.Msg) tea.Cmd { var c tea.Cmd; tm, c = tm.Update(msg); return c }
 	step(tea.WindowSizeMsg{Width: 120, Height: 30})
 
-	step(openRunFormMsg{image: "ghost:0.0"})
+	step(openRunFormMsg{image: "nginx:1.25"})
+	// "web" is already taken by a demo container, so the create conflicts.
+	step(tea.KeyMsg{Type: tea.KeyTab})
+	for _, r := range "web" {
+		step(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
 	cmd := step(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("expected a run command")
 	}
 	res, ok := cmd().(actionResultMsg)
 	if !ok || res.err == nil {
-		t.Fatalf("run result = %#v, want missing-image error", res)
+		t.Fatalf("run result = %#v, want name-conflict error", res)
 	}
 	step(res)
 	m := tm.(Model)
