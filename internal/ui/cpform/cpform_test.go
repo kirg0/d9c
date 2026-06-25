@@ -126,6 +126,29 @@ func TestSetErrorClearsBusy(t *testing.T) {
 	}
 }
 
+func TestSelectedFileMarkedWhenDestFocused(t *testing.T) {
+	m := New()
+	m.Open("abc123", "web")
+	m.Show("/data", []Entry{{Name: "a.txt"}, {Name: "b.txt"}})
+	m.ToggleFocus() // move focus to the destination field
+	v := m.View(80, 24)
+	// The chosen source stays marked (●) and named in the Selected line.
+	if !strings.Contains(v, "●") {
+		t.Errorf("view should mark the chosen source while dest focused:\n%s", v)
+	}
+	if !strings.Contains(v, "Selected: ") || !strings.Contains(v, "a.txt") {
+		t.Errorf("view should name the selected source a.txt:\n%s", v)
+	}
+}
+
+func TestSourceLabelEmptyListing(t *testing.T) {
+	m := New()
+	m.Open("abc123", "web")
+	if got := m.sourceLabel(); got != "(none)" {
+		t.Errorf("sourceLabel on empty listing = %q, want (none)", got)
+	}
+}
+
 func TestViewShowsContainerAndError(t *testing.T) {
 	m := New()
 	m.Open("abc123", "web")
