@@ -61,11 +61,10 @@ func (m *Model) dispatchCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 		// inside a tea.Cmd. Applies on top of any config-file color overrides.
 		names := strings.Join(theme.Names(), ", ")
 		if len(cmd.Args) == 0 {
-			cur := theme.NameOf(styles.Active())
-			if cur == "" {
-				cur = "custom"
-			}
-			return nil, fmt.Errorf("usage: theme <name> (%s); current: %s", names, cur)
+			// No name given: open the interactive picker with live preview instead
+			// of erroring out, so the user can scroll the built-in themes and watch
+			// the whole UI re-color as the cursor moves.
+			return func() tea.Msg { return openThemePickerMsg{} }, nil
 		}
 		name := strings.ToLower(strings.TrimSpace(cmd.Args[0]))
 		pal, ok := theme.ByName(name)

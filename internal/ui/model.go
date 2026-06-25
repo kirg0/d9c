@@ -34,6 +34,7 @@ import (
 	"d9c/internal/ui/pushform"
 	"d9c/internal/ui/runform"
 	"d9c/internal/ui/shell"
+	"d9c/internal/ui/styles"
 	"d9c/internal/ui/table"
 	"d9c/internal/ui/volform"
 
@@ -95,6 +96,7 @@ const (
 	ModeFSBrowser         // container filesystem browser ('f' / :files)
 	ModeNotice            // informational modal (e.g. SSH known_hosts mismatch)
 	ModeCpForm            // upload-to-container wizard (`:cp` with no args)
+	ModeThemePicker       // theme selector modal (`:theme` with no args, live preview)
 )
 
 // copyItem is one selectable entry in the copy overlay.
@@ -289,6 +291,9 @@ type eventsLineMsg struct{ line string }
 
 // openPushFormMsg requests the registry-credentials modal for pushing ref.
 type openPushFormMsg struct{ ref string }
+
+// openThemePickerMsg requests the theme selector modal (`:theme` with no args).
+type openThemePickerMsg struct{}
 
 // openNetFormMsg requests the create-network modal form.
 type openNetFormMsg struct{}
@@ -521,6 +526,13 @@ type Model struct {
 	backupProject       string // identity (working_dir) of the catalog's deployment
 	backupName          string // its display name (archive prefix / restore title)
 	backupConfirmDelete string // name awaiting a second 'd' to confirm deletion
+
+	// Theme picker overlay (ModeThemePicker) state: the list of built-in theme
+	// names, the cursor, and the palette to restore if the user cancels (the
+	// preview applies the highlighted theme live, mutating the global styles).
+	themeNames    []string
+	themeCursor   int
+	themeOriginal styles.Palette
 
 	// Generic confirmation overlay (ModeConfirm) state.
 	confirmPrompt string
