@@ -174,7 +174,12 @@ func (f *FakeBackend) RunContainer(opts RunOptions) error {
 		}
 	}
 	if !found {
-		return friendlyRunErr(errors.New("Error response from daemon: No such image: " + opts.Image))
+		// Mirror the real backend: a missing image is pulled automatically
+		// rather than failing, so the run proceeds.
+		if err := f.PullImage(opts.Image); err != nil {
+			return err
+		}
+		f.Images = append(f.Images, Image{ID: fmt.Sprintf("img%09x", len(f.Images)+1), Tags: opts.Image})
 	}
 	name := opts.Name
 	if name == "" {

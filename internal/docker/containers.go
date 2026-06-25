@@ -176,8 +176,8 @@ type RunOptions struct {
 }
 
 // RunContainer creates and starts a container from opts — the API-side
-// equivalent of `docker run -d`. The image must already be present on the
-// host; a missing image is reported with a hint to pull it first.
+// equivalent of `docker run -d`. If the image is missing on the host it is
+// pulled automatically (like `docker run`) and the create is retried once.
 func (b *dockerBackend) RunContainer(opts RunOptions) error {
 	if strings.TrimSpace(opts.Image) == "" {
 		return fmt.Errorf("image is required")
@@ -186,9 +186,6 @@ func (b *dockerBackend) RunContainer(opts RunOptions) error {
 	if err != nil {
 		return fmt.Errorf("invalid port spec: %w", err)
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
 
 	cfg := &container.Config{
 		Image:        opts.Image,
@@ -199,14 +196,42 @@ func (b *dockerBackend) RunContainer(opts RunOptions) error {
 		PortBindings: bindings,
 		Binds:        opts.Volumes,
 	}
-	created, err := b.cli.ContainerCreate(ctx, cfg, hostCfg, nil, nil, opts.Name)
+
+	created, err := b.createContainer(cfg, hostCfg, opts.Name)
 	if err != nil {
-		return friendlyRunErr(err)
+		// The image is not on the host: pull it (like `docker run` does) and
+		// retry the create once before giving up.
+		if isNoSuchImageErr(err) {
+			if perr := b.PullImage(opts.Image); perr != nil {
+				return fmt.Errorf("скачивание образа не удалось: %w", perr)
+			}
+			created, err = b.createContainer(cfg, hostCfg, opts.Name)
+		}
+		if err != nil {
+			return friendlyRunErr(err)
+		}
 	}
-	if err := b.cli.ContainerStart(ctx, created.ID, container.StartOptions{}); err != nil {
+
+	startCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := b.cli.ContainerStart(startCtx, created.ID, container.StartOptions{}); err != nil {
 		return fmt.Errorf("start container: %w", err)
 	}
 	return nil
+}
+
+// createContainer is the single create step shared by the initial attempt and
+// the post-pull retry in RunContainer.
+func (b *dockerBackend) createContainer(cfg *container.Config, hostCfg *container.HostConfig, name string) (container.CreateResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	return b.cli.ContainerCreate(ctx, cfg, hostCfg, nil, nil, name)
+}
+
+// isNoSuchImageErr reports whether the daemon rejected a create because the
+// image is absent on the host.
+func isNoSuchImageErr(err error) bool {
+	return err != nil && strings.Contains(strings.ToLower(err.Error()), "no such image")
 }
 
 // friendlyRunErr rewrites the daemon's terse create-conflicts into actionable
