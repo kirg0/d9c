@@ -105,9 +105,13 @@ var builtins = map[string]styles.Palette{
 		Danger:    "#FF1744", // bright red (errors / stopped)
 		Muted:     "#5F9EA0", // cadetblue dim text
 		Bg:        "#000000", // true-black body
-		BgAlt:     "#1A1A1A", // raised surfaces (selection, modals)
+		BgAlt:     "#1A1A1A", // raised surfaces (bars, modals)
 		Fg:        "#E0F7FA", // light cyan-white text
 		Border:    "#1E90FF", // dodgerblue rules
+		// On true-black, a BgAlt-shifted highlight is invisible; use a bright
+		// inverse cursor bar instead (aqua background, black text).
+		SelectBg: "#00E5FF",
+		SelectFg: "#000000",
 	},
 }
 

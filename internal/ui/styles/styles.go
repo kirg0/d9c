@@ -21,6 +21,16 @@ type Palette struct {
 	BgAlt     lipgloss.Color // raised surfaces (selection, bars, modals)
 	Fg        lipgloss.Color // primary foreground text
 	Border    lipgloss.Color // borders and rules
+
+	// SelectBg/SelectFg optionally override the highlighted (cursor) row's
+	// background and foreground. When empty, the selection falls back to the
+	// default subtle scheme — a BgAlt background with a Primary, bold foreground.
+	// A theme whose BgAlt sits too close to Bg (so the default highlight is
+	// invisible) can set these to a bright inverse bar instead, e.g. SelectBg =
+	// an accent color and SelectFg = the background. Applies to the table cursor
+	// row and the modal list selections (copy menu, theme picker, choice fields).
+	SelectBg lipgloss.Color
+	SelectFg lipgloss.Color
 }
 
 // DefaultPalette returns the built-in Tokyo Night color scheme used when no
@@ -199,10 +209,22 @@ func Apply(p Palette) {
 	colorFg = p.Fg
 	colorBorder = p.Border
 
+	// Selection (cursor row + modal list highlight). Default is the subtle
+	// BgAlt/Primary scheme; a theme may override either to a bright inverse bar
+	// when its BgAlt is too close to Bg to be seen.
+	selBg := colorBgAlt
+	if p.SelectBg != "" {
+		selBg = p.SelectBg
+	}
+	selFg := colorPrimary
+	if p.SelectFg != "" {
+		selFg = p.SelectFg
+	}
+
 	// Table
 	TableSelected = lipgloss.NewStyle().
-		Background(colorBgAlt).
-		Foreground(colorPrimary).
+		Background(selBg).
+		Foreground(selFg).
 		Bold(true)
 
 	TableHeader = lipgloss.NewStyle().
@@ -221,7 +243,7 @@ func Apply(p Palette) {
 	StatusExited = lipgloss.NewStyle().Foreground(colorDanger)
 	StatusOther = lipgloss.NewStyle().Foreground(colorWarning)
 
-	SelectedBg = colorBgAlt
+	SelectedBg = selBg
 
 	// Bottom bar (filter / command line)
 	BottomBar = lipgloss.NewStyle().
@@ -390,8 +412,8 @@ func Apply(p Palette) {
 		Bold(true)
 
 	CopyMenuSelected = lipgloss.NewStyle().
-		Background(colorBgAlt).
-		Foreground(colorPrimary).
+		Background(selBg).
+		Foreground(selFg).
 		Bold(true)
 
 	CopyMenuLabel = lipgloss.NewStyle().
@@ -443,8 +465,8 @@ func Apply(p Palette) {
 		Padding(0, 1)
 
 	FormChoiceSelected = lipgloss.NewStyle().
-		Background(colorBgAlt).
-		Foreground(colorPrimary).
+		Background(selBg).
+		Foreground(selFg).
 		Bold(true).
 		Padding(0, 1)
 

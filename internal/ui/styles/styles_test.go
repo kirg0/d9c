@@ -43,6 +43,37 @@ func TestApplyRebuildsStyles(t *testing.T) {
 	}
 }
 
+// TestSelectionOverride checks that SelectBg/SelectFg, when set, drive the
+// cursor-row highlight (a bright inverse bar) instead of the default
+// BgAlt/Primary scheme, and that empty overrides fall back to BgAlt/Primary.
+func TestSelectionOverride(t *testing.T) {
+	t.Cleanup(func() { Apply(DefaultPalette()) })
+
+	// Override set: selection uses SelectBg/SelectFg, not BgAlt/Primary.
+	Apply(Palette{
+		Primary: "#00E5FF", BgAlt: "#1A1A1A", Bg: "#000000",
+		SelectBg: "#00E5FF", SelectFg: "#000000",
+	})
+	if SelectedBg != lipgloss.Color("#00E5FF") {
+		t.Errorf("SelectedBg = %v, want SelectBg #00E5FF", SelectedBg)
+	}
+	if got := TableSelected.GetBackground(); got != lipgloss.Color("#00E5FF") {
+		t.Errorf("TableSelected bg = %v, want SelectBg #00E5FF", got)
+	}
+	if got := TableSelected.GetForeground(); got != lipgloss.Color("#000000") {
+		t.Errorf("TableSelected fg = %v, want SelectFg #000000", got)
+	}
+
+	// No override: selection falls back to BgAlt background / Primary foreground.
+	Apply(Palette{Primary: "#00E5FF", BgAlt: "#1A1A1A", Bg: "#000000"})
+	if SelectedBg != lipgloss.Color("#1A1A1A") {
+		t.Errorf("SelectedBg = %v, want BgAlt #1A1A1A fallback", SelectedBg)
+	}
+	if got := TableSelected.GetForeground(); got != lipgloss.Color("#00E5FF") {
+		t.Errorf("TableSelected fg = %v, want Primary #00E5FF fallback", got)
+	}
+}
+
 func TestStateColorTracksPalette(t *testing.T) {
 	t.Cleanup(func() { Apply(DefaultPalette()) })
 

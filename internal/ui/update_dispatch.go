@@ -10,7 +10,6 @@ import (
 	"d9c/internal/docker"
 	"d9c/internal/theme"
 	"d9c/internal/ui/cmdline"
-	"d9c/internal/ui/styles"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -71,7 +70,7 @@ func (m *Model) dispatchCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 		if !ok {
 			return nil, fmt.Errorf("unknown theme %q (available: %s)", name, names)
 		}
-		styles.Apply(pal)
+		m.applyPalette(pal)
 		m.copyNotif = "тема: " + name
 		return clearCopyNotifCmd(), nil
 	case "interval":
