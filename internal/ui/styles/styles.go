@@ -158,6 +158,12 @@ var (
 	FormError       lipgloss.Style
 	FormBusy        lipgloss.Style
 
+	// FormChoice / FormChoiceSelected style the options of a horizontal
+	// selector field (e.g. the driver picker in the create-network/volume
+	// forms): unselected options are dim, the selected one is highlighted.
+	FormChoice         lipgloss.Style
+	FormChoiceSelected lipgloss.Style
+
 	// ── embedded shell (interactive exec terminal) ───────────────────────────
 	ShellBorder lipgloss.Style
 	ShellTitle  lipgloss.Style
@@ -427,6 +433,16 @@ func Apply(p Palette) {
 	FormBusy = lipgloss.NewStyle().
 		Foreground(colorSecondary).
 		Bold(true)
+
+	FormChoice = lipgloss.NewStyle().
+		Foreground(colorMuted).
+		Padding(0, 1)
+
+	FormChoiceSelected = lipgloss.NewStyle().
+		Background(colorBgAlt).
+		Foreground(colorPrimary).
+		Bold(true).
+		Padding(0, 1)
 
 	// ── embedded shell (interactive exec terminal) ───────────────────────────
 

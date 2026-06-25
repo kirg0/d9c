@@ -5,6 +5,7 @@ package volform
 import (
 	"strings"
 
+	"d9c/internal/ui/driverfield"
 	"d9c/internal/ui/styles"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -17,10 +18,13 @@ const (
 	defaultDriver = "local"
 )
 
+// volDrivers are the built-in volume drivers offered in the driver selector.
+var volDrivers = []string{"local"}
+
 // Model is the two-field (Name, Driver) create-volume form.
 type Model struct {
 	name   textinput.Model
-	driver textinput.Model
+	driver driverfield.Model
 	focus  int // 0 = name, 1 = driver
 	errMsg string
 }
@@ -32,12 +36,7 @@ func New() Model {
 	n.CharLimit = 64
 	n.Width = 44
 
-	d := textinput.New()
-	d.Placeholder = "local"
-	d.CharLimit = 32
-	d.Width = 44
-
-	return Model{name: n, driver: d}
+	return Model{name: n, driver: driverfield.New(volDrivers)}
 }
 
 // Open prepares the form to create a new volume, pre-filled with the default
@@ -45,7 +44,7 @@ func New() Model {
 func (m *Model) Open() {
 	m.errMsg = ""
 	m.name.SetValue("")
-	m.driver.SetValue(defaultDriver)
+	m.driver.Set(defaultDriver)
 	m.focusField(0)
 }
 
@@ -61,7 +60,6 @@ func (m *Model) focusField(i int) {
 		m.name.CursorEnd()
 	} else {
 		m.driver.Focus()
-		m.driver.CursorEnd()
 	}
 }
 
@@ -74,8 +72,8 @@ func (m *Model) Prev() { m.focusField(m.focus - 1) }
 // Name returns the trimmed name field.
 func (m Model) Name() string { return strings.TrimSpace(m.name.Value()) }
 
-// Driver returns the trimmed driver field.
-func (m Model) Driver() string { return strings.TrimSpace(m.driver.Value()) }
+// Driver returns the selected driver.
+func (m Model) Driver() string { return m.driver.Value() }
 
 // Update forwards key events to the focused field.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
@@ -100,17 +98,27 @@ func (m Model) View(width, height int) string {
 		return marker + labelStyle.Render(label) + "\n  " + ti.View()
 	}
 
+	choice := func(label string, df driverfield.Model, active bool) string {
+		labelStyle := styles.FormLabel
+		marker := "  "
+		if active {
+			labelStyle = styles.FormLabelActive
+			marker = "▸ "
+		}
+		return marker + labelStyle.Render(label) + "\n  " + df.View(active)
+	}
+
 	var b strings.Builder
 	b.WriteString(styles.FormTitle.Render(" Create volume "))
 	b.WriteString("\n\n")
 	b.WriteString(field("Name", m.name, m.focus == 0))
 	b.WriteString("\n\n")
-	b.WriteString(field("Driver", m.driver, m.focus == 1))
+	b.WriteString(choice("Driver", m.driver, m.focus == 1))
 	b.WriteString("\n\n")
 	if m.errMsg != "" {
 		b.WriteString(styles.FormError.Render("✖ "+m.errMsg) + "\n")
 	}
-	b.WriteString(styles.FormHint.Render("tab switch · enter create · esc cancel"))
+	b.WriteString(styles.FormHint.Render("tab switch · ←/→ driver · enter create · esc cancel"))
 
 	panel := styles.OverlayPanel.Render(b.String())
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, panel)
