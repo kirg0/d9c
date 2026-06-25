@@ -5,6 +5,7 @@ package netform
 import (
 	"strings"
 
+	"d9c/internal/ui/driverfield"
 	"d9c/internal/ui/styles"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -18,10 +19,13 @@ const (
 	subnetPlaceholder = "172.30.0.0/16 (optional)"
 )
 
+// netDrivers are the built-in network drivers offered in the driver selector.
+var netDrivers = []string{"bridge", "host", "overlay", "macvlan", "ipvlan", "none"}
+
 // Model is the four-field (Name, Driver, Subnet, Gateway) create-network form.
 type Model struct {
 	name    textinput.Model
-	driver  textinput.Model
+	driver  driverfield.Model
 	subnet  textinput.Model
 	gateway textinput.Model
 	focus   int // 0 = name, 1 = driver, 2 = subnet, 3 = gateway
@@ -35,11 +39,6 @@ func New() Model {
 	n.CharLimit = 64
 	n.Width = 44
 
-	d := textinput.New()
-	d.Placeholder = "bridge"
-	d.CharLimit = 32
-	d.Width = 44
-
 	s := textinput.New()
 	s.Placeholder = subnetPlaceholder
 	s.CharLimit = 64
@@ -50,7 +49,7 @@ func New() Model {
 	g.CharLimit = 64
 	g.Width = 44
 
-	return Model{name: n, driver: d, subnet: s, gateway: g}
+	return Model{name: n, driver: driverfield.New(netDrivers), subnet: s, gateway: g}
 }
 
 // Open prepares the form to create a new network, pre-filled with the default
@@ -58,7 +57,7 @@ func New() Model {
 func (m *Model) Open() {
 	m.errMsg = ""
 	m.name.SetValue("")
-	m.driver.SetValue(defaultDriver)
+	m.driver.Set(defaultDriver)
 	m.subnet.SetValue("")
 	m.gateway.SetValue("")
 	m.focusField(0)
@@ -79,7 +78,6 @@ func (m *Model) focusField(i int) {
 		m.name.CursorEnd()
 	case 1:
 		m.driver.Focus()
-		m.driver.CursorEnd()
 	case 2:
 		m.subnet.Focus()
 		m.subnet.CursorEnd()
@@ -98,8 +96,8 @@ func (m *Model) Prev() { m.focusField(m.focus - 1) }
 // Name returns the trimmed name field.
 func (m Model) Name() string { return strings.TrimSpace(m.name.Value()) }
 
-// Driver returns the trimmed driver field.
-func (m Model) Driver() string { return strings.TrimSpace(m.driver.Value()) }
+// Driver returns the selected driver.
+func (m Model) Driver() string { return m.driver.Value() }
 
 // Subnet returns the trimmed subnet field.
 func (m Model) Subnet() string { return strings.TrimSpace(m.subnet.Value()) }
@@ -135,12 +133,22 @@ func (m Model) View(width, height int) string {
 		return marker + labelStyle.Render(label) + "\n  " + ti.View()
 	}
 
+	choice := func(label string, df driverfield.Model, active bool) string {
+		labelStyle := styles.FormLabel
+		marker := "  "
+		if active {
+			labelStyle = styles.FormLabelActive
+			marker = "▸ "
+		}
+		return marker + labelStyle.Render(label) + "\n  " + df.View(active)
+	}
+
 	var b strings.Builder
 	b.WriteString(styles.FormTitle.Render(" Create network "))
 	b.WriteString("\n\n")
 	b.WriteString(field("Name", m.name, m.focus == 0))
 	b.WriteString("\n\n")
-	b.WriteString(field("Driver", m.driver, m.focus == 1))
+	b.WriteString(choice("Driver", m.driver, m.focus == 1))
 	b.WriteString("\n\n")
 	b.WriteString(field("Subnet", m.subnet, m.focus == 2))
 	b.WriteString("\n\n")
@@ -149,7 +157,7 @@ func (m Model) View(width, height int) string {
 	if m.errMsg != "" {
 		b.WriteString(styles.FormError.Render("✖ "+m.errMsg) + "\n")
 	}
-	b.WriteString(styles.FormHint.Render("tab switch · enter create · esc cancel"))
+	b.WriteString(styles.FormHint.Render("tab switch · ←/→ driver · enter create · esc cancel"))
 
 	panel := styles.OverlayPanel.Render(b.String())
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, panel)
