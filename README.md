@@ -14,7 +14,7 @@ Docker **по TCP или SSH**. Один бинарник, без агентов
 
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)
-![version](https://img.shields.io/badge/version-1.7.0-informational)
+![version](https://img.shields.io/badge/version-1.7.1-informational)
 ![platform](https://img.shields.io/badge/platform-linux%20%7C%20macOS%20%7C%20windows-lightgrey)
 [![donate](https://img.shields.io/badge/donate-dalink.to-ff5e5b)](https://dalink.to/kirg08)
 

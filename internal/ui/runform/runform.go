@@ -7,6 +7,7 @@ import (
 
 	"d9c/internal/ui/styles"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -22,6 +23,8 @@ type Model struct {
 	env     textinput.Model
 	volumes textinput.Model
 	focus   int // 0 = image … 4 = volumes
+	spinner spinner.Model
+	busy    bool // a create/run is in flight; show the spinner and ignore input
 	errMsg  string
 }
 
@@ -34,18 +37,23 @@ func New() Model {
 		ti.Width = 52
 		return ti
 	}
+	sp := spinner.New()
+	sp.Spinner = spinner.MiniDot
+	sp.Style = styles.FormBusy
 	return Model{
 		image:   mk("nginx:latest"),
 		name:    mk("my-app (optional)"),
 		ports:   mk("8080:80, 9443:443/udp (optional)"),
 		env:     mk("KEY=value, OTHER=x (optional)"),
 		volumes: mk("/host/path:/ctr/path, myvol:/data (optional)"),
+		spinner: sp,
 	}
 }
 
 // Open resets the form for a fresh run, optionally pre-filling the image.
 func (m *Model) Open(image string) {
 	m.errMsg = ""
+	m.busy = false
 	m.image.SetValue(image)
 	m.name.SetValue("")
 	m.ports.SetValue("")
@@ -54,8 +62,35 @@ func (m *Model) Open(image string) {
 	m.focusField(0)
 }
 
-// SetError shows a validation/operation message inside the form (keeps it open).
-func (m *Model) SetError(s string) { m.errMsg = s }
+// Running marks the form busy while the create/run runs: it clears any error,
+// blurs the focused field and returns the command that starts the spinner
+// animation. The image being launched stays visible in the form.
+func (m *Model) Running() tea.Cmd {
+	m.errMsg = ""
+	m.busy = true
+	for _, f := range m.fields() {
+		f.Blur()
+	}
+	return m.spinner.Tick
+}
+
+// Busy reports whether a create/run is currently in flight.
+func (m Model) Busy() bool { return m.busy }
+
+// Tick advances the spinner; used while a create/run is in flight.
+func (m Model) Tick(msg spinner.TickMsg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.spinner, cmd = m.spinner.Update(msg)
+	return m, cmd
+}
+
+// SetError shows a validation/operation message inside the form (keeps it open)
+// and clears the busy state so the user can correct the input and retry.
+func (m *Model) SetError(s string) {
+	m.errMsg = s
+	m.busy = false
+	m.focusField(m.focus)
+}
 
 func (m *Model) fields() []*textinput.Model {
 	return []*textinput.Model{&m.image, &m.name, &m.ports, &m.env, &m.volumes}
@@ -94,8 +129,11 @@ func (m Model) Env() string { return m.env.Value() }
 // Volumes returns the raw volumes field (comma-separated bind specs).
 func (m Model) Volumes() string { return m.volumes.Value() }
 
-// Update forwards key events to the focused field.
+// Update forwards key events to the focused field. While busy, input is ignored.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	if m.busy {
+		return m, nil
+	}
 	var cmd tea.Cmd
 	f := m.fields()[m.focus]
 	*f, cmd = f.Update(msg)
@@ -122,10 +160,16 @@ func (m Model) View(width, height int) string {
 		b.WriteString(field(labels[i], ti, m.focus == i))
 		b.WriteString("\n\n")
 	}
-	if m.errMsg != "" {
+	switch {
+	case m.busy:
+		b.WriteString(m.spinner.View() + " " + styles.FormBusy.Render("running "+m.Image()+"…") + "\n")
+		b.WriteString(styles.FormHint.Render("образ скачается, если его нет на хосте · esc cancel"))
+	case m.errMsg != "":
 		b.WriteString(styles.FormError.Render("✖ "+m.errMsg) + "\n")
+		b.WriteString(styles.FormHint.Render("tab switch · enter run · esc cancel"))
+	default:
+		b.WriteString(styles.FormHint.Render("tab switch · enter run · esc cancel"))
 	}
-	b.WriteString(styles.FormHint.Render("tab switch · enter run · esc cancel"))
 
 	panel := styles.OverlayPanel.Render(b.String())
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, panel)

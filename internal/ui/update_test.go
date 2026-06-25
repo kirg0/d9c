@@ -1511,7 +1511,12 @@ func TestRunFormSubmit(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected a run command")
 	}
-	res, ok := cmd().(actionResultMsg)
+	// Enter batches the spinner-start with the backend run; the form should now
+	// be busy (spinner shown, input ignored) until the result arrives.
+	if m := tm.(Model); !m.runForm.Busy() {
+		t.Fatal("form should be busy while the run executes")
+	}
+	res, ok := findActionResult(t, cmd)
 	if !ok || res.err != nil {
 		t.Fatalf("run result = %#v, want success", res)
 	}
@@ -1545,17 +1550,38 @@ func TestRunFormBackendErrorStaysOpen(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected a run command")
 	}
-	res, ok := cmd().(actionResultMsg)
+	res, ok := findActionResult(t, cmd)
 	if !ok || res.err == nil {
 		t.Fatalf("run result = %#v, want name-conflict error", res)
 	}
 	step(res)
 	m := tm.(Model)
+	// A failed run clears busy so the user can correct the input and retry.
+	if m.runForm.Busy() {
+		t.Error("form should not be busy after an error")
+	}
 	if m.mode != ModeRunForm {
 		t.Errorf("mode = %v, want ModeRunForm (form stays open)", m.mode)
 	}
 	if m.err != "" {
 		t.Errorf("footer err = %q, want empty (error belongs to the form)", m.err)
+	}
+}
+
+// While a run is in flight, a second Enter must not fire another backend call.
+func TestRunFormBusyIgnoresInput(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	step := func(msg tea.Msg) tea.Cmd { var c tea.Cmd; tm, c = tm.Update(msg); return c }
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+
+	step(openRunFormMsg{image: "nginx:1.25"})
+	step(tea.KeyMsg{Type: tea.KeyEnter})
+	if m := tm.(Model); !m.runForm.Busy() {
+		t.Fatal("form should be busy after the first Enter")
+	}
+	if cmd := step(tea.KeyMsg{Type: tea.KeyEnter}); cmd != nil {
+		t.Fatal("a second Enter while busy must not issue a command")
 	}
 }
 
