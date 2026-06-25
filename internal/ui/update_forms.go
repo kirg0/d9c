@@ -189,6 +189,11 @@ func (m Model) handleBuildForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // Enter creates and starts the container, Esc (handled globally) cancels. A
 // backend failure is shown inside the form via the actionResultMsg branch.
 func (m Model) handleRunForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// While a create/run is in flight, swallow keys so a second Enter can't fire
+	// a duplicate run (esc is handled globally and still cancels the modal).
+	if m.runForm.Busy() {
+		return m, nil
+	}
 	switch msg.String() {
 	case "enter":
 		if m.runForm.Image() == "" {
@@ -202,7 +207,8 @@ func (m Model) handleRunForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			Env:     splitList(m.runForm.Env()),
 			Volumes: splitList(m.runForm.Volumes()),
 		}
-		return m, containerAction(func() error { return m.backend.RunContainer(opts) })
+		spin := m.runForm.Running()
+		return m, tea.Batch(spin, containerAction(func() error { return m.backend.RunContainer(opts) }))
 	case "tab", "down":
 		m.runForm.Next()
 		return m, nil

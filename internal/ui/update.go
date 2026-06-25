@@ -41,6 +41,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.pullForm, cmd = m.pullForm.Tick(msg)
 			return m, cmd
 		}
+		if m.mode == ModeRunForm && m.runForm.Busy() {
+			var cmd tea.Cmd
+			m.runForm, cmd = m.runForm.Tick(msg)
+			return m, cmd
+		}
 		return m, nil
 
 	case tickMsg:

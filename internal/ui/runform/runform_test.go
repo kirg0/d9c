@@ -64,3 +64,29 @@ func TestViewShowsError(t *testing.T) {
 		t.Error("view should render the error message")
 	}
 }
+
+func TestRunningEntersBusyAndViewShowsStatus(t *testing.T) {
+	m := New()
+	m.Open("nginx:1.25")
+	if cmd := m.Running(); cmd == nil {
+		t.Fatal("Running should return the spinner-start command")
+	}
+	if !m.Busy() {
+		t.Fatal("form should be busy after Running")
+	}
+	// While busy the form ignores typed input.
+	before := m.Image()
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	if m.Image() != before {
+		t.Error("busy form must ignore input")
+	}
+	// The busy view shows a running status with the image.
+	if got := m.View(100, 40); !strings.Contains(got, "running") || !strings.Contains(got, "nginx:1.25") {
+		t.Errorf("busy view = %q, want a running status with the image", got)
+	}
+	// An error clears the busy state so the user can retry.
+	m.SetError("name in use")
+	if m.Busy() {
+		t.Error("SetError must clear the busy state")
+	}
+}
