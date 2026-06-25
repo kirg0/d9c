@@ -543,6 +543,45 @@ func TestRenderHostDataLineSelected(t *testing.T) {
 	}
 }
 
+// TestRefreshStylesAfterThemeSwitch reproduces the runtime theme-switch bug: the
+// bubbles table captures its Selected style at construction, so after a later
+// styles.Apply the cursor row no longer matches the (new) selection prefix and
+// its highlight disappears in colorized views (visible only in the startup
+// theme). RefreshStyles re-syncs the table styles so the highlight survives.
+func TestRefreshStylesAfterThemeSwitch(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(termenv.Ascii)
+	t.Cleanup(func() { styles.Apply(styles.DefaultPalette()) })
+
+	styles.Apply(styles.DefaultPalette())
+	const w = 100
+	m := New()
+	m.SetSize(w, 12)
+	m.SetColumns(HostColumns(w))
+	m.SetColorizers(HostColorizers())
+	m.SetHosts([]hosts.Host{{Name: "prod", Host: "tcp://prod:2375"}}, "",
+		map[string]docker.HostSummary{"tcp://prod:2375": {Reachable: true}})
+
+	// Switch to a theme with a distinctive inverse selection bar.
+	p := styles.DefaultPalette()
+	p.SelectBg = "#abcdef"
+	p.SelectFg = "#123456"
+	styles.Apply(p)
+	want := fgEscape(styles.TableSelected) // the new theme's selection escape
+
+	// Stale table styles: the cursor row isn't recognised, so the new selection
+	// escape is absent (this is the bug the user saw — no highlight after switch).
+	if strings.Contains(m.View(), want) {
+		t.Fatal("precondition failed: selection should be stale before RefreshStyles")
+	}
+
+	// After re-syncing, the cursor row is highlighted with the new theme.
+	m.RefreshStyles()
+	if !strings.Contains(m.View(), want) {
+		t.Error("selected row not highlighted with the new theme after RefreshStyles")
+	}
+}
+
 // TestContainersViewStatusTrueColor verifies the same truncation fix for the
 // container STATUS and HEALTH columns: in a truecolor profile the text must
 // survive and be colored (this is the bug the user hit on hosts, present here

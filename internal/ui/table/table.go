@@ -771,6 +771,15 @@ func tableStyles() table.Styles {
 	return s
 }
 
+// RefreshStyles re-applies the package styles to the underlying bubbles table.
+// bubbles captures its Styles once at construction, so a runtime theme switch
+// (styles.Apply) leaves the table's stored Selected/Header/Cell pointing at the
+// previous palette. The selected-row highlight is detected and re-rendered by
+// matching bubbles' Selected-style ANSI prefix (see selectedPrefix/View); once
+// that prefix is stale the cursor row stops being recognised and its highlight
+// vanishes in colorized views. Call this after every styles.Apply.
+func (m *Model) RefreshStyles() { m.table.SetStyles(tableStyles()) }
+
 // truncate shortens display-only cells to at most max runes. It must never be
 // applied to identity columns (the ones selectedID reads) — a clipped value
 // would no longer match the real resource name. Rune-based so multi-byte text

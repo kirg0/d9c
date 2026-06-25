@@ -7,6 +7,15 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// applyPalette re-themes the UI to palette p: it rebuilds the package styles and
+// re-syncs the table's internal bubbles styles (which are captured once at
+// construction and would otherwise keep the previous theme's selection style,
+// making the cursor-row highlight disappear after a runtime theme switch).
+func (m *Model) applyPalette(p styles.Palette) {
+	styles.Apply(p)
+	m.table.RefreshStyles()
+}
+
 // openThemePicker opens the theme selector modal. It snapshots the active
 // palette (to roll back on cancel), positions the cursor on the current
 // built-in theme when there is one, and applies that theme as a live preview so
@@ -34,14 +43,14 @@ func (m *Model) applyThemeAt(i int) {
 		return
 	}
 	if pal, ok := theme.ByName(m.themeNames[i]); ok {
-		styles.Apply(pal)
+		m.applyPalette(pal)
 	}
 }
 
 // cancelThemePicker closes the picker and restores the palette that was active
 // when it opened, discarding the preview.
 func (m *Model) cancelThemePicker() {
-	styles.Apply(m.themeOriginal)
+	m.applyPalette(m.themeOriginal)
 	m.mode = ModeNormal
 }
 
