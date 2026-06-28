@@ -24,6 +24,32 @@ func TestExecArgv(t *testing.T) {
 	}
 }
 
+// TestPickShellArgv exercises the pure fallback core: candidates are tried
+// best-first, multi-word entries split into argv, and nil is returned when none
+// run (the distroless/scratch case that maps to errNoShell).
+func TestPickShellArgv(t *testing.T) {
+	tests := []struct {
+		name    string
+		present map[string]bool // first argv element that "exists"
+		want    string
+	}{
+		{"bash preferred", map[string]bool{"bash": true, "sh": true}, "bash"},
+		{"falls back to sh", map[string]bool{"sh": true}, "sh"},
+		{"busybox applet", map[string]bool{"/bin/busybox": true}, "/bin/busybox sh"},
+		{"none available", map[string]bool{}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := pickShellArgv(shellCandidates, func(argv []string) bool {
+				return tt.present[argv[0]]
+			})
+			if strings.Join(got, " ") != tt.want {
+				t.Errorf("pickShellArgv = %q, want %q", strings.Join(got, " "), tt.want)
+			}
+		})
+	}
+}
+
 // TestFakeExecSession verifies the demo session emits a banner, echoes typed
 // input back and reports EOF once closed — all without a real TTY or daemon.
 func TestFakeExecSession(t *testing.T) {
