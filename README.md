@@ -4,6 +4,8 @@
 
 # d9c
 
+<p align="center"><b>Русский</b> · <a href="README-EN.md">English</a></p>
+
 **Терминальный (TUI) менеджер Docker для удалённого хоста** — в духе [`k9s`](https://k9scli.io/)
 и [`lazydocker`](https://github.com/jesseduffield/lazydocker), но сфокусированный на управлении
 Docker **по TCP или SSH**. Один бинарник, без агентов на удалённой стороне: подключаетесь к демону,
