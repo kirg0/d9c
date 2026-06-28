@@ -2,6 +2,7 @@ package ui
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -558,6 +559,53 @@ func TestStartupHostNotFoundOpensNotice(t *testing.T) {
 		t.Fatal("expected startupNotice to be seeded")
 	}
 	if !strings.Contains(m.startupNotice.body, "no such host") {
+		t.Errorf("startupNotice body missing hint:\n%s", m.startupNotice.body)
+	}
+}
+
+// A live :connect that fails because the unix:// socket path is invalid opens
+// the dedicated "bad socket" notice instead of a raw footer error.
+func TestConnectSocketErrorOpensNotice(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	step := func(msg tea.Msg) tea.Cmd { var c tea.Cmd; tm, c = tm.Update(msg); return c }
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+
+	sockErr := fmt.Errorf("%w: файл сокета не найден: /no/such.sock", docker.ErrSocketPath)
+	cmd := step(connectResultMsg{host: "unix:///no/such.sock", err: sockErr})
+	if cmd == nil {
+		t.Fatal("connectResultMsg with socket error must produce an openNoticeMsg cmd")
+	}
+	notice, ok := cmd().(openNoticeMsg)
+	if !ok {
+		t.Fatalf("emitted msg = %T, want openNoticeMsg", cmd())
+	}
+	if !strings.Contains(notice.body, "unix:///no/such.sock") {
+		t.Errorf("notice body missing the failing host URL:\n%s", notice.body)
+	}
+	if !strings.Contains(notice.body, "файл сокета не найден") {
+		t.Errorf("notice body missing the underlying error:\n%s", notice.body)
+	}
+
+	step(notice)
+	if m := tm.(Model); m.mode != ModeNotice || m.err != "" {
+		t.Errorf("after notice: mode=%v err=%q, want ModeNotice/empty", m.mode, m.err)
+	}
+}
+
+// A startup connect failure caused by an invalid unix socket seeds the same
+// "bad socket" notice from Init (and keeps it out of the footer).
+func TestStartupSocketErrorOpensNotice(t *testing.T) {
+	sockErr := fmt.Errorf("could not connect to unix:///no/such.sock: %w",
+		fmt.Errorf("%w: файл сокета не найден: /no/such.sock", docker.ErrSocketPath))
+	m := NewModel(&config.Config{Host: "unix:///no/such.sock"}, docker.NewDisconnected(sockErr), nil, sockErr, true)
+	if m.err != "" {
+		t.Errorf("startup footer err = %q, want empty (notice replaces it)", m.err)
+	}
+	if m.startupNotice == nil {
+		t.Fatal("expected startupNotice to be seeded")
+	}
+	if !strings.Contains(m.startupNotice.body, "файл сокета не найден") {
 		t.Errorf("startupNotice body missing hint:\n%s", m.startupNotice.body)
 	}
 }

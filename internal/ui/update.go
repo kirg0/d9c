@@ -240,6 +240,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				title, body := hostNotFoundNoticeText(msg.host)
 				return m, func() tea.Msg { return openNoticeMsg{title: title, body: body} }
 			}
+			if docker.IsSocketError(msg.err) {
+				title, body := socketNoticeText(msg.host, msg.err)
+				return m, func() tea.Msg { return openNoticeMsg{title: title, body: body} }
+			}
 			m.err = fmt.Sprintf("connect to %s failed: %v", msg.host, msg.err)
 			return m, nil
 		}
@@ -864,6 +868,22 @@ func hostNotFoundNoticeText(host string) (title, body string) {
 	b.WriteString("Скорее всего, имя хоста указано с опечаткой или такого хоста\n")
 	b.WriteString("не существует. Проверьте, что адрес введён верно и хост\n")
 	b.WriteString("доступен из сети, затем повторите :connect.")
+	return title, b.String()
+}
+
+// socketNoticeText assembles the user-facing message shown when a unix://
+// socket path is invalid (missing, a directory, or not a socket). Same Russian
+// style as the other in-app dialogs; the underlying validation error is embedded
+// so the user sees exactly what is wrong with the path.
+func socketNoticeText(host string, err error) (title, body string) {
+	title = " Неверный путь до сокета "
+	var b strings.Builder
+	fmt.Fprintf(&b, "Не удалось подключиться к %s:\n", host)
+	fmt.Fprintf(&b, "%v\n\n", err)
+	b.WriteString("Проверьте путь до unix-сокета Docker. Обычно это\n")
+	b.WriteString("    unix:///var/run/docker.sock\n\n")
+	b.WriteString("Убедитесь, что демон Docker запущен и сокет существует,\n")
+	b.WriteString("затем повторите :connect.")
 	return title, b.String()
 }
 
