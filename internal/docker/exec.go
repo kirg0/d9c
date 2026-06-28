@@ -2,6 +2,7 @@ package docker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -25,12 +26,19 @@ type ExecSession interface {
 }
 
 // ExecInteractive opens an interactive exec session against a container. cmd is
-// the command to run; when empty it defaults to a shell. The returned session is
-// driven by the UI's embedded terminal (it pumps Read/Write and Resize) rather
-// than handing the local terminal over.
+// the command to run; when empty, pickShell probes for a usable shell (bash, sh,
+// ash…) so the session works even on images without /bin/sh. The returned
+// session is driven by the UI's embedded terminal (it pumps Read/Write and
+// Resize) rather than handing the local terminal over.
 func (b *dockerBackend) ExecInteractive(containerID string, cmd []string) (ExecSession, error) {
-	cmd = execArgv(cmd)
 	ctx := context.Background()
+	if len(cmd) == 0 {
+		sh, err := b.pickShell(ctx, containerID)
+		if err != nil {
+			return nil, err
+		}
+		cmd = sh
+	}
 
 	created, err := b.cli.ContainerExecCreate(ctx, containerID, container.ExecOptions{
 		AttachStdin:  true,
@@ -62,6 +70,82 @@ func execArgv(cmd []string) []string {
 // defaultShell is the command used when exec is given no arguments. sh exists in
 // virtually every image; users can ask for bash explicitly.
 func defaultShell() []string { return []string{"/bin/sh"} }
+
+// shellCandidates are the shells tried, best-first, when `x`/`:exec` is invoked
+// with no command. bash is preferred for a richer prompt; sh/ash cover busybox
+// and alpine; the absolute paths and busybox applet form handle images with an
+// unusual PATH.
+var shellCandidates = []string{
+	"bash",
+	"ash",
+	"sh",
+	"/bin/bash",
+	"/bin/sh",
+	"/bin/busybox sh",
+}
+
+// errNoShell is returned when none of shellCandidates is runnable in the target
+// container (e.g. distroless/scratch images that ship no shell at all).
+var errNoShell = errors.New("no usable shell in container (tried bash, sh, ash); for distroless/scratch images run a debug container")
+
+// pickShell probes shellCandidates in order and returns the first that runs in
+// containerID, or errNoShell when none do. Each probe is a cheap non-interactive
+// exec, so by the time the interactive session opens the shell is known to exist
+// (the alternative — detecting an immediate exit inside a TTY — is ambiguous
+// against the user quickly typing `exit`).
+func (b *dockerBackend) pickShell(ctx context.Context, containerID string) ([]string, error) {
+	argv := pickShellArgv(shellCandidates, func(a []string) bool {
+		return b.shellProbe(ctx, containerID, a)
+	})
+	if argv == nil {
+		return nil, errNoShell
+	}
+	return argv, nil
+}
+
+// pickShellArgv is the pure selection core of pickShell: it parses each candidate
+// into an argv and returns the first for which works reports true, or nil when
+// none qualify. Split out so the ordering/fallback logic is table-testable
+// without a daemon.
+func pickShellArgv(candidates []string, works func(argv []string) bool) []string {
+	for _, c := range candidates {
+		argv := strings.Fields(c)
+		if len(argv) == 0 {
+			continue
+		}
+		if works(argv) {
+			return argv
+		}
+	}
+	return nil
+}
+
+// shellProbe reports whether argv runs in containerID by exec'ing `argv -c
+// 'exit 0'` and checking for exit code 0. A missing binary yields 127 (or 126 if
+// found but not executable); either way the probe fails and the next candidate
+// is tried. The probe is time-bounded so an unresponsive daemon cannot hang the
+// shell hotkey.
+func (b *dockerBackend) shellProbe(ctx context.Context, containerID string, argv []string) bool {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	probe := append(append([]string{}, argv...), "-c", "exit 0")
+	created, err := b.cli.ContainerExecCreate(ctx, containerID, container.ExecOptions{Cmd: probe})
+	if err != nil {
+		return false
+	}
+	att, err := b.cli.ContainerExecAttach(ctx, created.ID, container.ExecAttachOptions{})
+	if err != nil {
+		return false
+	}
+	defer att.Close()
+	// Draining to EOF blocks until the probe process exits; only then is the
+	// exit code populated.
+	_, _ = io.Copy(io.Discard, att.Reader)
+
+	ins, err := b.cli.ContainerExecInspect(ctx, created.ID)
+	return err == nil && ins.ExitCode == 0
+}
 
 // ExecRunOptions describes a one-off interactive container run from an image —
 // the `docker run --rm -it` analogue driven by the exec wizard. Volumes take
