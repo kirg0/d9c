@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"d9c/internal/hosts"
+	"d9c/internal/i18n"
 	"d9c/internal/keymap"
 	"d9c/internal/theme"
 	"d9c/internal/ui/styles"
@@ -153,6 +154,63 @@ colors:
 	}
 	if len(reloaded.File.Colors) != 0 {
 		t.Errorf("SetTheme should clear stale color overrides, got %v", reloaded.File.Colors)
+	}
+}
+
+func TestLangRoundTripAndDefault(t *testing.T) {
+	// Missing/empty lang resolves to the default (RU).
+	s, err := Load(filepath.Join(t.TempDir(), "d9c-config.yaml"))
+	if err != nil {
+		t.Fatalf("Load missing: %v", err)
+	}
+	if lang, _ := s.Lang(); lang != i18n.RU {
+		t.Errorf("missing lang = %q, want %q", lang, i18n.RU)
+	}
+
+	// A configured lang resolves; an unknown value reports an error.
+	path := filepath.Join(t.TempDir(), "d9c-config.yaml")
+	if err := os.WriteFile(path, []byte("lang: en\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s2, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if lang, _ := s2.Lang(); lang != i18n.EN {
+		t.Errorf("lang = %q, want %q", lang, i18n.EN)
+	}
+}
+
+func TestSetLangPersistsAndPreservesSections(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "d9c-config.yaml")
+	const data = `theme: nord
+alerts:
+  cpu: 50
+  mem: 0
+`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if err := s.SetLang("en"); err != nil {
+		t.Fatalf("SetLang: %v", err)
+	}
+
+	reloaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if lang, _ := reloaded.Lang(); lang != i18n.EN {
+		t.Error("SetLang did not persist the chosen language")
+	}
+	if pal, _ := reloaded.Palette(); pal != mustTheme(t, "nord") {
+		t.Error("theme section was clobbered by a language change")
+	}
+	if thr, _ := reloaded.Alerts(); thr.CPU != 50 {
+		t.Error("alerts section was clobbered by a language change")
 	}
 }
 

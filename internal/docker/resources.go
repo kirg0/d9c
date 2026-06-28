@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"d9c/internal/i18n"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -94,9 +97,9 @@ func friendlyImageRemoveErr(err error) error {
 	msg := strings.ToLower(err.Error())
 	switch {
 	case strings.Contains(msg, "dependent child"):
-		return fmt.Errorf("у образа есть зависимые образы — удалите их сначала или выполните prune")
+		return errors.New(i18n.T("у образа есть зависимые образы — удалите их сначала или выполните prune", "the image has dependent images — remove them first or run prune"))
 	case strings.Contains(msg, "must force"):
-		return fmt.Errorf("образ используется контейнером — выполните rm -f или сначала удалите контейнер")
+		return errors.New(i18n.T("образ используется контейнером — выполните rm -f или сначала удалите контейнер", "the image is used by a container — run rm -f or remove the container first"))
 	}
 	return err
 }

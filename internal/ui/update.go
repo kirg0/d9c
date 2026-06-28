@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"d9c/internal/docker"
+	"d9c/internal/i18n"
 	"d9c/internal/keymap"
 	"d9c/internal/ui/composeedit"
 	"d9c/internal/ui/fsbrowser"
@@ -346,7 +347,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case opDoneMsg:
 		if msg.title == m.opTitle {
 			m.logs.AddLine("")
-			m.logs.AddLine("— готово (q/esc чтобы закрыть) —")
+			m.logs.AddLine(i18n.T("— готово (q/esc чтобы закрыть) —", "— done (q/esc to close) —"))
 			m.logCh = nil
 			// Refresh data in the background so statuses are current when the
 			// user closes the console; stay here so the output stays readable.
@@ -447,6 +448,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.openThemePicker()
 		return m, nil
 
+	case openLangPickerMsg:
+		m.openLangPicker()
+		return m, nil
+
 	case openConfirmMsg:
 		m.confirmPrompt = msg.prompt
 		m.confirmAction = msg.action
@@ -493,10 +498,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case fsCopiedMsg:
 		if msg.err != nil {
-			m.fsBrowser.SetError("копирование: " + msg.err.Error())
+			m.fsBrowser.SetError(i18n.T("копирование: ", "copy: ") + msg.err.Error())
 			return m, nil
 		}
-		m.copyNotif = "скопировано: ./" + msg.name
+		m.copyNotif = i18n.T("скопировано: ./", "downloaded: ./") + msg.name
 		return m, clearCopyNotifCmd()
 
 	case actionResultMsg:
@@ -694,6 +699,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cancelThemePicker()
 			return m, nil
 		}
+		// Cancel the language picker: roll the live preview back to the language
+		// that was active when it opened.
+		if m.mode == ModeLangPicker {
+			m.cancelLangPicker()
+			return m, nil
+		}
 		// Esc first clears a pending bulk selection (before popping any view).
 		if m.mode == ModeNormal && len(m.selected) > 0 {
 			m.selected = nil
@@ -750,6 +761,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleCopyMode(msg)
 	case ModeThemePicker:
 		return m.handleThemePicker(msg)
+	case ModeLangPicker:
+		return m.handleLangPicker(msg)
 	case ModeBackupPicker:
 		return m.handleBackupPicker(msg)
 	case ModeHelp:
@@ -839,21 +852,30 @@ func (m Model) handleNotice(_ tea.KeyMsg) (tea.Model, tea.Cmd) {
 // to match the rest of the in-app dialogs, and the actual known_hosts path is
 // embedded so the user knows exactly which file to clean.
 func hostKeyNoticeText(host string) (title, body string) {
-	title = " Ключ хоста изменился "
+	title = i18n.T(" Ключ хоста изменился ", " Host key changed ")
 	path := docker.KnownHostsPath()
 	if path == "" {
 		path = "~/.ssh/known_hosts"
 	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "Не удалось подключиться к %s:\n", host)
-	b.WriteString("SSH-ключ хоста не совпадает с сохранённым в known_hosts.\n\n")
-	b.WriteString("Скорее всего, удалённый хост был пересоздан и теперь предъявляет\n")
-	b.WriteString("новый ключ. Если вы доверяете этому хосту, удалите устаревшую\n")
-	b.WriteString("запись (или весь файл) и подключитесь заново:\n\n")
-	b.WriteString("    " + path + "\n\n")
-	b.WriteString("После очистки повторите :connect — d9c примет новый ключ\n")
-	b.WriteString("и сохранит его при следующем подключении.")
-	return title, b.String()
+	body = fmt.Sprintf(i18n.T(
+		"Не удалось подключиться к %s:\n"+
+			"SSH-ключ хоста не совпадает с сохранённым в known_hosts.\n\n"+
+			"Скорее всего, удалённый хост был пересоздан и теперь предъявляет\n"+
+			"новый ключ. Если вы доверяете этому хосту, удалите устаревшую\n"+
+			"запись (или весь файл) и подключитесь заново:\n\n"+
+			"    %s\n\n"+
+			"После очистки повторите :connect — d9c примет новый ключ\n"+
+			"и сохранит его при следующем подключении.",
+		"Could not connect to %s:\n"+
+			"the host's SSH key does not match the one saved in known_hosts.\n\n"+
+			"The remote host was most likely re-provisioned and now presents\n"+
+			"a new key. If you trust this host, remove the stale entry\n"+
+			"(or the whole file) and connect again:\n\n"+
+			"    %s\n\n"+
+			"After cleaning it up, repeat :connect — d9c will accept the new\n"+
+			"key and save it on the next connection."),
+		host, path)
+	return title, body
 }
 
 // hostNotFoundNoticeText assembles the user-facing message shown when the
@@ -861,14 +883,20 @@ func hostKeyNoticeText(host string) (title, body string) {
 // address or a host that no longer exists. Same Russian style as the other
 // in-app dialogs; the failing host is embedded so the user can spot a typo.
 func hostNotFoundNoticeText(host string) (title, body string) {
-	title = " Хост не найден "
-	var b strings.Builder
-	fmt.Fprintf(&b, "Не удалось подключиться к %s:\n", host)
-	b.WriteString("не удаётся определить адрес хоста (no such host).\n\n")
-	b.WriteString("Скорее всего, имя хоста указано с опечаткой или такого хоста\n")
-	b.WriteString("не существует. Проверьте, что адрес введён верно и хост\n")
-	b.WriteString("доступен из сети, затем повторите :connect.")
-	return title, b.String()
+	title = i18n.T(" Хост не найден ", " Host not found ")
+	body = fmt.Sprintf(i18n.T(
+		"Не удалось подключиться к %s:\n"+
+			"не удаётся определить адрес хоста (no such host).\n\n"+
+			"Скорее всего, имя хоста указано с опечаткой или такого хоста\n"+
+			"не существует. Проверьте, что адрес введён верно и хост\n"+
+			"доступен из сети, затем повторите :connect.",
+		"Could not connect to %s:\n"+
+			"the host address cannot be resolved (no such host).\n\n"+
+			"The host name is most likely mistyped or no longer exists.\n"+
+			"Check that the address is correct and the host is reachable\n"+
+			"from the network, then repeat :connect."),
+		host)
+	return title, body
 }
 
 // socketNoticeText assembles the user-facing message shown when a unix://
@@ -876,15 +904,22 @@ func hostNotFoundNoticeText(host string) (title, body string) {
 // style as the other in-app dialogs; the underlying validation error is embedded
 // so the user sees exactly what is wrong with the path.
 func socketNoticeText(host string, err error) (title, body string) {
-	title = " Неверный путь до сокета "
-	var b strings.Builder
-	fmt.Fprintf(&b, "Не удалось подключиться к %s:\n", host)
-	fmt.Fprintf(&b, "%v\n\n", err)
-	b.WriteString("Проверьте путь до unix-сокета Docker. Обычно это\n")
-	b.WriteString("    unix:///var/run/docker.sock\n\n")
-	b.WriteString("Убедитесь, что демон Docker запущен и сокет существует,\n")
-	b.WriteString("затем повторите :connect.")
-	return title, b.String()
+	title = i18n.T(" Неверный путь до сокета ", " Invalid socket path ")
+	body = fmt.Sprintf(i18n.T(
+		"Не удалось подключиться к %s:\n"+
+			"%v\n\n"+
+			"Проверьте путь до unix-сокета Docker. Обычно это\n"+
+			"    unix:///var/run/docker.sock\n\n"+
+			"Убедитесь, что демон Docker запущен и сокет существует,\n"+
+			"затем повторите :connect.",
+		"Could not connect to %s:\n"+
+			"%v\n\n"+
+			"Check the Docker unix socket path. It is usually\n"+
+			"    unix:///var/run/docker.sock\n\n"+
+			"Make sure the Docker daemon is running and the socket exists,\n"+
+			"then repeat :connect."),
+		host, err)
+	return title, body
 }
 
 // handleConfirm drives the generic confirmation overlay: y/enter runs the
@@ -983,7 +1018,7 @@ func (m *Model) openFSBrowser(dir string) tea.Cmd {
 		return nil
 	}
 	if st := m.containerState(id); st != "" && st != "running" {
-		m.err = "files: контейнер не запущен (состояние: " + st + ")"
+		m.err = i18n.T("files: контейнер не запущен (состояние: ", "files: container is not running (state: ") + st + ")"
 		return nil
 	}
 	if dir == "" {
@@ -1100,10 +1135,10 @@ func (m Model) handleAction(action keymap.Action) (tea.Model, tea.Cmd) {
 		// fresh data immediately rather than waiting for the next tick.
 		m.paused = !m.paused
 		if m.paused {
-			m.copyNotif = "автообновление на паузе"
+			m.copyNotif = i18n.T("автообновление на паузе", "auto-refresh paused")
 			return m, clearCopyNotifCmd()
 		}
-		m.copyNotif = "автообновление возобновлено"
+		m.copyNotif = i18n.T("автообновление возобновлено", "auto-refresh resumed")
 		return m, tea.Batch(m.fetchCurrentResource(), clearCopyNotifCmd())
 	case keymap.Help:
 		m.mode = ModeHelp
@@ -1301,7 +1336,7 @@ func (m Model) handleHostKey(key string) (handled bool, model tea.Model, cmd tea
 			return hostsUpdatedMsg{store.List()}
 		}
 		return true, m, func() tea.Msg {
-			return openConfirmMsg{prompt: "Удалить хост " + name + " из списка?", action: remove}
+			return openConfirmMsg{prompt: fmt.Sprintf(i18n.T("Удалить хост %s из списка?", "Remove host %s from the list?"), name), action: remove}
 		}
 	}
 	return false, m, nil
@@ -1319,7 +1354,7 @@ func (m Model) handleImageSelectionKey(key string) (handled bool, model tea.Mode
 			return true, m, nil
 		}
 		remove := bulkAction(refs, func(ref string) error { return m.backend.RemoveImage(ref, false) })
-		prompt := fmt.Sprintf("Удалить выбранные образы (%d)?", len(refs))
+		prompt := fmt.Sprintf(i18n.T("Удалить выбранные образы (%d)?", "Remove selected images (%d)?"), len(refs))
 		return true, m, func() tea.Msg { return openConfirmMsg{prompt: prompt, action: remove} }
 	}
 	return false, m, nil

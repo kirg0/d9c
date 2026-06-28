@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"d9c/internal/i18n"
 	"d9c/internal/theme"
 	"d9c/internal/ui/styles"
 	uitbl "d9c/internal/ui/table"
@@ -30,6 +31,8 @@ func (m Model) View() string {
 		body = m.viewCopyOverlay()
 	case ModeThemePicker:
 		body = m.viewThemeOverlay()
+	case ModeLangPicker:
+		body = m.viewLangOverlay()
 	case ModeConfirm:
 		body = m.viewConfirmOverlay()
 	case ModeNotice:
@@ -281,6 +284,10 @@ func (m Model) viewFooter() string {
 		sb.WriteString(keyHint("↑↓", "Preview"))
 		sb.WriteString(keyHint("enter", "Apply"))
 		sb.WriteString(keyHint("q/esc", "Cancel"))
+	case ModeLangPicker:
+		sb.WriteString(keyHint("↑↓", "Preview"))
+		sb.WriteString(keyHint("enter", "Apply"))
+		sb.WriteString(keyHint("q/esc", "Cancel"))
 	case ModeConfirm:
 		sb.WriteString(keyHint("y/enter", "Confirm"))
 		sb.WriteString(keyHint("n/esc", "Cancel"))
@@ -336,10 +343,10 @@ func (m Model) viewFooter() string {
 		sb.WriteString(keyHint("q/esc", "Close"))
 	case ModeShell:
 		if m.shell.Closed() {
-			sb.WriteString(styles.FooterDesc.Render("  процесс завершён  "))
+			sb.WriteString(styles.FooterDesc.Render(i18n.T("  процесс завершён  ", "  process finished  ")))
 			sb.WriteString(keyHint("q/esc/enter", "Close"))
 		} else {
-			sb.WriteString(styles.FooterDesc.Render("  ввод → контейнер  "))
+			sb.WriteString(styles.FooterDesc.Render(i18n.T("  ввод → контейнер  ", "  input → container  ")))
 			sb.WriteString(keyHint("exit/Ctrl-D", "Quit shell"))
 			sb.WriteString(keyHint("ctrl+\\", "Detach"))
 		}
@@ -500,8 +507,41 @@ func (m Model) viewThemeOverlay() string {
 		}
 	}
 
-	hint := styles.CopyMenuHint.Render("  ↑/↓ превью   enter применить   q/esc отмена")
-	title := styles.CopyMenuTitle.Render(" Тема ")
+	hint := styles.CopyMenuHint.Render(i18n.T("  ↑/↓ превью   enter применить   q/esc отмена", "  ↑/↓ preview   enter apply   q/esc cancel"))
+	title := styles.CopyMenuTitle.Render(i18n.T(" Тема ", " Theme "))
+	content := title + "\n\n" +
+		strings.Join(rows, "\n") +
+		"\n\n" + hint
+
+	panel := styles.OverlayPanel.Render(content)
+	return overlayCenter(m.viewNormal(), panel, m.width, bodyH)
+}
+
+// viewLangOverlay renders the language picker centered over the current view,
+// mirroring the theme picker: the highlighted language is applied live, so the
+// surrounding UI text already reflects the choice.
+func (m Model) viewLangOverlay() string {
+	bodyH := m.height - 2 // header + footer
+
+	maxName := 0
+	for _, l := range m.langNames {
+		if w := lipgloss.Width(l.Display()); w > maxName {
+			maxName = w
+		}
+	}
+
+	var rows []string
+	for i, l := range m.langNames {
+		label := l.Display() + strings.Repeat(" ", maxName-lipgloss.Width(l.Display()))
+		if i == m.langCursor {
+			rows = append(rows, " ▶  "+styles.CopyMenuSelected.Render(" "+label+" "))
+		} else {
+			rows = append(rows, "    "+styles.CopyMenuLabel.Render(label))
+		}
+	}
+
+	hint := styles.CopyMenuHint.Render(i18n.T("  ↑/↓ превью   enter применить   q/esc отмена", "  ↑/↓ preview   enter apply   q/esc cancel"))
+	title := styles.CopyMenuTitle.Render(i18n.T(" Язык ", " Language "))
 	content := title + "\n\n" +
 		strings.Join(rows, "\n") +
 		"\n\n" + hint
@@ -515,8 +555,8 @@ func (m Model) viewThemeOverlay() string {
 func (m Model) viewConfirmOverlay() string {
 	bodyH := m.height - 2 // header + footer
 
-	title := styles.CopyMenuTitle.Render(" Подтверждение ")
-	hint := styles.CopyMenuHint.Render("  y/enter подтвердить   n/esc отмена")
+	title := styles.CopyMenuTitle.Render(i18n.T(" Подтверждение ", " Confirm "))
+	hint := styles.CopyMenuHint.Render(i18n.T("  y/enter подтвердить   n/esc отмена", "  y/enter confirm   n/esc cancel"))
 	content := title + "\n\n" + m.confirmPrompt + "\n\n" + hint
 
 	panel := styles.OverlayPanel.Render(content)
@@ -529,7 +569,7 @@ func (m Model) viewNoticeOverlay() string {
 	bodyH := m.height - 2 // header + footer
 
 	title := styles.CopyMenuTitle.Render(m.noticeTitle)
-	hint := styles.CopyMenuHint.Render("  enter/esc закрыть")
+	hint := styles.CopyMenuHint.Render(i18n.T("  enter/esc закрыть", "  enter/esc close"))
 	content := title + "\n\n" + m.noticeBody + "\n\n" + hint
 
 	panel := styles.OverlayPanel.Render(content)

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"d9c/internal/config"
+	"d9c/internal/i18n"
 
 	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/client"
@@ -173,20 +174,20 @@ func unixSocketPath(host string) (string, bool) {
 // sockets. Every failure wraps ErrSocketPath (see IsSocketError).
 func validateUnixSocket(path string) error {
 	if strings.TrimSpace(path) == "" {
-		return fmt.Errorf("%w: путь до сокета пуст", ErrSocketPath)
+		return fmt.Errorf(i18n.T("%w: путь до сокета пуст", "%w: socket path is empty"), ErrSocketPath)
 	}
 	info, err := os.Stat(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("%w: файл сокета не найден: %s", ErrSocketPath, path)
+		return fmt.Errorf(i18n.T("%w: файл сокета не найден: %s", "%w: socket file not found: %s"), ErrSocketPath, path)
 	}
 	if err != nil {
 		return fmt.Errorf("%w: %s: %w", ErrSocketPath, path, err)
 	}
 	if info.IsDir() {
-		return fmt.Errorf("%w: %s — это каталог, а не сокет", ErrSocketPath, path)
+		return fmt.Errorf(i18n.T("%w: %s — это каталог, а не сокет", "%w: %s is a directory, not a socket"), ErrSocketPath, path)
 	}
 	if runtime.GOOS != "windows" && info.Mode()&os.ModeSocket == 0 {
-		return fmt.Errorf("%w: %s — не unix-сокет", ErrSocketPath, path)
+		return fmt.Errorf(i18n.T("%w: %s — не unix-сокет", "%w: %s is not a unix socket"), ErrSocketPath, path)
 	}
 	return nil
 }

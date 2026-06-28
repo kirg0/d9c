@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"d9c/internal/i18n"
 )
 
 // FakeBackend is an in-memory Backend implementation used for the --demo mode
@@ -129,7 +131,7 @@ func (f *FakeBackend) RemoveContainer(id string, force bool) error {
 	for i, c := range f.Containers {
 		if c.ID == id {
 			if c.State == "running" && !force {
-				return fmt.Errorf("контейнер запущен — выполните rm -f или сначала остановите его")
+				return errors.New(i18n.T("контейнер запущен — выполните rm -f или сначала остановите его", "the container is running — run rm -f or stop it first"))
 			}
 			f.Containers = append(f.Containers[:i], f.Containers[i+1:]...)
 			return nil
@@ -316,7 +318,7 @@ func (f *FakeBackend) ListPath(containerID, dir string) ([]FileEntry, error) {
 	}
 	entries, ok := fakeFS[dir]
 	if !ok {
-		return nil, fmt.Errorf("путь %s не найден", dir)
+		return nil, fmt.Errorf(i18n.T("путь %s не найден", "path %s not found"), dir)
 	}
 	return entries, nil
 }
@@ -344,7 +346,7 @@ func (f *FakeBackend) CopyFromContainer(containerID, srcPath, destDir string) er
 // exists (nothing is stored), so the success/error paths are observable.
 func (f *FakeBackend) CopyToContainer(containerID, localPath, destDir string) error {
 	if _, err := os.Stat(localPath); err != nil {
-		return fmt.Errorf("открыть %s: %w", localPath, err)
+		return fmt.Errorf(i18n.T("открыть %s: %w", "open %s: %w"), localPath, err)
 	}
 	return nil
 }
@@ -490,7 +492,7 @@ func (f *FakeBackend) RemoveNetwork(id string) error {
 	for i, n := range f.Networks {
 		if n.ID == id {
 			if n.Name == "bridge" || n.Name == "host" {
-				return fmt.Errorf("встроенную сеть %q удалить нельзя", n.Name)
+				return fmt.Errorf(i18n.T("встроенную сеть %q удалить нельзя", "the built-in network %q cannot be removed"), n.Name)
 			}
 			f.Networks = append(f.Networks[:i], f.Networks[i+1:]...)
 			return nil
@@ -843,7 +845,7 @@ func (f *FakeBackend) SystemPrune() (string, error) {
 	}
 	f.Containers = kept
 	imgs, _ := f.PruneImages()
-	summary := fmt.Sprintf("prune: контейнеров %d, сетей 0, образов %d, кэш 3 — освобождено 53.0 MB", ctrs, imgs)
+	summary := fmt.Sprintf(i18n.T("prune: контейнеров %d, сетей 0, образов %d, кэш 3 — освобождено 53.0 MB", "prune: containers %d, networks 0, images %d, cache 3 — reclaimed 53.0 MB"), ctrs, imgs)
 	return summary, nil
 }
 

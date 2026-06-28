@@ -15,6 +15,7 @@ import (
 	"d9c/internal/config"
 	"d9c/internal/docker"
 	"d9c/internal/hosts"
+	"d9c/internal/i18n"
 	"d9c/internal/keymap"
 	"d9c/internal/plugins"
 	"d9c/internal/settings"
@@ -98,6 +99,7 @@ const (
 	ModeNotice            // informational modal (e.g. SSH known_hosts mismatch)
 	ModeCpForm            // upload-to-container wizard (`:cp` with no args)
 	ModeThemePicker       // theme selector modal (`:theme` with no args, live preview)
+	ModeLangPicker        // language selector modal (`:lang` with no args, live preview)
 )
 
 // copyItem is one selectable entry in the copy overlay.
@@ -295,6 +297,9 @@ type openPushFormMsg struct{ ref string }
 
 // openThemePickerMsg requests the theme selector modal (`:theme` with no args).
 type openThemePickerMsg struct{}
+
+// openLangPickerMsg requests the language selector modal (`:lang` with no args).
+type openLangPickerMsg struct{}
 
 // openNetFormMsg requests the create-network modal form.
 type openNetFormMsg struct{}
@@ -538,6 +543,13 @@ type Model struct {
 	themeNames    []string
 	themeCursor   int
 	themeOriginal styles.Palette
+
+	// Language picker overlay (ModeLangPicker) state: the selectable languages,
+	// the cursor, and the language to restore if the user cancels (the preview
+	// switches the active language live, mutating the global i18n state).
+	langNames    []i18n.Lang
+	langCursor   int
+	langOriginal i18n.Lang
 
 	// Generic confirmation overlay (ModeConfirm) state.
 	confirmPrompt string
