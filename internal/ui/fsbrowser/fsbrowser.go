@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"d9c/internal/docker"
+	"d9c/internal/i18n"
 	"d9c/internal/ui/styles"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -144,7 +145,7 @@ func (m Model) View() string {
 	}
 
 	if len(m.entries) == 0 {
-		empty := styles.CopyMenuHint.Render("  (пусто)")
+		empty := styles.CopyMenuHint.Render(i18n.T("  (пусто)", "  (empty)"))
 		return header + "\n" + empty
 	}
 

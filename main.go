@@ -7,6 +7,7 @@ import (
 	"d9c/internal/config"
 	"d9c/internal/docker"
 	"d9c/internal/hosts"
+	"d9c/internal/i18n"
 	"d9c/internal/plugins"
 	"d9c/internal/settings"
 	"d9c/internal/ui"
@@ -50,6 +51,12 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("loading plugins: %w", err)
 	}
+
+	lang, err := set.Lang()
+	if err != nil {
+		return fmt.Errorf("loading language: %w", err)
+	}
+	i18n.Set(lang)
 
 	palette, err := set.Palette()
 	if err != nil {

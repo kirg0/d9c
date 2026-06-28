@@ -243,6 +243,7 @@ are written back immediately — the other sections are preserved. An old standa
 (the file is renamed to `d9c-hosts.json.migrated`).
 
 ```yaml
+lang: ru                  # UI language: ru (default) or en
 theme: dracula            # built-in palette (tokyonight by default)
 colors:                   # optional pointwise color overrides
   primary: "#ff79c6"
@@ -262,6 +263,11 @@ preview, Enter — apply, q/Esc — cancel). Picking a theme through the picker 
 is **saved to the config** (`theme:`) — it survives a restart; `:theme <name>` changes the theme
 for the current session only. In `colors` you can override any of the base colors on top of the
 selected theme:
+
+**The UI language** is switched the same way: the `:lang` command with no argument opens a
+picker modal (`Русский` / `English`, arrows — preview, Enter — apply, q/Esc — cancel), while
+`:lang en` / `:lang ru` change the language directly. The choice is **saved to the config**
+(`lang:`) and survives a restart. The interface is Russian by default.
 
 | Key | Purpose |
 | --- | --- |

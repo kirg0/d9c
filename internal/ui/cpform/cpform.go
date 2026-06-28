@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"d9c/internal/i18n"
 	"d9c/internal/ui/styles"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -318,7 +319,7 @@ func (m Model) sourceLabel() string {
 // pickerBody renders the windowed local listing (or an empty marker).
 func (m Model) pickerBody() string {
 	if len(m.entries) == 0 {
-		return "  " + styles.CopyMenuHint.Render("(пусто)")
+		return "  " + styles.CopyMenuHint.Render(i18n.T("(пусто)", "(empty)"))
 	}
 	vis := m.listHeight()
 	end := min(m.offset+vis, len(m.entries))

@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"d9c/internal/i18n"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stdcopy"
@@ -53,11 +56,11 @@ func friendlyListErr(dir, stderr string) error {
 	low := strings.ToLower(stderr)
 	switch {
 	case strings.Contains(low, "executable file not found"), strings.Contains(low, "no such file or directory") && strings.Contains(low, "ls"):
-		return fmt.Errorf("в контейнере нет `ls` — обзор файловой системы недоступен")
+		return errors.New(i18n.T("в контейнере нет `ls` — обзор файловой системы недоступен", "the container has no `ls` — filesystem browsing is unavailable"))
 	case strings.Contains(low, "permission denied"):
-		return fmt.Errorf("нет доступа к %s", dir)
+		return fmt.Errorf(i18n.T("нет доступа к %s", "no access to %s"), dir)
 	case strings.Contains(low, "no such file"):
-		return fmt.Errorf("путь %s не найден", dir)
+		return fmt.Errorf(i18n.T("путь %s не найден", "path %s not found"), dir)
 	}
 	return fmt.Errorf("ls: %s", strings.TrimSpace(stderr))
 }
@@ -137,11 +140,11 @@ func (b *dockerBackend) CopyFromContainer(containerID, srcPath, destDir string) 
 func (b *dockerBackend) CopyToContainer(containerID, localPath, destDir string) error {
 	info, err := os.Stat(localPath)
 	if err != nil {
-		return fmt.Errorf("открыть %s: %w", localPath, err)
+		return fmt.Errorf(i18n.T("открыть %s: %w", "open %s: %w"), localPath, err)
 	}
 	buf, err := tarLocal(localPath, info)
 	if err != nil {
-		return fmt.Errorf("упаковать %s: %w", localPath, err)
+		return fmt.Errorf(i18n.T("упаковать %s: %w", "pack %s: %w"), localPath, err)
 	}
 	if strings.TrimSpace(destDir) == "" {
 		destDir = "/"
@@ -163,13 +166,13 @@ func friendlyCopyErr(err error) error {
 	msg := strings.ToLower(err.Error())
 	switch {
 	case strings.Contains(msg, "no such container"):
-		return fmt.Errorf("контейнер не найден")
+		return errors.New(i18n.T("контейнер не найден", "container not found"))
 	case strings.Contains(msg, "could not find the file"), strings.Contains(msg, "no such file"):
-		return fmt.Errorf("путь в контейнере не найден")
+		return errors.New(i18n.T("путь в контейнере не найден", "path in the container not found"))
 	case strings.Contains(msg, "not a directory"):
-		return fmt.Errorf("целевой путь в контейнере — не каталог")
+		return errors.New(i18n.T("целевой путь в контейнере — не каталог", "target path in the container is not a directory"))
 	case strings.Contains(msg, "permission denied"):
-		return fmt.Errorf("нет доступа к пути")
+		return errors.New(i18n.T("нет доступа к пути", "no access to the path"))
 	}
 	return fmt.Errorf("docker cp: %w", err)
 }

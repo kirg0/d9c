@@ -5,6 +5,7 @@ package pullform
 import (
 	"strings"
 
+	"d9c/internal/i18n"
 	"d9c/internal/ui/styles"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -102,7 +103,7 @@ func (m Model) View(width, height int) string {
 	switch {
 	case m.busy:
 		b.WriteString(m.spinner.View() + " " + styles.FormBusy.Render("pulling "+m.Image()+"…") + "\n")
-		b.WriteString(styles.FormHint.Render("это может занять время · esc cancel"))
+		b.WriteString(styles.FormHint.Render(i18n.T("это может занять время · esc cancel", "this may take a while · esc cancel")))
 	case m.errMsg != "":
 		b.WriteString(styles.FormError.Render("✖ "+m.errMsg) + "\n")
 		b.WriteString(styles.FormHint.Render("enter pull · esc cancel"))

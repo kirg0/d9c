@@ -3,6 +3,7 @@ package cmdline
 import (
 	"strings"
 
+	"d9c/internal/i18n"
 	"d9c/internal/ui/styles"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -93,20 +94,25 @@ var composeHostOnly = map[string]bool{
 // shell (SSH). The dispatcher uses it to reject such commands early on tcp://.
 func IsComposeHostOp(name string) bool { return composeHostOnly[name] }
 
-// View-switching commands are always available, plus the global events feed
-// and system-wide operations.
-var viewCmds = []cmdDef{
-	{"containers", ""},
-	{"images", ""},
-	{"networks", ""},
-	{"volumes", ""},
-	{"hosts", "(= dashboard: STATUS + агрегат docker info)"},
-	{"compose", ""},
-	{"events", "(live daemon events)"},
-	{"system", "df | prune (полная очистка с подтверждением)"},
-	{"theme", "[name] (сменить тему; без имени — выбор из списка с превью)"},
-	{"interval", "<dur> | pause | resume (интервал автообновления)"},
-	{"alert", "cpu <%> | mem <%> | off (пороги CPU/MEM)"},
+// viewCmds returns the always-available commands: view switching, the global
+// events feed and system-wide operations. It is a function (not a package var)
+// so the localized hints reflect the active language at call time, after
+// i18n.Set has run.
+func viewCmds() []cmdDef {
+	return []cmdDef{
+		{"containers", ""},
+		{"images", ""},
+		{"networks", ""},
+		{"volumes", ""},
+		{"hosts", i18n.T("(= dashboard: STATUS + агрегат docker info)", "(= dashboard: STATUS + docker info summary)")},
+		{"compose", ""},
+		{"events", "(live daemon events)"},
+		{"system", i18n.T("df | prune (полная очистка с подтверждением)", "df | prune (full cleanup with confirmation)")},
+		{"theme", i18n.T("[name] (сменить тему; без имени — выбор из списка с превью)", "[name] (switch theme; no name — pick from a list with preview)")},
+		{"lang", i18n.T("[ru|en] (язык интерфейса; без аргумента — выбор)", "[ru|en] (UI language; no arg — pick from a list)")},
+		{"interval", i18n.T("<dur> | pause | resume (интервал автообновления)", "<dur> | pause | resume (auto-refresh interval)")},
+		{"alert", i18n.T("cpu <%> | mem <%> | off (пороги CPU/MEM)", "cpu <%> | mem <%> | off (CPU/MEM thresholds)")},
+	}
 }
 
 // CommandMsg is emitted when the user presses Enter in the command line.
@@ -275,9 +281,10 @@ func resourceCmds(resource string, hostCompose bool) []cmdDef {
 // the always-available view-switch commands.
 func (m Model) builtinCommands() []cmdDef {
 	specific := resourceCmds(m.resource, m.hostCompose)
-	out := make([]cmdDef, 0, len(specific)+len(viewCmds))
+	global := viewCmds()
+	out := make([]cmdDef, 0, len(specific)+len(global))
 	out = append(out, specific...)
-	out = append(out, viewCmds...)
+	out = append(out, global...)
 	return out
 }
 

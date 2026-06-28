@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"d9c/internal/i18n"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 )
@@ -108,27 +110,27 @@ func (b *dockerBackend) SystemPrune() (string, error) {
 	if r, err := b.cli.ContainersPrune(ctx, filters.Args{}); err != nil {
 		fail("containers", err)
 	} else {
-		parts = append(parts, fmt.Sprintf("контейнеров %d", len(r.ContainersDeleted)))
+		parts = append(parts, fmt.Sprintf(i18n.T("контейнеров %d", "containers %d"), len(r.ContainersDeleted)))
 		reclaimed += r.SpaceReclaimed
 	}
 	if r, err := b.cli.NetworksPrune(ctx, filters.Args{}); err != nil {
 		fail("networks", err)
 	} else {
-		parts = append(parts, fmt.Sprintf("сетей %d", len(r.NetworksDeleted)))
+		parts = append(parts, fmt.Sprintf(i18n.T("сетей %d", "networks %d"), len(r.NetworksDeleted)))
 	}
 	if r, err := b.cli.ImagesPrune(ctx, filters.Args{}); err != nil { // dangling only
 		fail("images", err)
 	} else {
-		parts = append(parts, fmt.Sprintf("образов %d", len(r.ImagesDeleted)))
+		parts = append(parts, fmt.Sprintf(i18n.T("образов %d", "images %d"), len(r.ImagesDeleted)))
 		reclaimed += r.SpaceReclaimed
 	}
 	if r, err := b.cli.BuildCachePrune(ctx, types.BuildCachePruneOptions{}); err != nil {
 		fail("build cache", err)
 	} else {
-		parts = append(parts, fmt.Sprintf("кэш %d", len(r.CachesDeleted)))
+		parts = append(parts, fmt.Sprintf(i18n.T("кэш %d", "cache %d"), len(r.CachesDeleted)))
 		reclaimed += r.SpaceReclaimed
 	}
 
-	summary := "prune: " + strings.Join(parts, ", ") + " — освобождено " + formatBytes(int64(reclaimed))
+	summary := "prune: " + strings.Join(parts, ", ") + i18n.T(" — освобождено ", " — reclaimed ") + formatBytes(int64(reclaimed))
 	return summary, firstErr
 }

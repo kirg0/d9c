@@ -3,11 +3,14 @@ package docker
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
 	"sync"
 	"time"
+
+	"d9c/internal/i18n"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -203,7 +206,7 @@ func (b *dockerBackend) RunContainer(opts RunOptions) error {
 		// retry the create once before giving up.
 		if isNoSuchImageErr(err) {
 			if perr := b.PullImage(opts.Image); perr != nil {
-				return fmt.Errorf("скачивание образа не удалось: %w", perr)
+				return fmt.Errorf(i18n.T("скачивание образа не удалось: %w", "pulling the image failed: %w"), perr)
 			}
 			created, err = b.createContainer(cfg, hostCfg, opts.Name)
 		}
@@ -243,11 +246,11 @@ func friendlyRunErr(err error) error {
 	msg := strings.ToLower(err.Error())
 	switch {
 	case strings.Contains(msg, "no such image"):
-		return fmt.Errorf("образ не найден на хосте — скачайте его сначала (:pull в разделе Images)")
+		return errors.New(i18n.T("образ не найден на хосте — скачайте его сначала (:pull в разделе Images)", "image not found on the host — pull it first (:pull in the Images view)"))
 	case strings.Contains(msg, "is already in use"):
-		return fmt.Errorf("имя контейнера занято — выберите другое или удалите старый контейнер")
+		return errors.New(i18n.T("имя контейнера занято — выберите другое или удалите старый контейнер", "container name is taken — pick another or remove the old container"))
 	case strings.Contains(msg, "invalid containerport"), strings.Contains(msg, "invalid port"):
-		return fmt.Errorf("неверный формат порта — используйте host:container, например 8080:80")
+		return errors.New(i18n.T("неверный формат порта — используйте host:container, например 8080:80", "invalid port format — use host:container, e.g. 8080:80"))
 	}
 	return fmt.Errorf("create container: %w", err)
 }

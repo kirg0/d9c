@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"d9c/internal/i18n"
 	"d9c/internal/theme"
 	"d9c/internal/ui/styles"
 
@@ -72,10 +73,10 @@ func (m Model) handleThemePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		if m.themeCursor < len(m.themeNames) {
 			name := m.themeNames[m.themeCursor]
-			m.copyNotif = "тема: " + name
+			m.copyNotif = i18n.T("тема: ", "theme: ") + name
 			if m.settings != nil {
 				if err := m.settings.SetTheme(name); err != nil {
-					m.copyNotif = "тема применена, но не сохранена: " + err.Error()
+					m.copyNotif = i18n.T("тема применена, но не сохранена: ", "theme applied but not saved: ") + err.Error()
 				}
 			}
 			m.mode = ModeNormal

@@ -8,6 +8,7 @@ import (
 
 	"d9c/internal/alerts"
 	"d9c/internal/docker"
+	"d9c/internal/i18n"
 	"d9c/internal/theme"
 	"d9c/internal/ui/cmdline"
 
@@ -46,7 +47,9 @@ func (m *Model) dispatchCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 			prune := systemPruneCmd(m.backend)
 			return func() tea.Msg {
 				return openConfirmMsg{
-					prompt: "Удалить остановленные контейнеры, неиспользуемые сети,\nвисячие образы и build-кэш? (тома не затрагиваются)",
+					prompt: i18n.T(
+						"Удалить остановленные контейнеры, неиспользуемые сети,\nвисячие образы и build-кэш? (тома не затрагиваются)",
+						"Remove stopped containers, unused networks,\ndangling images and build cache? (volumes are left alone)"),
 					action: prune,
 				}
 			}, nil
@@ -71,7 +74,25 @@ func (m *Model) dispatchCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 			return nil, fmt.Errorf("unknown theme %q (available: %s)", name, names)
 		}
 		m.applyPalette(pal)
-		m.copyNotif = "тема: " + name
+		m.copyNotif = i18n.T("тема: ", "theme: ") + name
+		return clearCopyNotifCmd(), nil
+	case "lang", "language":
+		// Switch the UI language on the fly. No arg opens the interactive picker
+		// (mirroring :theme); an explicit code sets it directly and persists it.
+		if len(cmd.Args) == 0 {
+			return func() tea.Msg { return openLangPickerMsg{} }, nil
+		}
+		lang, err := i18n.Resolve(cmd.Args[0])
+		if err != nil {
+			return nil, err
+		}
+		i18n.Set(lang)
+		m.copyNotif = i18n.T("язык: ", "language: ") + lang.Display()
+		if m.settings != nil {
+			if err := m.settings.SetLang(string(lang)); err != nil {
+				m.copyNotif = i18n.T("язык применён, но не сохранён: ", "language applied but not saved: ") + err.Error()
+			}
+		}
 		return clearCopyNotifCmd(), nil
 	case "interval":
 		// Auto-refresh cadence, available from any view. No arg reports the
@@ -79,27 +100,29 @@ func (m *Model) dispatchCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 		if len(cmd.Args) == 0 {
 			state := m.refreshInterval.String()
 			if m.paused {
-				state += " (на паузе)"
+				state += i18n.T(" (на паузе)", " (paused)")
 			}
-			return nil, fmt.Errorf("интервал автообновления: %s; задать: interval <dur> (напр. 5s), пауза: p", state)
+			return nil, fmt.Errorf(i18n.T(
+				"интервал автообновления: %s; задать: interval <dur> (напр. 5s), пауза: p",
+				"auto-refresh interval: %s; set: interval <dur> (e.g. 5s), pause: p"), state)
 		}
 		switch strings.ToLower(cmd.Args[0]) {
 		case "pause", "off":
 			m.paused = true
-			m.copyNotif = "автообновление на паузе"
+			m.copyNotif = i18n.T("автообновление на паузе", "auto-refresh paused")
 			return clearCopyNotifCmd(), nil
 		case "resume", "on":
 			m.paused = false
-			m.copyNotif = "автообновление возобновлено"
+			m.copyNotif = i18n.T("автообновление возобновлено", "auto-refresh resumed")
 			return tea.Batch(m.fetchCurrentResource(), clearCopyNotifCmd()), nil
 		}
 		d, err := time.ParseDuration(cmd.Args[0])
 		if err != nil {
-			return nil, fmt.Errorf("неверный интервал %q (примеры: 1s, 5s, 2m)", cmd.Args[0])
+			return nil, fmt.Errorf(i18n.T("неверный интервал %q (примеры: 1s, 5s, 2m)", "invalid interval %q (examples: 1s, 5s, 2m)"), cmd.Args[0])
 		}
 		m.refreshInterval = clampInterval(d)
 		m.paused = false
-		m.copyNotif = "интервал: " + m.refreshInterval.String()
+		m.copyNotif = i18n.T("интервал: ", "interval: ") + m.refreshInterval.String()
 		// The running tick loop reads m.refreshInterval when it reschedules, so the
 		// new cadence applies after at most one old interval. Don't start a second
 		// tickCmd here — that would run two tick chains in parallel. Refresh now so
@@ -109,7 +132,9 @@ func (m *Model) dispatchCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 		// Resource-usage thresholds, available from any view. No arg reports the
 		// current config; `cpu`/`mem <pct>` set a metric, `off` disables both.
 		if len(cmd.Args) == 0 {
-			return nil, fmt.Errorf("алерты: %s; задать: alert cpu <%%> | alert mem <%%> | alert off", alertSummary(m.alerts))
+			return nil, fmt.Errorf(i18n.T(
+				"алерты: %s; задать: alert cpu <%%> | alert mem <%%> | alert off",
+				"alerts: %s; set: alert cpu <%%> | alert mem <%%> | alert off"), alertSummary(m.alerts))
 		}
 		switch strings.ToLower(cmd.Args[0]) {
 		case "off", "none", "clear":
@@ -127,7 +152,7 @@ func (m *Model) dispatchCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 		}
 		m.applyColumns(m.width)
 		m.refreshTableRows()
-		m.copyNotif = "алерты: " + alertSummary(m.alerts)
+		m.copyNotif = i18n.T("алерты: ", "alerts: ") + alertSummary(m.alerts)
 		return clearCopyNotifCmd(), nil
 	}
 
@@ -305,7 +330,7 @@ func (m *Model) setAlertThreshold(metric string, args []string) error {
 	if raw != "off" && raw != "none" {
 		f, err := strconv.ParseFloat(raw, 64)
 		if err != nil || f < 0 {
-			return fmt.Errorf("неверный порог %q (пример: alert %s 80)", args[1], metric)
+			return fmt.Errorf(i18n.T("неверный порог %q (пример: alert %s 80)", "invalid threshold %q (example: alert %s 80)"), args[1], metric)
 		}
 		v = f
 	}
@@ -321,7 +346,7 @@ func (m *Model) setAlertThreshold(metric string, args []string) error {
 // alertSummary renders the active thresholds for the footer/command help.
 func alertSummary(t alerts.Thresholds) string {
 	if !t.Active() {
-		return "выключены"
+		return i18n.T("выключены", "off")
 	}
 	parts := make([]string, 0, 2)
 	if t.CPU > 0 {

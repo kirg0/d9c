@@ -5,6 +5,7 @@ package runform
 import (
 	"strings"
 
+	"d9c/internal/i18n"
 	"d9c/internal/ui/styles"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -163,7 +164,7 @@ func (m Model) View(width, height int) string {
 	switch {
 	case m.busy:
 		b.WriteString(m.spinner.View() + " " + styles.FormBusy.Render("running "+m.Image()+"…") + "\n")
-		b.WriteString(styles.FormHint.Render("образ скачается, если его нет на хосте · esc cancel"))
+		b.WriteString(styles.FormHint.Render(i18n.T("образ скачается, если его нет на хосте · esc cancel", "the image is pulled if it's not on the host · esc cancel")))
 	case m.errMsg != "":
 		b.WriteString(styles.FormError.Render("✖ "+m.errMsg) + "\n")
 		b.WriteString(styles.FormHint.Render("tab switch · enter run · esc cancel"))

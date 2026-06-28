@@ -21,6 +21,7 @@ import (
 
 	"d9c/internal/alerts"
 	"d9c/internal/hosts"
+	"d9c/internal/i18n"
 	"d9c/internal/keymap"
 	"d9c/internal/theme"
 	"d9c/internal/ui/styles"
@@ -29,6 +30,7 @@ import (
 // File is the on-disk shape of d9c-config.yaml. Every section is optional;
 // omitempty keeps a freshly written file free of empty noise.
 type File struct {
+	Lang   string            `yaml:"lang,omitempty"`
 	Theme  string            `yaml:"theme,omitempty"`
 	Colors map[string]string `yaml:"colors,omitempty"`
 	Keys   map[string]string `yaml:"keys,omitempty"`
@@ -91,6 +93,18 @@ func (s *Store) Save() error {
 		return fmt.Errorf("write config file: %w", err)
 	}
 	return nil
+}
+
+// Lang resolves the configured UI language (default RU when the section is
+// empty or invalid handling is delegated to i18n.Resolve).
+func (s *Store) Lang() (i18n.Lang, error) {
+	return i18n.Resolve(s.File.Lang)
+}
+
+// SetLang records the UI language code and persists the file.
+func (s *Store) SetLang(name string) error {
+	s.File.Lang = name
+	return s.Save()
 }
 
 // Palette resolves the theme/colors section into a concrete palette (default
