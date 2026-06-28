@@ -572,7 +572,7 @@ func NewModel(cfg *config.Config, backend docker.Backend, store *hosts.Store, co
 		interval = defaultRefreshInterval
 	}
 	errStr := ""
-	if connectErr != nil && !docker.IsHostKeyError(connectErr) && !docker.IsHostNotFoundError(connectErr) {
+	if connectErr != nil && !docker.IsHostKeyError(connectErr) && !docker.IsHostNotFoundError(connectErr) && !docker.IsSocketError(connectErr) {
 		errStr = connectErr.Error()
 	}
 	hostOps := backend.SupportsHostCompose()
@@ -630,11 +630,15 @@ func NewModel(cfg *config.Config, backend docker.Backend, store *hosts.Store, co
 	// Seed columns for the starting resource so a fast first data update can't
 	// render rows against an empty column set (panic in bubbles renderRow).
 	m.applyColumns(0)
-	if connectErr != nil && docker.IsHostKeyError(connectErr) {
+	switch {
+	case connectErr != nil && docker.IsHostKeyError(connectErr):
 		title, body := hostKeyNoticeText(cfg.Host)
 		m.startupNotice = &openNoticeMsg{title: title, body: body}
-	} else if connectErr != nil && docker.IsHostNotFoundError(connectErr) {
+	case connectErr != nil && docker.IsHostNotFoundError(connectErr):
 		title, body := hostNotFoundNoticeText(cfg.Host)
+		m.startupNotice = &openNoticeMsg{title: title, body: body}
+	case connectErr != nil && docker.IsSocketError(connectErr):
+		title, body := socketNoticeText(cfg.Host, connectErr)
 		m.startupNotice = &openNoticeMsg{title: title, body: body}
 	}
 	return m

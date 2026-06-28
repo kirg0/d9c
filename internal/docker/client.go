@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
+	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -132,14 +135,67 @@ type dockerBackend struct {
 }
 
 // New creates a Backend from the provided config.
-// Supports tcp:// and ssh:// schemes in cfg.Host.
+// Supports tcp://, unix:// and ssh:// schemes in cfg.Host.
 func New(cfg *config.Config) (Backend, error) {
 	host := cfg.Host
 
 	if strings.HasPrefix(host, "ssh://") {
 		return newSSHBackend(cfg)
 	}
+	if path, ok := unixSocketPath(host); ok {
+		// Validate the socket path up front: the Docker client builds lazily and
+		// never dials here, so an obviously wrong unix://… would otherwise surface
+		// only as an opaque dial failure (or a pointless auto-reconnect loop).
+		if err := validateUnixSocket(path); err != nil {
+			return nil, err
+		}
+	}
 	return newTCPBackend(cfg)
+}
+
+// ErrSocketPath is the sentinel wrapped by every unix:// socket-path validation
+// failure; IsSocketError detects it to show a dedicated dialog.
+var ErrSocketPath = errors.New("invalid docker socket")
+
+// unixSocketPath extracts the filesystem path from a unix:// Docker host,
+// reporting false for any other scheme.
+func unixSocketPath(host string) (string, bool) {
+	if !strings.HasPrefix(host, "unix://") {
+		return "", false
+	}
+	return strings.TrimPrefix(host, "unix://"), true
+}
+
+// validateUnixSocket checks that path points to an existing unix domain socket
+// before the Docker client is built, so a mistyped or missing socket yields a
+// clear, actionable error instead of a confusing dial failure. The socket-type
+// check is skipped on Windows, where os.Stat does not report AF_UNIX files as
+// sockets. Every failure wraps ErrSocketPath (see IsSocketError).
+func validateUnixSocket(path string) error {
+	if strings.TrimSpace(path) == "" {
+		return fmt.Errorf("%w: путь до сокета пуст", ErrSocketPath)
+	}
+	info, err := os.Stat(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("%w: файл сокета не найден: %s", ErrSocketPath, path)
+	}
+	if err != nil {
+		return fmt.Errorf("%w: %s: %w", ErrSocketPath, path, err)
+	}
+	if info.IsDir() {
+		return fmt.Errorf("%w: %s — это каталог, а не сокет", ErrSocketPath, path)
+	}
+	if runtime.GOOS != "windows" && info.Mode()&os.ModeSocket == 0 {
+		return fmt.Errorf("%w: %s — не unix-сокет", ErrSocketPath, path)
+	}
+	return nil
+}
+
+// IsSocketError reports whether err is a unix:// socket-path validation failure
+// (missing file, a directory, not a socket, or an empty path). The UI uses it to
+// show a dedicated dialog instead of dumping the raw error into the footer.
+func IsSocketError(err error) bool {
+	return errors.Is(err, ErrSocketPath)
 }
 
 func newTCPBackend(cfg *config.Config) (Backend, error) {

@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -76,6 +79,95 @@ func TestIsHostNotFoundError(t *testing.T) {
 	for _, tt := range tests {
 		if got := IsHostNotFoundError(tt.err); got != tt.want {
 			t.Errorf("%s: IsHostNotFoundError = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestUnixSocketPath(t *testing.T) {
+	tests := []struct {
+		host     string
+		wantPath string
+		wantOK   bool
+	}{
+		{"unix:///var/run/docker.sock", "/var/run/docker.sock", true},
+		{"unix://", "", true},
+		{"tcp://host:2375", "", false},
+		{"ssh://user@host", "", false},
+		{"", "", false},
+	}
+	for _, tt := range tests {
+		gotPath, gotOK := unixSocketPath(tt.host)
+		if gotPath != tt.wantPath || gotOK != tt.wantOK {
+			t.Errorf("unixSocketPath(%q) = (%q, %v), want (%q, %v)", tt.host, gotPath, gotOK, tt.wantPath, tt.wantOK)
+		}
+	}
+}
+
+func TestValidateUnixSocket(t *testing.T) {
+	dir := t.TempDir()
+	missing := filepath.Join(dir, "nope.sock")
+	regular := filepath.Join(dir, "plain.txt")
+	if err := os.WriteFile(regular, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("empty path", func(t *testing.T) {
+		if err := validateUnixSocket(""); !IsSocketError(err) {
+			t.Errorf("empty path: err = %v, want a socket error", err)
+		}
+	})
+	t.Run("missing file", func(t *testing.T) {
+		if err := validateUnixSocket(missing); !IsSocketError(err) {
+			t.Errorf("missing file: err = %v, want a socket error", err)
+		}
+	})
+	t.Run("directory", func(t *testing.T) {
+		if err := validateUnixSocket(dir); !IsSocketError(err) {
+			t.Errorf("directory: err = %v, want a socket error", err)
+		}
+	})
+	t.Run("regular file rejected off windows", func(t *testing.T) {
+		err := validateUnixSocket(regular)
+		if runtime.GOOS == "windows" {
+			if err != nil {
+				t.Errorf("windows: regular file should pass (no ModeSocket check), got %v", err)
+			}
+			return
+		}
+		if !IsSocketError(err) {
+			t.Errorf("regular file: err = %v, want a socket error", err)
+		}
+	})
+	t.Run("real socket accepted", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("AF_UNIX listener not reliable on Windows CI")
+		}
+		sock := filepath.Join(dir, "live.sock")
+		ln, err := net.Listen("unix", sock)
+		if err != nil {
+			t.Skipf("cannot create unix socket: %v", err)
+		}
+		defer func() { _ = ln.Close() }()
+		if err := validateUnixSocket(sock); err != nil {
+			t.Errorf("real socket: err = %v, want nil", err)
+		}
+	})
+}
+
+func TestIsSocketError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{"sentinel", ErrSocketPath, true},
+		{"wrapped", fmt.Errorf("could not connect: %w", ErrSocketPath), true},
+		{"unrelated", errors.New("connection refused"), false},
+	}
+	for _, tt := range tests {
+		if got := IsSocketError(tt.err); got != tt.want {
+			t.Errorf("%s: IsSocketError = %v, want %v", tt.name, got, tt.want)
 		}
 	}
 }
