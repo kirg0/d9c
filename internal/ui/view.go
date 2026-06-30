@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"d9c/internal/docker"
 	"d9c/internal/i18n"
 	"d9c/internal/theme"
 	"d9c/internal/ui/styles"
@@ -190,6 +191,11 @@ func (m Model) viewHeader() string {
 		status = styles.HeaderStatusOK
 	}
 	right := status.Render(" ● ") + styles.HeaderHost.Render(m.cfg.Host+" ")
+	// Surface a non-Docker engine (Podman) so the user can confirm the
+	// connection lands on the expected runtime; Docker is the implied default.
+	if m.runtime == docker.RuntimePodman {
+		right = styles.HeaderRuntime.Render(" "+m.runtime.Label()+" ") + right
+	}
 	if m.reconnecting {
 		right = styles.HeaderStatusRetry.Render(" ● ") +
 			styles.HeaderReconnect.Render(fmt.Sprintf(" ⟳ reconnecting… (attempt %d) ", m.reconnectAttempt))

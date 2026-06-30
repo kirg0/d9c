@@ -35,6 +35,11 @@ type FakeBackend struct {
 
 	// LogLines is the canned log stream returned by ContainerLogs.
 	LogLines []string
+
+	// RuntimeKind simulates the container engine reported by Runtime(); the zero
+	// value (RuntimeUnknown) is treated as Docker. Set RuntimePodman to exercise
+	// the Podman-specific paths without a live host.
+	RuntimeKind Runtime
 }
 
 // NewFakeBackend returns a FakeBackend pre-populated with representative data.
@@ -851,6 +856,15 @@ func (f *FakeBackend) SystemPrune() (string, error) {
 
 // Ping always succeeds for the in-memory fake backend.
 func (f *FakeBackend) Ping() error { return nil }
+
+// Runtime reports the engine the fake simulates. It defaults to Docker; set
+// RuntimeKind to RuntimePodman to exercise the Podman code paths in demo/tests.
+func (f *FakeBackend) Runtime() Runtime {
+	if f.RuntimeKind != RuntimeUnknown {
+		return f.RuntimeKind
+	}
+	return RuntimeDocker
+}
 
 // Info returns a daemon summary derived from the in-memory demo data, so the
 // multi-host dashboard can be exercised without a live host.

@@ -455,6 +455,11 @@ func (b *dockerBackend) ComposeRemove(project string) error {
 // and read/write the project's files on the host), false for tcp://.
 func (b *dockerBackend) SupportsHostCompose() bool { return b.sshClient != nil }
 
+// composeBin returns the host compose CLI prefix for the detected engine:
+// "docker compose" for Docker, "podman compose" for Podman. Used to build the
+// up/pull/down/config/create commands run over SSH.
+func (b *dockerBackend) composeBin() string { return b.engineCmd() + " compose" }
+
 // ── compose-engine ops over SSH (up / pull / down / config) ─────────────────
 
 // ComposeUp/Pull/Down run the corresponding `docker compose` action on the host
@@ -493,7 +498,7 @@ func (b *dockerBackend) CreateComposeFile(dir, content string) (<-chan string, f
 	if err := b.sshEnsureDirAndWrite(dir, path, content); err != nil {
 		return nil, nil, err
 	}
-	base := "docker compose --project-directory " + shellQuote(dir) + " -f " + shellQuote(path) + " up -d"
+	base := b.composeBin() + " --project-directory " + shellQuote(dir) + " -f " + shellQuote(path) + " up -d"
 	if b.sshNeedsSudo() {
 		base = "sudo " + base
 	}
@@ -616,7 +621,7 @@ func (b *dockerBackend) RestoreComposeProject(identity, backupPath string) (<-ch
 		if !send("starting project…") {
 			return
 		}
-		upBase := buildComposeCmd(project, workdir, configFiles, "up -d")
+		upBase := buildComposeCmd(b.composeBin(), project, workdir, configFiles, "up -d")
 		if sudo {
 			upBase = "sudo " + upBase
 		}
@@ -811,18 +816,18 @@ func (b *dockerBackend) runComposeSSHStream(identity, action string) (<-chan str
 	if err != nil {
 		return nil, nil, err
 	}
-	base := buildComposeCmd(project, workdir, configFiles, action)
+	base := buildComposeCmd(b.composeBin(), project, workdir, configFiles, action)
 	if b.sshNeedsSudo() {
 		base = "sudo " + base
 	}
 	return b.sshExecStream(base)
 }
 
-// sshNeedsSudo probes once whether docker on the host requires sudo, mirroring
-// the sudo fallback used by sshExecOutput. A streamed command can't be retried
-// mid-flight, so the privilege is decided before it starts.
+// sshNeedsSudo probes once whether the engine CLI on the host requires sudo,
+// mirroring the sudo fallback used by sshExecOutput. A streamed command can't be
+// retried mid-flight, so the privilege is decided before it starts.
 func (b *dockerBackend) sshNeedsSudo() bool {
-	_, err := b.sshExecOutput("docker version --format '{{.Server.Version}}'")
+	_, err := b.sshExecOutput(b.engineCmd() + " version --format '{{.Server.Version}}'")
 	return err != nil
 }
 
@@ -907,7 +912,7 @@ func (b *dockerBackend) runComposeSSHOutput(identity, action string) (string, er
 	if err != nil {
 		return "", err
 	}
-	base := buildComposeCmd(project, workdir, configFiles, action)
+	base := buildComposeCmd(b.composeBin(), project, workdir, configFiles, action)
 	out, err := b.sshExecOutput(base)
 	if err == nil {
 		return out, nil
@@ -938,11 +943,13 @@ func (b *dockerBackend) composeProjectMeta(identity string) (project, workdir, c
 	return l[composeProjectLabel], l[composeWorkdirLabel], l[composeConfigLabel], nil
 }
 
-// buildComposeCmd assembles a `docker compose` command line, scoping it to the
-// project name, working directory and config files.
-func buildComposeCmd(project, workdir, configFiles, action string) string {
+// buildComposeCmd assembles a compose command line for the given engine prefix
+// (`docker compose` or `podman compose`), scoping it to the project name,
+// working directory and config files.
+func buildComposeCmd(bin, project, workdir, configFiles, action string) string {
 	var sb strings.Builder
-	sb.WriteString("docker compose --project-name ")
+	sb.WriteString(bin)
+	sb.WriteString(" --project-name ")
 	sb.WriteString(shellQuote(project))
 	if workdir != "" {
 		sb.WriteString(" --project-directory ")

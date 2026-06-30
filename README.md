@@ -187,6 +187,28 @@ go run . -version              # вывести версию и выйти
 > контейнерами проекта: `start` / `stop` / `restart` / `pause` / `unpause` / `remove`. Нужен
 > полный набор Compose — подключайтесь через `-H ssh://...`.
 
+### Podman
+
+Podman предоставляет Docker-совместимый REST API, поэтому d9c подключается к нему тем же
+бэкендом, что и к Docker — отдельный флаг не нужен. Включите сервис сокета и укажите его в `-H`:
+
+```
+# rootless (от обычного пользователя)
+podman system service --time=0 unix:///run/user/$(id -u)/podman/podman.sock &
+go run . -H ssh://user@host          # туннель к podman.sock на хосте
+go run . -H unix:///run/user/1000/podman/podman.sock   # локальный сокет
+
+# rootful (системный сокет)
+sudo podman system service --time=0 unix:///run/podman/podman.sock &
+go run . -H ssh://root@host
+```
+
+Когда d9c определяет, что на той стороне Podman (по ответу `/version`), в шапке рядом с хостом
+появляется метка **podman**. Операции Compose по SSH автоматически используют `podman compose`
+вместо `docker compose`. Учтите особенности rootless: сокет лежит в `/run/user/<uid>/…`,
+а доступ к нему есть только у владельца — подключайтесь под тем же пользователем (`ssh://user@host`,
+а не `root`), иначе сокет будет не виден.
+
 Раздел **Hosts** — это и список сохранённых хостов, и мульти-хост дашборд: на каждый хост строка
 со статусом (● up/down) и агрегатом из `docker info` (контейнеры/запущено/образы/версия демона).
 Данные собираются по одному соединению на хост, обновляются раз в ~10 секунд. `Enter` — подключиться

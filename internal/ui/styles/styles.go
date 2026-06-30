@@ -133,6 +133,10 @@ var (
 	// HeaderPaused is the chip shown in the header while auto-refresh is paused.
 	HeaderPaused lipgloss.Style
 
+	// HeaderRuntime is the chip identifying a non-Docker engine (e.g. Podman)
+	// next to the host in the header.
+	HeaderRuntime lipgloss.Style
+
 	// HeaderAlert is the chip shown in the header when one or more containers
 	// breach a configured resource-usage threshold (the ⚠ count).
 	HeaderAlert lipgloss.Style
@@ -359,6 +363,12 @@ func Apply(p Palette) {
 		Background(colorBg).
 		Foreground(colorWarning).
 		Bold(true)
+
+	HeaderRuntime = lipgloss.NewStyle().
+		Background(colorSecondary).
+		Foreground(colorBg).
+		Bold(true).
+		Padding(0, 1)
 
 	HeaderAlert = lipgloss.NewStyle().
 		Background(colorDanger).

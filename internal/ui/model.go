@@ -266,6 +266,14 @@ type pingResultMsg struct {
 	err error
 }
 
+// runtimeMsg carries the detected container engine (Docker vs Podman) for the
+// current backend; seq tags it with the backend generation (pingSeq), so a
+// probe that raced a host switch is dropped instead of mislabeling the header.
+type runtimeMsg struct {
+	seq     int
+	runtime docker.Runtime
+}
+
 // hostSummariesMsg carries per-host daemon snapshots for the hosts view (STATUS
 // + aggregate counts), keyed by host URL.
 type hostSummariesMsg struct{ summaries map[string]docker.HostSummary }
@@ -393,6 +401,11 @@ type fsCopiedMsg struct {
 type Model struct {
 	cfg     *config.Config
 	backend docker.Backend
+
+	// runtime is the container engine behind the current backend (Docker vs
+	// Podman), detected off the event loop after each backend swap. It only
+	// labels the header; an unknown/Docker engine shows no chip.
+	runtime docker.Runtime
 
 	// composeHostOps mirrors backend.SupportsHostCompose(): false on a tcp://
 	// connection, where the SSH-only compose commands (up/down/pull/config/edit/
@@ -675,7 +688,7 @@ func (m *Model) applyComposeCapability() {
 }
 
 func (m Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.fetchCurrentResource(), tickCmd(m.refreshInterval), enableQuickEditCmd()}
+	cmds := []tea.Cmd{m.fetchCurrentResource(), tickCmd(m.refreshInterval), enableQuickEditCmd(), detectRuntimeCmd(m.backend, m.pingSeq)}
 	// If the initial connect failed because the SSH host key changed, surface it
 	// as the notice modal instead of a footer error line — same dialog the user
 	// would get from a live :connect.
@@ -696,6 +709,15 @@ func tickCmd(d time.Duration) tea.Cmd {
 func pingCmd(b docker.Backend, seq int) tea.Cmd {
 	return func() tea.Msg {
 		return pingResultMsg{seq: seq, err: b.Ping()}
+	}
+}
+
+// detectRuntimeCmd identifies the container engine behind b off the event loop;
+// the result labels the connection in the header. seq tags it with the backend
+// generation, like pingCmd, so a stale probe can't relabel a swapped backend.
+func detectRuntimeCmd(b docker.Backend, seq int) tea.Cmd {
+	return func() tea.Msg {
+		return runtimeMsg{seq: seq, runtime: b.Runtime()}
 	}
 }
 

@@ -195,35 +195,42 @@ func TestResolveComposePath(t *testing.T) {
 func TestBuildComposeCmd(t *testing.T) {
 	tests := []struct {
 		name                     string
+		bin                      string
 		project, workdir, config string
 		action                   string
 		want                     string
 	}{
 		{
-			name: "single config", project: "webapp", workdir: "/srv/webapp",
+			name: "single config", bin: "docker compose", project: "webapp", workdir: "/srv/webapp",
 			config: "/srv/webapp/docker-compose.yml", action: "up -d",
 			want: "docker compose --project-name 'webapp' --project-directory '/srv/webapp' -f '/srv/webapp/docker-compose.yml' up -d",
 		},
 		{
-			name: "multiple configs", project: "app", workdir: "/srv/app",
+			name: "multiple configs", bin: "docker compose", project: "app", workdir: "/srv/app",
 			config: "/srv/app/compose.yaml,/srv/app/override.yaml", action: "pull",
 			want: "docker compose --project-name 'app' --project-directory '/srv/app' -f '/srv/app/compose.yaml' -f '/srv/app/override.yaml' pull",
 		},
 		{
-			name: "no workdir", project: "x", workdir: "", config: "", action: "pull",
+			name: "no workdir", bin: "docker compose", project: "x", workdir: "", config: "", action: "pull",
 			want: "docker compose --project-name 'x' pull",
 		},
 		{
 			// Relative config from the label must be resolved against workdir so
 			// `-f` does not fall back to the SSH session's home directory.
-			name: "relative config resolved to workdir", project: "webapp", workdir: "/srv/webapp",
+			name: "relative config resolved to workdir", bin: "docker compose", project: "webapp", workdir: "/srv/webapp",
 			config: "docker-compose.yml", action: "pull",
 			want: "docker compose --project-name 'webapp' --project-directory '/srv/webapp' -f '/srv/webapp/docker-compose.yml' pull",
+		},
+		{
+			// Podman host: only the engine verb changes; everything else is identical.
+			name: "podman engine", bin: "podman compose", project: "webapp", workdir: "/srv/webapp",
+			config: "/srv/webapp/compose.yaml", action: "up -d",
+			want: "podman compose --project-name 'webapp' --project-directory '/srv/webapp' -f '/srv/webapp/compose.yaml' up -d",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := buildComposeCmd(tt.project, tt.workdir, tt.config, tt.action); got != tt.want {
+			if got := buildComposeCmd(tt.bin, tt.project, tt.workdir, tt.config, tt.action); got != tt.want {
 				t.Errorf("buildComposeCmd = %q, want %q", got, tt.want)
 			}
 		})
