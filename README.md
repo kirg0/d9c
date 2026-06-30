@@ -175,6 +175,8 @@ go run . -version              # вывести версию и выйти
 | --- | --- | --- |
 | TCP | `-H tcp://host:2375` | демон должен слушать TCP (`-H tcp://0.0.0.0:2375` на стороне сервера) |
 | SSH | `-H ssh://user@host` | туннель по SSH к локальному сокету демона; ключи из агента/`~/.ssh` |
+| Unix | `-H unix:///var/run/docker.sock` | локальный сокет демона (Linux/macOS) |
+| npipe | `-H npipe:////./pipe/docker_engine` | именованный канал Windows (Docker Desktop / Podman machine) |
 
 > **TCP против SSH — что доступно.** Почти всё (контейнеры, образы, сети, тома, exec,
 > обзор ФС контейнера, события, дашборд) работает по обоим транспортам через Docker Engine API.
@@ -201,7 +203,14 @@ go run . -H unix:///run/user/1000/podman/podman.sock   # локальный со
 # rootful (системный сокет)
 sudo podman system service --time=0 unix:///run/podman/podman.sock &
 go run . -H ssh://root@host
+
+# Windows (Podman machine) — именованный канал
+d9c -H npipe:////./pipe/podman-machine-default
 ```
+
+> На Windows `podman machine` поднимает API на именованном канале — подключайтесь по
+> `npipe://`. Проверено на Podman 5.8: движок определяется как **podman**, чип появляется
+> в шапке, разделы Containers/Images/… работают штатно.
 
 Когда d9c определяет, что на той стороне Podman (по ответу `/version`), в шапке рядом с хостом
 появляется метка **podman**. Операции Compose по SSH автоматически используют `podman compose`
