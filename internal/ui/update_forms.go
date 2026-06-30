@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"d9c/internal/docker"
+	"d9c/internal/hosts"
+	"d9c/internal/i18n"
 	"d9c/internal/ui/cpform"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -19,13 +21,12 @@ import (
 func (m Model) handleHostForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
-		name := m.hostForm.Name()
-		host := m.hostForm.Host()
+		rec := m.hostForm.Result()
 		var err error
 		if m.hostForm.IsEditing() {
-			err = m.hostStore.Edit(m.hostForm.OrigName(), name, host)
+			err = m.hostStore.EditHost(m.hostForm.OrigName(), rec)
 		} else {
-			err = m.hostStore.Add(name, host)
+			err = m.hostStore.AddHost(rec)
 		}
 		if err == nil {
 			err = m.hostStore.Save()
@@ -43,9 +44,48 @@ func (m Model) handleHostForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "shift+tab", "up":
 		m.hostForm.Prev()
 		return m, nil
+	case "left", "right", " ":
+		// The SSH auth selector toggles with arrows/space; on the text fields
+		// these keys edit normally (ToggleAuth is a no-op off the auth field).
+		if m.hostForm.OnAuthField() {
+			m.hostForm.ToggleAuth()
+			return m, nil
+		}
 	}
 	updated, cmd := m.hostForm.Update(msg)
 	m.hostForm = updated
+	return m, cmd
+}
+
+// handleConnectAuth drives the SSH credential prompt shown before connecting to
+// a password-auth host: Tab/arrows switch fields, Enter rewrites the host URL
+// with the (editable) login, stashes the password on the live config and
+// connects, and Esc (handled globally) cancels. The password is never saved to
+// the host store — it lives only on m.cfg for the session/auto-reconnect.
+func (m Model) handleConnectAuth(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		login := m.connForm.Login()
+		if login == "" {
+			m.connForm.SetError(i18n.T("логин обязателен", "login is required"))
+			return m, nil
+		}
+		url := hosts.WithSSHUser(m.connForm.HostURL(), login)
+		m.cfg.SSHPassword = m.connForm.Password()
+		m.cfg.SSHKeyFile = ""
+		m.cfg.Host = url
+		m.mode = ModeNormal
+		m.relayout()
+		return m, connectCmd(m.cfg, url)
+	case "tab", "down":
+		m.connForm.Next()
+		return m, nil
+	case "shift+tab", "up":
+		m.connForm.Prev()
+		return m, nil
+	}
+	updated, cmd := m.connForm.Update(msg)
+	m.connForm = updated
 	return m, cmd
 }
 

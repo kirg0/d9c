@@ -64,6 +64,84 @@ func TestUpsertByHost(t *testing.T) {
 	}
 }
 
+func TestAddEditHostAuthMetadata(t *testing.T) {
+	s := &Store{}
+
+	// Key auth with a custom path is preserved verbatim.
+	if err := s.AddHost(Host{Name: "lab", Host: "ssh://me@lab", SSHAuth: SSHAuthKey, SSHKeyPath: "/keys/id"}); err != nil {
+		t.Fatalf("AddHost key: %v", err)
+	}
+	h, _ := s.Find("lab")
+	if h.SSHAuth != SSHAuthKey || h.SSHKeyPath != "/keys/id" {
+		t.Errorf("key auth not stored: %+v", h)
+	}
+
+	// Password auth drops any stray key path (never stored for password).
+	if err := s.AddHost(Host{Name: "prod", Host: "ssh://me@prod", SSHAuth: SSHAuthPassword, SSHKeyPath: "/keys/id"}); err != nil {
+		t.Fatalf("AddHost password: %v", err)
+	}
+	h, _ = s.Find("prod")
+	if h.SSHAuth != SSHAuthPassword || h.SSHKeyPath != "" {
+		t.Errorf("password auth should drop key path: %+v", h)
+	}
+
+	// Non-ssh hosts carry no SSH auth metadata even if supplied.
+	if err := s.AddHost(Host{Name: "tcp", Host: "tcp://x:2375", SSHAuth: SSHAuthKey, SSHKeyPath: "/k"}); err != nil {
+		t.Fatalf("AddHost tcp: %v", err)
+	}
+	h, _ = s.Find("tcp")
+	if h.SSHAuth != "" || h.SSHKeyPath != "" {
+		t.Errorf("non-ssh host should have no auth metadata: %+v", h)
+	}
+
+	// EditHost updates the method and clears the key path when switching to password.
+	if err := s.EditHost("lab", Host{Name: "lab", Host: "ssh://me@lab", SSHAuth: SSHAuthPassword}); err != nil {
+		t.Fatalf("EditHost: %v", err)
+	}
+	h, _ = s.Find("lab")
+	if h.SSHAuth != SSHAuthPassword || h.SSHKeyPath != "" {
+		t.Errorf("edit to password failed: %+v", h)
+	}
+
+	// Legacy Edit clears auth metadata (the old 3-arg path).
+	if err := s.Edit("prod", "prod", "ssh://me@prod"); err != nil {
+		t.Fatalf("Edit: %v", err)
+	}
+	h, _ = s.Find("prod")
+	if h.SSHAuth != "" {
+		t.Errorf("legacy Edit should clear auth: %+v", h)
+	}
+}
+
+func TestSSHUserHelpers(t *testing.T) {
+	cases := []struct {
+		url, user, want string
+	}{
+		{"ssh://deploy@host:22", "", "deploy"},
+		{"ssh://host", "", ""},
+		{"tcp://host:2375", "", ""},
+	}
+	for _, c := range cases {
+		if got := SSHUser(c.url); got != c.want {
+			t.Errorf("SSHUser(%q) = %q, want %q", c.url, got, c.want)
+		}
+	}
+
+	repl := []struct {
+		url, user, want string
+	}{
+		{"ssh://old@host:22", "new", "ssh://new@host:22"},
+		{"ssh://host:22", "new", "ssh://new@host:22"},
+		{"ssh://old@host", "", "ssh://host"},
+		{"tcp://host:2375", "new", "tcp://host:2375"},
+	}
+	for _, c := range repl {
+		if got := WithSSHUser(c.url, c.user); got != c.want {
+			t.Errorf("WithSSHUser(%q,%q) = %q, want %q", c.url, c.user, got, c.want)
+		}
+	}
+}
+
 // TestPersistCallback verifies Save forwards the current list to the injected
 // callback, and that a zero-value store (no callback) treats Save as a no-op.
 func TestPersistCallback(t *testing.T) {

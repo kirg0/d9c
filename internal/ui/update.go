@@ -223,13 +223,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case openHostFormMsg:
 		if msg.editing {
-			m.hostForm.OpenEdit(msg.name, msg.host)
+			m.hostForm.OpenEdit(msg.host)
 		} else {
 			m.hostForm.OpenAdd()
 		}
 		m.mode = ModeHostForm
 		m.relayout()
 		return m, nil
+
+	case connectRequestMsg:
+		return m.beginConnect(msg.host)
 
 	case connectResultMsg:
 		if msg.err != nil {
@@ -769,6 +772,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleHelp(msg)
 	case ModeHostForm:
 		return m.handleHostForm(msg)
+	case ModeConnectAuth:
+		return m.handleConnectAuth(msg)
 	case ModeComposeEdit:
 		return m.handleComposeEdit(msg)
 	case ModeEvents:
@@ -954,7 +959,7 @@ func (m Model) handleNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.resource == ViewHosts {
 			name := m.selectedID()
 			if h, ok := m.hostStore.Find(name); ok {
-				return m, connectCmd(m.cfg, h.Host)
+				return m.beginConnect(h)
 			}
 		}
 		// In the compose view, Enter drills into the project's containers.
@@ -1316,7 +1321,7 @@ func (m Model) handleHostKey(key string) (handled bool, model tea.Model, cmd tea
 		name := m.selectedID()
 		if h, ok := m.hostStore.Find(name); ok {
 			return true, m, func() tea.Msg {
-				return openHostFormMsg{editing: true, name: h.Name, host: h.Host}
+				return openHostFormMsg{editing: true, host: h}
 			}
 		}
 		return true, m, nil
