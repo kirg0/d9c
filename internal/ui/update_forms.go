@@ -63,6 +63,11 @@ func (m Model) handleHostForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // connects, and Esc (handled globally) cancels. The password is never saved to
 // the host store — it lives only on m.cfg for the session/auto-reconnect.
 func (m Model) handleConnectAuth(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// While a connect is in flight, swallow keys so a second Enter can't fire a
+	// duplicate dial (esc is handled globally and still cancels the modal).
+	if m.connForm.Busy() {
+		return m, nil
+	}
 	switch msg.String() {
 	case "enter":
 		login := m.connForm.Login()
@@ -74,9 +79,10 @@ func (m Model) handleConnectAuth(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.cfg.SSHPassword = m.connForm.Password()
 		m.cfg.SSHKeyFile = ""
 		m.cfg.Host = url
-		m.mode = ModeNormal
-		m.relayout()
-		return m, connectCmd(m.cfg, url)
+		// Keep the modal open showing a "connecting…" status; the result lands as
+		// connectResultMsg, which closes it on success or shows the error inline.
+		spin := m.connForm.Connecting()
+		return m, tea.Batch(spin, connectCmd(m.cfg, url))
 	case "tab", "down":
 		m.connForm.Next()
 		return m, nil

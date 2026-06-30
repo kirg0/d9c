@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"testing"
 
 	"d9c/internal/config"
@@ -73,8 +74,12 @@ func TestConnectAuthSubmitRewritesLoginAndConnects(t *testing.T) {
 
 	model, cmd := m.handleConnectAuth(tea.KeyMsg{Type: tea.KeyEnter})
 	got := model.(Model)
-	if got.mode != ModeNormal {
-		t.Fatalf("mode = %v, want ModeNormal after submit", got.mode)
+	// The modal stays open showing a "connecting…" status until the result lands.
+	if got.mode != ModeConnectAuth {
+		t.Fatalf("mode = %v, want ModeConnectAuth (prompt stays open while dialing)", got.mode)
+	}
+	if !got.connForm.Busy() {
+		t.Error("expected the prompt to be in the connecting/busy state after submit")
 	}
 	if cmd == nil {
 		t.Fatal("expected a connect cmd after submit")
@@ -84,6 +89,28 @@ func TestConnectAuthSubmitRewritesLoginAndConnects(t *testing.T) {
 	}
 	if got.cfg.SSHPassword != "s3cret" {
 		t.Errorf("SSHPassword = %q, want s3cret (held in memory only)", got.cfg.SSHPassword)
+	}
+}
+
+// A failed connect from the credential prompt keeps the modal open with the
+// error shown inline (so the user can fix the credentials and retry).
+func TestConnectAuthErrorStaysInModal(t *testing.T) {
+	m := NewModel(&config.Config{}, docker.NewFakeBackend(), nil, nil, false)
+	m.mode = ModeConnectAuth
+	m.connForm.Open("prod", "ssh://deploy@prod", "deploy")
+	_ = m.connForm.Connecting()
+
+	authErr := errors.New("SSH tunnel: ssh: handshake failed: unable to authenticate")
+	model, cmd := m.Update(connectResultMsg{err: authErr, host: "ssh://deploy@prod"})
+	got := model.(Model)
+	if got.mode != ModeConnectAuth {
+		t.Fatalf("mode = %v, want ModeConnectAuth (stay open on failure)", got.mode)
+	}
+	if got.connForm.Busy() {
+		t.Error("busy state should clear after a failed connect")
+	}
+	if cmd != nil {
+		t.Errorf("expected no follow-up cmd after inline error")
 	}
 }
 

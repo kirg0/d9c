@@ -1,6 +1,37 @@
 package connform
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+func TestViewShowsConnectingStatusWhenBusy(t *testing.T) {
+	m := New()
+	m.Open("prod", "ssh://deploy@prod", "deploy")
+	_ = m.Connecting()
+
+	if !m.Busy() {
+		t.Fatal("Connecting() should put the prompt in the busy state")
+	}
+	out := m.View(80, 24)
+	if !strings.Contains(out, "connecting to prod") {
+		t.Errorf("View while busy should show the connecting status, got:\n%s", out)
+	}
+}
+
+func TestSetErrorClearsBusy(t *testing.T) {
+	m := New()
+	m.Open("prod", "ssh://deploy@prod", "deploy")
+	_ = m.Connecting()
+	m.SetError("authentication failed")
+
+	if m.Busy() {
+		t.Error("SetError should clear the busy state so the user can retry")
+	}
+	if !strings.Contains(m.View(80, 24), "authentication failed") {
+		t.Error("View should show the error after SetError")
+	}
+}
 
 func TestOpenPrefillsLoginAndFocusesPassword(t *testing.T) {
 	m := New()

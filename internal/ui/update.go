@@ -52,6 +52,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cpForm, cmd = m.cpForm.Tick(msg)
 			return m, cmd
 		}
+		if m.mode == ModeConnectAuth && m.connForm.Busy() {
+			var cmd tea.Cmd
+			m.connForm, cmd = m.connForm.Tick(msg)
+			return m, cmd
+		}
 		return m, nil
 
 	case tickMsg:
@@ -236,6 +241,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case connectResultMsg:
 		if msg.err != nil {
+			// When the credential prompt drove this connect, keep it open and show
+			// the failure inline so the user can fix the login/password and retry —
+			// except for a host-key mismatch, which needs the dedicated notice.
+			if m.mode == ModeConnectAuth && !docker.IsHostKeyError(msg.err) {
+				m.connForm.SetError(connectModalError(msg.err))
+				return m, nil
+			}
 			if docker.IsHostKeyError(msg.err) {
 				title, body := hostKeyNoticeText(msg.host)
 				return m, func() tea.Msg { return openNoticeMsg{title: title, body: body} }
@@ -272,6 +284,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// A manual connect supersedes any in-flight auto-reconnect.
 		m.reconnecting = false
 		m.reconnectAttempt = 0
+		// Close the credential prompt if it drove this connect (no-op otherwise).
+		m.mode = ModeNormal
 		m.resource = ViewContainers
 		m.cmdline.SetResource("containers")
 		m.refreshPluginCmds()
@@ -850,6 +864,21 @@ func (m Model) handleNotice(_ tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.mode = ModeNormal
 	m.relayout()
 	return m, nil
+}
+
+// connectModalError condenses a connect failure into a short line for the
+// credential prompt. Authentication failures (the common case for password auth)
+// get a friendly hint to re-check the credentials; everything else passes the
+// raw error through.
+func connectModalError(err error) string {
+	msg := err.Error()
+	if strings.Contains(msg, "unable to authenticate") ||
+		strings.Contains(msg, "permission denied") ||
+		strings.Contains(msg, "no supported methods remain") {
+		return i18n.T("не удалось войти — проверьте логин и пароль",
+			"authentication failed — check the login and password")
+	}
+	return msg
 }
 
 // hostKeyNoticeText assembles the user-facing message shown when an SSH host
