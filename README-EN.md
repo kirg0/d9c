@@ -195,6 +195,16 @@ to the selected host. Management right from the section: `a` — add, `e` — ed
 `:dashboard` / `:dash` commands are aliases for `:hosts`. The host list is stored in the shared
 `d9c-config.yaml` (the `hosts:` section, see [Config, themes and keys](#config-themes-and-keys)).
 
+For `ssh://` hosts the add/edit form lets you choose the authentication method
+(`←/→/space` toggle):
+
+- **Key** — the "Key path" field takes a custom private-key path; empty falls back
+  to ssh-agent and the default `~/.ssh` keys.
+- **Password** — only the login is saved to the config; the password is never
+  written to disk. On connect (`Enter` / `:connect`) a modal prompts for the login
+  and password: the saved login is pre-filled but editable before connecting. The
+  password lives in memory only for the session.
+
 ---
 
 ## Sections and navigation
@@ -251,6 +261,11 @@ colors:                   # optional pointwise color overrides
 hosts:                    # saved hosts (Hosts section; usually edited from the UI)
   - name: prod
     host: ssh://user@prod.example.com
+    ssh_auth: key          # key | password (empty = key via ssh-agent/~/.ssh)
+    ssh_key_path: ~/.ssh/prod_ed25519   # optional; for ssh_auth: key
+  - name: staging
+    host: ssh://deploy@staging.example.com
+    ssh_auth: password     # prompts for the password on connect; never stored
   - name: local
     host: tcp://localhost:2375
 ```

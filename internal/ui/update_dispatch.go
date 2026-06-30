@@ -378,7 +378,7 @@ func (m *Model) dispatchHostCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 		if !ok {
 			return nil, fmt.Errorf("host %q not found", name)
 		}
-		return connectCmd(m.cfg, h.Host), nil
+		return func() tea.Msg { return connectRequestMsg{host: h} }, nil
 
 	case "add":
 		// Open the modal form pre-filled with base defaults.
@@ -394,7 +394,7 @@ func (m *Model) dispatchHostCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 			return nil, fmt.Errorf("host %q not found", name)
 		}
 		// Open the modal form pre-filled with the selected host.
-		return func() tea.Msg { return openHostFormMsg{editing: true, name: h.Name, host: h.Host} }, nil
+		return func() tea.Msg { return openHostFormMsg{editing: true, host: h} }, nil
 
 	case "rm":
 		name := m.selectedID()

@@ -597,6 +597,27 @@ func TestDemo_HostsDeleteViaKey(t *testing.T) {
 	}
 }
 
+// TestDemo_ConnectPasswordPrompt verifies that connecting (Enter) to a saved SSH
+// host configured for password auth opens the credential prompt with the login
+// pre-filled from the host URL (and does NOT dial — the prompt is shown first).
+func TestDemo_ConnectPasswordPrompt(t *testing.T) {
+	store := &hosts.Store{}
+	_ = store.AddHost(hosts.Host{Name: "prod", Host: "ssh://deploy@prod", SSHAuth: hosts.SSHAuthPassword})
+
+	tm := newTestModelStore(t, store)
+	waitFor(t, tm, "web")
+
+	tm.Type(":hosts")
+	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+	waitFor(t, tm, "prod")
+
+	tm.Send(tea.KeyMsg{Type: tea.KeyEnter}) // connect selected host
+	// The credential prompt opens with the saved login pre-filled.
+	waitFor(t, tm, "Connect to prod", "Login", "deploy")
+
+	tm.Quit()
+}
+
 // TestDemo_HostsEditViaForm opens the edit form for the selected host (pre-filled),
 // appends to the name, saves, and verifies the rename persisted.
 func TestDemo_HostsEditViaForm(t *testing.T) {

@@ -22,6 +22,7 @@ import (
 	"d9c/internal/ui/buildform"
 	"d9c/internal/ui/cmdline"
 	"d9c/internal/ui/composeedit"
+	"d9c/internal/ui/connform"
 	"d9c/internal/ui/cpform"
 	"d9c/internal/ui/detail"
 	"d9c/internal/ui/events"
@@ -100,6 +101,7 @@ const (
 	ModeCpForm            // upload-to-container wizard (`:cp` with no args)
 	ModeThemePicker       // theme selector modal (`:theme` with no args, live preview)
 	ModeLangPicker        // language selector modal (`:lang` with no args, live preview)
+	ModeConnectAuth       // SSH login/password prompt before connecting (password-auth hosts)
 )
 
 // copyItem is one selectable entry in the copy overlay.
@@ -219,12 +221,17 @@ type backupEntry struct {
 	modTime time.Time
 }
 
-// openHostFormMsg requests opening the add/edit modal form.
+// openHostFormMsg requests opening the add/edit modal form. For edits, host
+// carries the full saved record (URL plus SSH auth metadata).
 type openHostFormMsg struct {
 	editing bool
-	name    string
-	host    string
+	host    hosts.Host
 }
+
+// connectRequestMsg asks the Update loop to connect to a saved host, routing
+// through the SSH credential prompt first when the host uses password auth.
+type connectRequestMsg struct{ host hosts.Host }
+
 type inspectResultMsg struct{ result *docker.InspectResult }
 type switchResourceMsg struct{ resource ResourceView }
 type actionResultMsg struct{ err error }
@@ -459,6 +466,7 @@ type Model struct {
 	cmdline     cmdline.Model
 	logs        logs.Model
 	hostForm    hostform.Model
+	connForm    connform.Model
 	composeEdit composeedit.Model
 	help        help.Model
 	shell       shell.Model
@@ -605,6 +613,7 @@ func NewModel(cfg *config.Config, backend docker.Backend, store *hosts.Store, co
 		cmdline:        cmd,
 		logs:           logs.New(),
 		hostForm:       hostform.New(),
+		connForm:       connform.New(),
 		composeEdit:    composeedit.New(),
 		help:           help.New(),
 		shell:          shell.New(),
@@ -1036,6 +1045,23 @@ func connectCmd(base *config.Config, hostURL string) tea.Cmd {
 		}
 		return connectResultMsg{backend: b, host: hostURL}
 	}
+}
+
+// beginConnect starts connecting to a saved host. SSH hosts configured for
+// password auth open the credential prompt first (login pre-filled, editable);
+// every other host connects directly with the host's stored key path (empty =
+// ssh-agent / default keys). The chosen auth fields are written onto m.cfg so a
+// later auto-reconnect reuses them.
+func (m Model) beginConnect(h hosts.Host) (tea.Model, tea.Cmd) {
+	if strings.HasPrefix(h.Host, "ssh://") && h.SSHAuth == hosts.SSHAuthPassword {
+		m.connForm.Open(h.Name, h.Host, hosts.SSHUser(h.Host))
+		m.mode = ModeConnectAuth
+		m.relayout()
+		return m, nil
+	}
+	m.cfg.SSHKeyFile = h.SSHKeyPath
+	m.cfg.SSHPassword = ""
+	return m, connectCmd(m.cfg, h.Host)
 }
 
 // maybeStartReconnect enters the auto-reconnect state when err signals a lost

@@ -14,10 +14,28 @@ import (
 	"strings"
 )
 
+// SSH authentication methods stored per host. The empty value means the legacy
+// default (ssh-agent plus the keys in ~/.ssh), kept so configs written before
+// this field stay backward compatible.
+const (
+	// SSHAuthKey authenticates with a private key — either the one at SSHKeyPath
+	// or, when that is empty, ssh-agent / the default ~/.ssh keys.
+	SSHAuthKey = "key"
+	// SSHAuthPassword authenticates with a password prompted at connect time.
+	// Only the login is saved; the password is never written to disk.
+	SSHAuthPassword = "password"
+)
+
 // Host is a single saved connection target.
 type Host struct {
 	Name string `json:"name" yaml:"name"`
 	Host string `json:"host" yaml:"host"`
+	// SSHAuth selects the SSH authentication method (SSHAuthKey/SSHAuthPassword);
+	// empty means key-based (agent + default keys). Ignored for non-ssh hosts.
+	SSHAuth string `json:"ssh_auth,omitempty" yaml:"ssh_auth,omitempty"`
+	// SSHKeyPath is the private-key path used when SSHAuth is key-based; empty
+	// falls back to ssh-agent and the default ~/.ssh keys.
+	SSHKeyPath string `json:"ssh_key_path,omitempty" yaml:"ssh_key_path,omitempty"`
 }
 
 // Store holds the saved hosts and a callback that persists them. The zero value
@@ -107,16 +125,36 @@ func (s *Store) Add(name, host string) error {
 	return nil
 }
 
-// Edit replaces the name and host URL of the entry identified by name.
+// AddHost appends h (carrying SSH auth metadata), rejecting empty Name/Host and
+// duplicate names. It is the metadata-aware counterpart of Add.
+func (s *Store) AddHost(h Host) error {
+	h = h.normalized()
+	if h.Name == "" || h.Host == "" {
+		return fmt.Errorf("name and host are required")
+	}
+	if _, ok := s.Find(h.Name); ok {
+		return fmt.Errorf("host %q already exists", h.Name)
+	}
+	s.Hosts = append(s.Hosts, h)
+	return nil
+}
+
+// Edit replaces the name and host URL of the entry identified by name. It clears
+// any stored SSH auth metadata; use EditHost to preserve or change it.
 func (s *Store) Edit(name, newName, newHost string) error {
-	newName = strings.TrimSpace(newName)
-	newHost = strings.TrimSpace(newHost)
-	if newName == "" || newHost == "" {
+	return s.EditHost(name, Host{Name: newName, Host: newHost})
+}
+
+// EditHost replaces the entry identified by name with h (carrying SSH auth
+// metadata), rejecting empty Name/Host and a rename onto an existing name.
+func (s *Store) EditHost(name string, h Host) error {
+	h = h.normalized()
+	if h.Name == "" || h.Host == "" {
 		return fmt.Errorf("name and host are required")
 	}
 	idx := -1
-	for i, h := range s.Hosts {
-		if h.Name == name {
+	for i, existing := range s.Hosts {
+		if existing.Name == name {
 			idx = i
 			break
 		}
@@ -124,13 +162,29 @@ func (s *Store) Edit(name, newName, newHost string) error {
 	if idx < 0 {
 		return fmt.Errorf("host %q not found", name)
 	}
-	if newName != name {
-		if _, ok := s.Find(newName); ok {
-			return fmt.Errorf("host %q already exists", newName)
+	if h.Name != name {
+		if _, ok := s.Find(h.Name); ok {
+			return fmt.Errorf("host %q already exists", h.Name)
 		}
 	}
-	s.Hosts[idx] = Host{Name: newName, Host: newHost}
+	s.Hosts[idx] = h
 	return nil
+}
+
+// normalized trims fields and drops SSH auth metadata that does not apply to the
+// host (non-ssh hosts, or a key path stored under password auth).
+func (h Host) normalized() Host {
+	h.Name = strings.TrimSpace(h.Name)
+	h.Host = strings.TrimSpace(h.Host)
+	h.SSHKeyPath = strings.TrimSpace(h.SSHKeyPath)
+	if !strings.HasPrefix(h.Host, "ssh://") {
+		h.SSHAuth = ""
+		h.SSHKeyPath = ""
+	}
+	if h.SSHAuth == SSHAuthPassword {
+		h.SSHKeyPath = "" // password auth never carries a key
+	}
+	return h
 }
 
 // Remove deletes the entry identified by name.
@@ -158,6 +212,36 @@ func (s *Store) UpsertByHost(hostURL string) bool {
 	}
 	s.Hosts = append(s.Hosts, Host{Name: uniqueName(s, deriveName(hostURL)), Host: hostURL})
 	return true
+}
+
+// SSHUser extracts the login from an ssh:// URL ("ssh://user@host:22" → "user").
+// It returns "" when the scheme is not ssh:// or no user part is present.
+func SSHUser(hostURL string) string {
+	if !strings.HasPrefix(hostURL, "ssh://") {
+		return ""
+	}
+	rest := strings.TrimPrefix(hostURL, "ssh://")
+	if at := strings.LastIndex(rest, "@"); at >= 0 {
+		return rest[:at]
+	}
+	return ""
+}
+
+// WithSSHUser returns hostURL with its login replaced by user, preserving the
+// host and port ("ssh://old@host:22", "new" → "ssh://new@host:22"). A non-ssh
+// URL or an empty user is returned unchanged (minus any now-empty "@").
+func WithSSHUser(hostURL, user string) string {
+	if !strings.HasPrefix(hostURL, "ssh://") {
+		return hostURL
+	}
+	rest := strings.TrimPrefix(hostURL, "ssh://")
+	if at := strings.LastIndex(rest, "@"); at >= 0 {
+		rest = rest[at+1:]
+	}
+	if user == "" {
+		return "ssh://" + rest
+	}
+	return "ssh://" + user + "@" + rest
 }
 
 // deriveName builds a readable label from a connection URL.
