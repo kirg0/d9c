@@ -116,6 +116,7 @@ func (b *disconnectedBackend) RestoreComposeProject(string, string) (<-chan stri
 func (b *disconnectedBackend) SystemDF() (*InspectResult, error)      { return nil, b.err() }
 func (b *disconnectedBackend) SystemPrune() (string, error)           { return "", b.err() }
 func (b *disconnectedBackend) Ping() error                            { return b.err() }
+func (b *disconnectedBackend) Runtime() Runtime                       { return RuntimeUnknown }
 func (b *disconnectedBackend) Info() (HostSummary, error)             { return HostSummary{}, b.err() }
 func (b *disconnectedBackend) ComposeStart(string) error              { return b.err() }
 func (b *disconnectedBackend) ComposeStop(string) error               { return b.err() }

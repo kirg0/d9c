@@ -59,6 +59,28 @@ func TestDemo_ContainersRender(t *testing.T) {
 	tm.Quit()
 }
 
+// TestPodmanHeaderChip verifies the header labels a Podman connection: once the
+// runtime probe (runtimeMsg) lands, the "podman" chip appears in the header. A
+// plain Docker backend leaves the header chip-free. The full-screen renderer
+// scrolls the app header out of teatest's captured grid, so this asserts on
+// viewHeader directly after driving the message through Update.
+func TestPodmanHeaderChip(t *testing.T) {
+	newHeader := func(rk docker.Runtime) string {
+		fake := docker.NewFakeBackend()
+		fake.RuntimeKind = rk
+		m := NewModel(&config.Config{Demo: true, Host: "ssh://host"}, fake, &hosts.Store{}, nil, false)
+		m.width, m.height = 120, 30
+		nm, _ := m.Update(runtimeMsg{seq: m.pingSeq, runtime: rk})
+		return nm.(Model).viewHeader()
+	}
+	if h := newHeader(docker.RuntimePodman); !strings.Contains(h, "podman") {
+		t.Errorf("podman backend: header has no podman chip: %q", h)
+	}
+	if h := newHeader(docker.RuntimeDocker); strings.Contains(h, "podman") {
+		t.Errorf("docker backend: header unexpectedly shows podman chip: %q", h)
+	}
+}
+
 // TestDemo_ContainerStats verifies the CPU%/MEM columns populate from the
 // Stats API: the header is present and the running "web" container shows its
 // sampled figures once the async stats fetch completes.

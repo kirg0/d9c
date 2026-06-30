@@ -98,6 +98,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, cmd
 			}
 		}
+		// Re-probe the engine if an earlier attempt came back unknown (e.g. the
+		// daemon wasn't reachable yet) so the header label settles once it is.
+		if msg.err == nil && m.runtime == docker.RuntimeUnknown {
+			return m, detectRuntimeCmd(m.backend, m.pingSeq)
+		}
+		return m, nil
+
+	case runtimeMsg:
+		// Drop a probe issued against a backend we've since swapped out.
+		if msg.seq != m.pingSeq {
+			return m, nil
+		}
+		m.runtime = msg.runtime
 		return m, nil
 
 	case containersUpdatedMsg:
@@ -272,6 +285,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.backend = msg.backend
 		m.applyComposeCapability()
+		m.runtime = docker.RuntimeUnknown // re-probed below for the new host
 		m.cfg.Host = msg.host
 		// Forget the old host's samples and let the new host fetch immediately.
 		m.stats = nil
@@ -290,7 +304,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cmdline.SetResource("containers")
 		m.refreshPluginCmds()
 		m.relayout()
-		return m, m.fetchCurrentResource()
+		return m, tea.Batch(m.fetchCurrentResource(), detectRuntimeCmd(m.backend, m.pingSeq))
 
 	case inspectResultMsg:
 		m.detail.SetContent(msg.result)
@@ -623,6 +637,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		old := m.backend
 		m.backend = msg.backend
 		m.applyComposeCapability()
+		m.runtime = docker.RuntimeUnknown // re-probed below for the new connection
 		m.reconnecting = false
 		m.reconnectAttempt = 0
 		// Invalidate pings still in flight against the dropped connection.
@@ -635,7 +650,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.stopEventStream()
 		// A stats batch stuck on the dead connection shouldn't gate the new one.
 		m.statsInFlight = false
-		return m, tea.Batch(closeBackendCmd(old), m.fetchCurrentResource())
+		return m, tea.Batch(closeBackendCmd(old), m.fetchCurrentResource(), detectRuntimeCmd(m.backend, m.pingSeq))
 
 	case clearCopyNotifMsg:
 		m.copyNotif = ""

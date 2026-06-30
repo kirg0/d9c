@@ -115,6 +115,10 @@ type Backend interface {
 	Events() (lines <-chan string, stop func(), err error)
 	// Ping checks the connection to the daemon is alive (used by auto-reconnect).
 	Ping() error
+	// Runtime reports which container engine backs the connection (Docker vs
+	// Podman), so the UI can label it and host-side compose ops pick the right
+	// CLI verb. The result is probed once and cached.
+	Runtime() Runtime
 	// Info returns a one-shot daemon summary (container/image counts, version) —
 	// the data behind the multi-host dashboard. Reachable is left to the caller.
 	Info() (HostSummary, error)
@@ -133,6 +137,11 @@ type dockerBackend struct {
 	// delta between refresh ticks. Guarded by statsMu; see ContainerStats.
 	statsMu   sync.Mutex
 	statsPrev map[string]cpuSample
+
+	// runtime caches the detected container engine (Docker vs Podman); guarded
+	// by runtimeMu and filled lazily on the first Runtime() call. See runtime.go.
+	runtimeMu sync.Mutex
+	runtime   Runtime
 }
 
 // New creates a Backend from the provided config.

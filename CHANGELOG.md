@@ -4,6 +4,22 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 проект следует [семантическому версионированию](https://semver.org/lang/ru/).
 
+## [1.18.0] - 2026-07-01
+
+### Добавлено
+
+- **Поддержка Podman поверх Docker-совместимого API.** d9c подключается к Podman
+  (`podman system service`) тем же бэкендом, что и к Docker — по `tcp://`, `unix://`
+  или `ssh://`, без отдельного флага. Движок определяется по ответу `/version`
+  (`docker.Runtime`: компонент/платформа «Podman Engine»), результат кешируется и
+  перепроверяется при смене хоста/реконнекте. Когда на той стороне Podman, в шапке
+  рядом с хостом появляется метка **podman**. Операции Compose по SSH
+  (`up`/`pull`/`down`/`config`/`create`) и проба `version` автоматически используют
+  `podman compose` / `podman` вместо `docker compose` / `docker`. В README — раздел
+  про rootless-сокеты и подключение. `Backend.Runtime()` добавлен во все реализации
+  (real/fake/disconnected); `FakeBackend.RuntimeKind` позволяет проигрывать Podman-
+  пути в demo/тестах.
+
 ## [1.17.0] - 2026-06-30
 
 ### Добавлено
