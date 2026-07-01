@@ -2,7 +2,6 @@ package docker
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -202,61 +201,201 @@ func (b *nerdctlBackend) ComposeRemove(p string) error {
 // both locally and over SSH.
 func (b *nerdctlBackend) SupportsHostCompose() bool { return true }
 
-// composeArgs builds a `nerdctl compose` argv scoped to a deployment's project
-// name, working directory and config files, ending with the action words.
-func (b *nerdctlBackend) composeArgs(identity string, action ...string) ([]string, error) {
-	project, workdir, configFiles, err := b.composeMeta(identity)
-	if err != nil {
-		return nil, err
-	}
-	args := []string{"compose", "--project-name", project}
-	if workdir != "" {
-		args = append(args, "--project-directory", workdir)
-	}
-	for _, cf := range splitCommaList(configFiles) {
-		args = append(args, "-f", resolveComposePath(workdir, cf))
-	}
-	return append(args, action...), nil
+// nerdctl compose (unlike docker compose) does not stamp the working_dir /
+// config_files labels, and `nerdctl compose ls` is absent in 2.x — so the path
+// of a *discovered* project's compose file is unrecoverable, and the engine ops
+// cannot drive `nerdctl compose -f …`. They are instead reconstructed from the
+// labels that ARE present (com.docker.compose.project on both containers and
+// networks): up starts the project's containers, pull pulls their images, and
+// down stops+removes the containers and the project's networks. Recreation from
+// the file and `config` remain unavailable (errComposeFilesUnsupported).
+
+// composeTask is one step of a reconstructed compose engine op: a banner line
+// plus either a simple action (start/rm) or a streamed sub-command (pull).
+type composeTask struct {
+	banner string
+	action func() error // simple action; nil when stream is set
+	stream []string     // full (namespace-scoped) argv for runner.stream
 }
 
-// composeMeta reads a deployment's project/workdir/config from its containers'
-// labels (selected by identity).
-func (b *nerdctlBackend) composeMeta(identity string) (project, workdir, configFiles string, err error) {
-	rows, err := b.projectContainers(identity)
-	if err != nil {
-		return "", "", "", err
+// runComposeTasks streams the tasks' progress into a channel, running them in
+// order off the event loop. The returned stop aborts the sequence (and the
+// active streamed sub-command); the caller MUST call it when abandoning the
+// channel, per the stream contract.
+func (b *nerdctlBackend) runComposeTasks(tasks []composeTask) (<-chan string, func(), error) {
+	out := make(chan string, 256)
+	done := make(chan struct{})
+	var once sync.Once
+	var mu sync.Mutex
+	var activeStop func()
+	stop := func() {
+		once.Do(func() {
+			close(done)
+			mu.Lock()
+			s := activeStop
+			mu.Unlock()
+			if s != nil {
+				s()
+			}
+		})
 	}
-	if len(rows) == 0 {
-		return "", "", "", fmt.Errorf("no containers found for compose deployment %q", identity)
+	send := func(line string) bool {
+		select {
+		case out <- line:
+			return true
+		case <-done:
+			return false
+		}
 	}
-	l := parseLabels(rows[0].Labels)
-	return l[composeProjectLabel], l[composeWorkdirLabel], l[composeConfigLabel], nil
+	go func() {
+		defer close(out)
+		defer stop()
+		for _, t := range tasks {
+			select {
+			case <-done:
+				return
+			default:
+			}
+			if t.banner != "" && !send(t.banner) {
+				return
+			}
+			switch {
+			case t.stream != nil:
+				ch, s, err := b.runner.stream(t.stream)
+				if err != nil {
+					if !send("  error: " + err.Error()) {
+						return
+					}
+					continue
+				}
+				mu.Lock()
+				activeStop = s
+				mu.Unlock()
+				for line := range ch {
+					if !send("  " + line) {
+						s()
+						return
+					}
+				}
+				mu.Lock()
+				activeStop = nil
+				mu.Unlock()
+			case t.action != nil:
+				if err := t.action(); err != nil {
+					if !send("  error: " + err.Error()) {
+						return
+					}
+				} else if !send("  done") {
+					return
+				}
+			}
+		}
+		send("done")
+	}()
+	return out, stop, nil
 }
 
-func (b *nerdctlBackend) composeStream(identity string, action ...string) (<-chan string, func(), error) {
-	args, err := b.composeArgs(identity, action...)
+// ComposeUp starts every container of the project — it brings a discovered or
+// stopped deployment up. nerdctl cannot recreate from the compose file without
+// its (unrecorded) path, so this is a start, not a recreate.
+func (b *nerdctlBackend) ComposeUp(project string) (<-chan string, func(), error) {
+	rows, err := b.projectContainers(project)
 	if err != nil {
 		return nil, nil, err
 	}
-	return b.runner.stream(b.args(args...))
-}
-
-func (b *nerdctlBackend) ComposeUp(p string) (<-chan string, func(), error) {
-	return b.composeStream(p, "up", "-d")
-}
-func (b *nerdctlBackend) ComposePull(p string) (<-chan string, func(), error) {
-	return b.composeStream(p, "pull")
-}
-func (b *nerdctlBackend) ComposeDown(p string) (<-chan string, func(), error) {
-	return b.composeStream(p, "down")
-}
-
-func (b *nerdctlBackend) ComposeConfig(identity string) (string, error) {
-	args, err := b.composeArgs(identity, "config")
-	if err != nil {
-		return "", err
+	tasks := make([]composeTask, 0, len(rows))
+	for _, r := range rows {
+		id, name := r.ID, r.toContainer().Name
+		tasks = append(tasks, composeTask{
+			banner: "Starting " + name,
+			action: func() error { _, e := b.run("start", id); return e },
+		})
 	}
-	return b.run(args...)
+	return b.runComposeTasks(tasks)
+}
+
+// ComposePull pulls the image of every distinct service in the project,
+// streaming each pull's progress.
+func (b *nerdctlBackend) ComposePull(project string) (<-chan string, func(), error) {
+	rows, err := b.projectContainers(project)
+	if err != nil {
+		return nil, nil, err
+	}
+	seen := map[string]bool{}
+	var tasks []composeTask
+	for _, r := range rows {
+		if r.Image == "" || seen[r.Image] {
+			continue
+		}
+		seen[r.Image] = true
+		tasks = append(tasks, composeTask{
+			banner: "Pulling " + r.Image,
+			stream: b.args("pull", r.Image),
+		})
+	}
+	return b.runComposeTasks(tasks)
+}
+
+// ComposeDown stops and removes the project's containers, then removes its
+// networks (identified by the com.docker.compose.project label). Named volumes
+// are left intact, matching `docker compose down` defaults.
+func (b *nerdctlBackend) ComposeDown(project string) (<-chan string, func(), error) {
+	rows, err := b.projectContainers(project)
+	if err != nil {
+		return nil, nil, err
+	}
+	name := project
+	if len(rows) > 0 {
+		if p := parseLabels(rows[0].Labels)[composeProjectLabel]; p != "" {
+			name = p
+		}
+	}
+	nets, _ := b.projectNetworks(name)
+	tasks := make([]composeTask, 0, len(rows)+len(nets))
+	for _, r := range rows {
+		id, cname := r.ID, r.toContainer().Name
+		tasks = append(tasks, composeTask{
+			banner: "Removing " + cname,
+			action: func() error { _, e := b.run("rm", "-f", id); return e },
+		})
+	}
+	for _, n := range nets {
+		net := n
+		tasks = append(tasks, composeTask{
+			banner: "Removing network " + net,
+			action: func() error { _, e := b.run("network", "rm", net); return e },
+		})
+	}
+	return b.runComposeTasks(tasks)
+}
+
+// projectNetworks returns the networks that belong to a compose project, matched
+// by the com.docker.compose.project label nerdctl stamps on them.
+func (b *nerdctlBackend) projectNetworks(project string) ([]string, error) {
+	out, err := b.run("network", "ls", "--format", jsonFormat)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := parseJSONLines[nerdctlNetwork](out)
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, r := range rows {
+		if r.Name == "" {
+			continue
+		}
+		if parseLabels(r.Labels)[composeProjectLabel] == project {
+			names = append(names, r.Name)
+		}
+	}
+	return names, nil
+}
+
+// ComposeConfig is unavailable on the nerdctl backend: rendering the merged
+// config needs the compose file, whose path nerdctl does not record.
+func (b *nerdctlBackend) ComposeConfig(string) (string, error) {
+	return "", errComposeFilesUnsupported
 }
 
 // ── compose file edit / create / backup (host filesystem) ───────────────────
@@ -283,14 +422,3 @@ func (b *nerdctlBackend) RestoreComposeProject(identity, backupPath string) (<-c
 }
 
 var errComposeFilesUnsupported = fmt.Errorf("editing/backup of compose files is not supported on the containerd (nerdctl) backend")
-
-// splitCommaList splits a comma-separated list into trimmed, non-empty items.
-func splitCommaList(s string) []string {
-	var out []string
-	for _, part := range strings.Split(s, ",") {
-		if part = strings.TrimSpace(part); part != "" {
-			out = append(out, part)
-		}
-	}
-	return out
-}
