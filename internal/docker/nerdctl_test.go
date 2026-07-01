@@ -247,6 +247,37 @@ func TestJSONToYAML(t *testing.T) {
 	}
 }
 
+func TestInfoServerVersion(t *testing.T) {
+	// nerdctl reports the server engine version inside Server.Components, not as a
+	// flat Server.Version field (real output shape from nerdctl 2.3.4).
+	fr := &fakeRunner{fn: func(args []string) (string, error) {
+		if len(args) > 0 && args[len(args)-1] == jsonFormat && contains(args, "version") {
+			return `{"Client":{"Version":"v2.3.4"},"Server":{"Components":[{"Name":"containerd","Version":"v2.3.2"},{"Name":"runc","Version":"1.5.0"}]}}`, nil
+		}
+		return "", nil // empty ps/images
+	}}
+	b := newTestBackend(fr)
+	if got := b.serverVersion(); got != "v2.3.2" {
+		t.Errorf("serverVersion = %q, want v2.3.2", got)
+	}
+	sum, err := b.Info()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.Version != "v2.3.2" {
+		t.Errorf("Info().Version = %q, want v2.3.2", sum.Version)
+	}
+}
+
+func contains(ss []string, v string) bool {
+	for _, s := range ss {
+		if s == v {
+			return true
+		}
+	}
+	return false
+}
+
 func TestCopyNeedsLocalOverSSH(t *testing.T) {
 	b := &nerdctlBackend{runner: &fakeRunner{}, namespace: defaultNamespace, local: false}
 	if err := b.CopyFromContainer("id", "/etc/hosts", "."); err == nil {

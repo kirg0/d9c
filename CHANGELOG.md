@@ -4,6 +4,17 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 проект следует [семантическому версионированию](https://semver.org/lang/ru/).
 
+## [1.19.1] - 2026-07-01
+
+### Исправлено
+
+- **containerd/nerdctl: пустая версия сервера в дашборде Hosts.** `Info().Version`
+  собирался неверным шаблоном `nerdctl version --format '{{.Server.Version}}'` — у
+  nerdctl версия сервера лежит в `Server.Components[]` (containerd), а не в плоском
+  поле `.Server.Version`. Теперь парсится `nerdctl version --format json` → версия
+  компонента containerd. Найдено при живой проверке на реальном хосте (containerd
+  v2.3.2, rootless-режим; #16).
+
 ## [1.19.0] - 2026-07-01
 
 ### Добавлено
