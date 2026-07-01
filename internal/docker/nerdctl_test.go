@@ -247,6 +247,18 @@ func TestJSONToYAML(t *testing.T) {
 	}
 }
 
+func TestSSHRunnerCmdPrependsSbinPath(t *testing.T) {
+	r := sshRunner{bin: "nerdctl"}
+	got := r.cmd([]string{"run", "-d", "-p", "8080:80", "nginx"})
+	// iptables lives in /usr/sbin, absent from a non-interactive SSH PATH.
+	if !strings.HasPrefix(got, `PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin" nerdctl `) {
+		t.Errorf("cmd() = %q, want PATH augmentation prefix", got)
+	}
+	if !strings.Contains(got, "'run' '-d' '-p' '8080:80' 'nginx'") {
+		t.Errorf("cmd() = %q, want quoted args", got)
+	}
+}
+
 func TestInfoServerVersion(t *testing.T) {
 	// nerdctl reports the server engine version inside Server.Components, not as a
 	// flat Server.Version field (real output shape from nerdctl 2.3.4).
