@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -50,16 +51,46 @@ func (b *nerdctlBackend) Info() (HostSummary, error) {
 		}
 	}
 	images, _ := b.ListImages()
-	version := ""
-	if v, err := b.run("version", "--format", "{{.Server.Version}}"); err == nil {
-		version = strings.TrimSpace(v)
-	}
 	return HostSummary{
 		Containers: len(rows),
 		Running:    running,
 		Paused:     paused,
 		Stopped:    stopped,
 		Images:     len(images),
-		Version:    version,
+		Version:    b.serverVersion(),
 	}, nil
+}
+
+// nerdctlVersion is the subset of `nerdctl version --format '{{json .}}'` we use:
+// the server engine version lives in Server.Components (there is no flat
+// Server.Version field), keyed by component name ("containerd").
+type nerdctlVersion struct {
+	Server struct {
+		Components []struct {
+			Name    string `json:"Name"`
+			Version string `json:"Version"`
+		} `json:"Components"`
+	} `json:"Server"`
+}
+
+// serverVersion reports the containerd server version behind nerdctl (best
+// effort; empty string when it can't be read).
+func (b *nerdctlBackend) serverVersion() string {
+	out, err := b.run("version", "--format", jsonFormat)
+	if err != nil {
+		return ""
+	}
+	var v nerdctlVersion
+	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &v); err != nil {
+		return ""
+	}
+	for _, c := range v.Server.Components {
+		if strings.EqualFold(c.Name, "containerd") {
+			return c.Version
+		}
+	}
+	if len(v.Server.Components) > 0 {
+		return v.Server.Components[0].Version
+	}
+	return ""
 }
