@@ -120,6 +120,9 @@ func TestSSHUserHelpers(t *testing.T) {
 		{"ssh://deploy@host:22", "", "deploy"},
 		{"ssh://host", "", ""},
 		{"tcp://host:2375", "", ""},
+		{"nerdctl+ssh://cont@192.168.1.249", "", "cont"},
+		{"nerdctl+ssh://host", "", ""},
+		{"nerdctl://", "", ""},
 	}
 	for _, c := range cases {
 		if got := SSHUser(c.url); got != c.want {
@@ -134,11 +137,41 @@ func TestSSHUserHelpers(t *testing.T) {
 		{"ssh://host:22", "new", "ssh://new@host:22"},
 		{"ssh://old@host", "", "ssh://host"},
 		{"tcp://host:2375", "new", "tcp://host:2375"},
+		{"nerdctl+ssh://old@host:22", "new", "nerdctl+ssh://new@host:22"},
+		{"nerdctl+ssh://host", "cont", "nerdctl+ssh://cont@host"},
 	}
 	for _, c := range repl {
 		if got := WithSSHUser(c.url, c.user); got != c.want {
 			t.Errorf("WithSSHUser(%q,%q) = %q, want %q", c.url, c.user, got, c.want)
 		}
+	}
+}
+
+func TestIsSSHAndAuthKept(t *testing.T) {
+	for _, c := range []struct {
+		url  string
+		want bool
+	}{
+		{"ssh://user@host", true},
+		{"nerdctl+ssh://cont@host", true},
+		{"nerdctl://", false},
+		{"tcp://host:2375", false},
+		{"unix:///run/docker.sock", false},
+	} {
+		if got := IsSSH(c.url); got != c.want {
+			t.Errorf("IsSSH(%q) = %v, want %v", c.url, got, c.want)
+		}
+	}
+
+	// A nerdctl+ssh:// host must keep its password-auth metadata (it used to be
+	// wiped because normalized() only recognized ssh://).
+	s := NewStore(nil, nil)
+	if err := s.AddHost(Host{Name: "c", Host: "nerdctl+ssh://cont@host", SSHAuth: SSHAuthPassword}); err != nil {
+		t.Fatal(err)
+	}
+	h, _ := s.Find("c")
+	if h.SSHAuth != SSHAuthPassword {
+		t.Errorf("SSHAuth = %q, want password (nerdctl+ssh auth was dropped)", h.SSHAuth)
 	}
 }
 

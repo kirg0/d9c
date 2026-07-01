@@ -171,13 +171,38 @@ func (s *Store) EditHost(name string, h Host) error {
 	return nil
 }
 
+// sshSchemes are the host-URL prefixes reached over SSH: a plain Docker ssh://
+// host and a nerdctl+ssh:// containerd host. SSH auth metadata (key/password)
+// applies to both. Order matters — the longer prefix is tried first so the
+// remaining "user@host:port" body is extracted correctly.
+var sshSchemes = []string{"nerdctl+ssh://", "ssh://"}
+
+// IsSSH reports whether a host URL is reached over SSH (ssh:// or nerdctl+ssh://),
+// so the UI shows the auth selector / credential prompt and the store keeps the
+// SSH auth fields for it.
+func IsSSH(hostURL string) bool {
+	_, _, ok := sshParts(hostURL)
+	return ok
+}
+
+// sshParts splits an SSH host URL into its scheme prefix and "user@host:port"
+// body, reporting false for non-SSH schemes.
+func sshParts(hostURL string) (prefix, body string, ok bool) {
+	for _, p := range sshSchemes {
+		if strings.HasPrefix(hostURL, p) {
+			return p, strings.TrimPrefix(hostURL, p), true
+		}
+	}
+	return "", "", false
+}
+
 // normalized trims fields and drops SSH auth metadata that does not apply to the
 // host (non-ssh hosts, or a key path stored under password auth).
 func (h Host) normalized() Host {
 	h.Name = strings.TrimSpace(h.Name)
 	h.Host = strings.TrimSpace(h.Host)
 	h.SSHKeyPath = strings.TrimSpace(h.SSHKeyPath)
-	if !strings.HasPrefix(h.Host, "ssh://") {
+	if !IsSSH(h.Host) {
 		h.SSHAuth = ""
 		h.SSHKeyPath = ""
 	}
@@ -214,13 +239,14 @@ func (s *Store) UpsertByHost(hostURL string) bool {
 	return true
 }
 
-// SSHUser extracts the login from an ssh:// URL ("ssh://user@host:22" → "user").
-// It returns "" when the scheme is not ssh:// or no user part is present.
+// SSHUser extracts the login from an SSH URL ("ssh://user@host:22" → "user",
+// "nerdctl+ssh://user@host" → "user"). It returns "" for a non-SSH scheme or
+// when no user part is present.
 func SSHUser(hostURL string) string {
-	if !strings.HasPrefix(hostURL, "ssh://") {
+	_, rest, ok := sshParts(hostURL)
+	if !ok {
 		return ""
 	}
-	rest := strings.TrimPrefix(hostURL, "ssh://")
 	if at := strings.LastIndex(rest, "@"); at >= 0 {
 		return rest[:at]
 	}
@@ -228,20 +254,21 @@ func SSHUser(hostURL string) string {
 }
 
 // WithSSHUser returns hostURL with its login replaced by user, preserving the
-// host and port ("ssh://old@host:22", "new" → "ssh://new@host:22"). A non-ssh
-// URL or an empty user is returned unchanged (minus any now-empty "@").
+// scheme, host and port ("ssh://old@host:22", "new" → "ssh://new@host:22";
+// nerdctl+ssh:// is preserved too). A non-ssh URL or an empty user is returned
+// unchanged (minus any now-empty "@").
 func WithSSHUser(hostURL, user string) string {
-	if !strings.HasPrefix(hostURL, "ssh://") {
+	prefix, rest, ok := sshParts(hostURL)
+	if !ok {
 		return hostURL
 	}
-	rest := strings.TrimPrefix(hostURL, "ssh://")
 	if at := strings.LastIndex(rest, "@"); at >= 0 {
 		rest = rest[at+1:]
 	}
 	if user == "" {
-		return "ssh://" + rest
+		return prefix + rest
 	}
-	return "ssh://" + user + "@" + rest
+	return prefix + user + "@" + rest
 }
 
 // deriveName builds a readable label from a connection URL.

@@ -89,9 +89,10 @@ func (m *Model) OpenEdit(h hosts.Host) {
 // SetError shows a validation message inside the form (keeps it open).
 func (m *Model) SetError(s string) { m.errMsg = s }
 
-// isSSH reports whether the Host URL targets ssh:// (so auth fields apply).
+// isSSH reports whether the Host URL is reached over SSH (ssh:// or
+// nerdctl+ssh://), so the auth fields apply.
 func (m Model) isSSH() bool {
-	return strings.HasPrefix(strings.TrimSpace(m.host.Value()), "ssh://")
+	return hosts.IsSSH(strings.TrimSpace(m.host.Value()))
 }
 
 // fields returns the focusable field ids in order, given the current Host URL
