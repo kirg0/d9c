@@ -290,6 +290,109 @@ func contains(ss []string, v string) bool {
 	return false
 }
 
+// composeFakeRunner serves a two-service project (web/cache) plus its network,
+// so the reconstructed compose engine ops can be exercised without nerdctl.
+func composeFakeRunner() *fakeRunner {
+	return &fakeRunner{fn: func(args []string) (string, error) {
+		switch {
+		case contains(args, "ps"):
+			return `{"ID":"c1","Names":"d9c-demo-web-1","Image":"nginx","Status":"Up","Labels":"com.docker.compose.project=d9c-demo,com.docker.compose.service=web"}
+{"ID":"c2","Names":"d9c-demo-cache-1","Image":"redis","Status":"Up","Labels":"com.docker.compose.project=d9c-demo,com.docker.compose.service=cache"}`, nil
+		case contains(args, "network") && contains(args, "ls"):
+			return `{"ID":"n1","Name":"d9c-demo_default","Labels":"com.docker.compose.project=d9c-demo"}
+{"ID":"n2","Name":"bridge","Labels":""}`, nil
+		}
+		return "", nil
+	}}
+}
+
+func drain(ch <-chan string) string {
+	var lines []string
+	for l := range ch {
+		lines = append(lines, l)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func TestComposeDownReconstructed(t *testing.T) {
+	fr := composeFakeRunner()
+	b := newTestBackend(fr)
+	ch, stop, err := b.ComposeDown("d9c-demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stop()
+	out := drain(ch)
+	if !strings.Contains(out, "Removing d9c-demo-web-1") || !strings.Contains(out, "Removing network d9c-demo_default") {
+		t.Errorf("down output:\n%s", out)
+	}
+	var sawRm, sawNetRm bool
+	for _, c := range fr.calls {
+		if contains(c, "rm") && contains(c, "-f") && contains(c, "c1") {
+			sawRm = true
+		}
+		if contains(c, "network") && contains(c, "rm") && contains(c, "d9c-demo_default") {
+			sawNetRm = true
+		}
+	}
+	if !sawRm || !sawNetRm {
+		t.Errorf("expected `rm -f` and `network rm`; calls=%v", fr.calls)
+	}
+}
+
+func TestComposeUpStartsContainers(t *testing.T) {
+	fr := composeFakeRunner()
+	b := newTestBackend(fr)
+	ch, stop, err := b.ComposeUp("d9c-demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stop()
+	out := drain(ch)
+	if !strings.Contains(out, "Starting d9c-demo-web-1") || !strings.Contains(out, "Starting d9c-demo-cache-1") {
+		t.Errorf("up output:\n%s", out)
+	}
+	var starts int
+	for _, c := range fr.calls {
+		if contains(c, "start") && (contains(c, "c1") || contains(c, "c2")) {
+			starts++
+		}
+	}
+	if starts != 2 {
+		t.Errorf("expected 2 start calls, got %d (calls=%v)", starts, fr.calls)
+	}
+}
+
+func TestComposePullPullsDistinctImages(t *testing.T) {
+	fr := composeFakeRunner()
+	b := newTestBackend(fr)
+	ch, stop, err := b.ComposePull("d9c-demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stop()
+	out := drain(ch)
+	if !strings.Contains(out, "Pulling nginx") || !strings.Contains(out, "Pulling redis") {
+		t.Errorf("pull output:\n%s", out)
+	}
+	var pulls int
+	for _, c := range fr.calls {
+		if contains(c, "pull") {
+			pulls++
+		}
+	}
+	if pulls != 2 {
+		t.Errorf("expected 2 pull calls, got %d", pulls)
+	}
+}
+
+func TestComposeConfigUnsupported(t *testing.T) {
+	b := newTestBackend(&fakeRunner{})
+	if _, err := b.ComposeConfig("d9c-demo"); err == nil {
+		t.Error("ComposeConfig should be unsupported on nerdctl")
+	}
+}
+
 func TestCopyNeedsLocalOverSSH(t *testing.T) {
 	b := &nerdctlBackend{runner: &fakeRunner{}, namespace: defaultNamespace, local: false}
 	if err := b.CopyFromContainer("id", "/etc/hosts", "."); err == nil {
