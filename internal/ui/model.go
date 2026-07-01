@@ -1082,7 +1082,7 @@ func connectCmd(base *config.Config, hostURL string) tea.Cmd {
 // ssh-agent / default keys). The chosen auth fields are written onto m.cfg so a
 // later auto-reconnect reuses them.
 func (m Model) beginConnect(h hosts.Host) (tea.Model, tea.Cmd) {
-	if strings.HasPrefix(h.Host, "ssh://") && h.SSHAuth == hosts.SSHAuthPassword {
+	if hosts.IsSSH(h.Host) && h.SSHAuth == hosts.SSHAuthPassword {
 		m.connForm.Open(h.Name, h.Host, hosts.SSHUser(h.Host))
 		m.mode = ModeConnectAuth
 		m.relayout()
