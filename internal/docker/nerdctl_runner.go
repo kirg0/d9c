@@ -131,13 +131,23 @@ type sshRunner struct {
 	closeFn func()
 }
 
+// sbinPath lists the directories where container networking tools (iptables)
+// live. A non-interactive SSH session's PATH typically omits /usr/sbin and
+// /sbin, so `nerdctl run -p` fails to find iptables ("failed to load networking
+// flags: exec: \"iptables\": executable file not found in $PATH") and port
+// publishing breaks; we append these to PATH for every nerdctl invocation over
+// SSH. Harmless when they don't exist.
+const sbinPath = "/usr/local/sbin:/usr/sbin:/sbin"
+
 func (r sshRunner) cmd(args []string) string {
 	parts := make([]string, 0, len(args)+1)
 	parts = append(parts, r.bin)
 	for _, a := range args {
 		parts = append(parts, shellQuote(a))
 	}
-	return strings.Join(parts, " ")
+	// Prepend a PATH augmentation so iptables (in /usr/sbin) is found even in the
+	// stripped-down PATH of a non-interactive SSH exec.
+	return `PATH="$PATH:` + sbinPath + `" ` + strings.Join(parts, " ")
 }
 
 func (r sshRunner) output(args []string) (string, error) {

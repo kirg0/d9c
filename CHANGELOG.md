@@ -4,6 +4,18 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 проект следует [семантическому версионированию](https://semver.org/lang/ru/).
 
+## [1.19.3] - 2026-07-01
+
+### Исправлено
+
+- **containerd/nerdctl: запуск контейнера с портом (`-p`) падал `iptables not
+  found`.** У неинтерактивной SSH-сессии PATH = `/usr/local/bin:/usr/bin:/bin`
+  (без `/usr/sbin`), где лежит `iptables`; nerdctl на стороне клиента дёргает его
+  при публикации порта и не находил → `failed to load networking flags` (внешне —
+  «зависание» на докачке образа, затем ошибка). Теперь SSH-runner добавляет
+  `/usr/local/sbin:/usr/sbin:/sbin` в PATH для всех nerdctl-команд. Проверено на
+  реальном хосте: `run -d -p 8080:80 nginx` стартует штатно (#18).
+
 ## [1.19.2] - 2026-07-01
 
 ### Исправлено
