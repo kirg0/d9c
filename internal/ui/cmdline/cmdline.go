@@ -112,6 +112,7 @@ func viewCmds() []cmdDef {
 		{"lang", i18n.T("[ru|en] (язык интерфейса; без аргумента — выбор)", "[ru|en] (UI language; no arg — pick from a list)")},
 		{"interval", i18n.T("<dur> | pause | resume (интервал автообновления)", "<dur> | pause | resume (auto-refresh interval)")},
 		{"alert", i18n.T("cpu <%> | mem <%> | off (пороги CPU/MEM)", "cpu <%> | mem <%> | off (CPU/MEM thresholds)")},
+		{"namespace", i18n.T("[имя] (namespace containerd; без имени — выбор)", "[name] (containerd namespace; no name — pick from a list)")},
 	}
 }
 

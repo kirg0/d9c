@@ -4,6 +4,34 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 проект следует [семантическому версионированию](https://semver.org/lang/ru/).
 
+## [1.19.0] - 2026-07-01
+
+### Добавлено
+
+- **Поддержка containerd через nerdctl.** У containerd нет Docker-совместимого API,
+  поэтому d9c управляет им через `nerdctl` (Docker-совместимый CLI-фронтенд) — новый
+  бэкенд `nerdctlBackend` за тем же интерфейсом `docker.Backend`. Подключение по новым
+  схемам хоста: `nerdctl://` (nerdctl на локальной машине) и `nerdctl+ssh://user@host`
+  (nerdctl на удалённом хосте по SSH, поверх существующей SSH-обвязки). Реализован весь
+  набор разделов: контейнеры (list/start/stop/restart/kill/rm/inspect/logs/stats/run),
+  exec (по SSH-транспорту), образы (list/pull/rmi/tag/push/build/history/prune), сети,
+  тома, Compose (discovery по тем же `com.docker.compose.*` меткам + `nerdctl compose
+  up/down/pull`), events, `system df`/`prune`. В шапке — метка **containerd**.
+- **Namespaces containerd.** Новый опциональный интерфейс `docker.NamespacedBackend`;
+  команда `:namespace <имя>` переключает namespace, `:namespace` без аргумента открывает
+  picker (список из `nerdctl namespace ls`). Активный namespace виден в шапке как
+  `containerd:<ns>`. Все команды nerdctl автоматически скоупятся `--namespace`.
+- Транспортные SSH-хелперы вынесены в `internal/docker/ssh_exec.go` (client-
+  параметризованные `sshOutput`/`sshStream`/`sshPipe`/`sshInteractive`) и делятся между
+  docker- и nerdctl-бэкендами; методы docker-бэкенда стали тонкими обёртками (поведение
+  не изменилось).
+
+### Ограничения
+
+- `docker cp` и редактирование/бэкап compose-файлов доступны только когда nerdctl
+  запущен локально (по SSH файлы жили бы на удалённом хосте). Локальный интерактивный
+  exec требует ssh-транспорта.
+
 ## [1.18.0] - 2026-07-01
 
 ### Добавлено

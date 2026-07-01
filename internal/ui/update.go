@@ -483,6 +483,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.openLangPicker()
 		return m, nil
 
+	case namespacesLoadedMsg:
+		if msg.err != nil {
+			m.copyNotif = i18n.T("не удалось получить namespaces: ", "could not list namespaces: ") + msg.err.Error()
+			return m, clearCopyNotifCmd()
+		}
+		m.openNamespacePicker(msg.names, msg.current)
+		return m, nil
+
 	case openConfirmMsg:
 		m.confirmPrompt = msg.prompt
 		m.confirmAction = msg.action
@@ -795,6 +803,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleThemePicker(msg)
 	case ModeLangPicker:
 		return m.handleLangPicker(msg)
+	case ModeNamespacePicker:
+		return m.handleNamespacePicker(msg)
 	case ModeBackupPicker:
 		return m.handleBackupPicker(msg)
 	case ModeHelp:

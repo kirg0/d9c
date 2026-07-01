@@ -21,15 +21,22 @@ const (
 	RuntimeUnknown Runtime = ""
 	RuntimeDocker  Runtime = "docker"
 	RuntimePodman  Runtime = "podman"
+	// RuntimeContainerd backs the nerdctl CLI backend (containerd has no Docker
+	// API, so it cannot reuse dockerBackend). See nerdctl.go.
+	RuntimeContainerd Runtime = "containerd"
 )
 
 // Label renders the runtime for display in the header; an unknown engine is
 // shown as "docker" (the default assumption).
 func (r Runtime) Label() string {
-	if r == RuntimePodman {
+	switch r {
+	case RuntimePodman:
 		return "podman"
+	case RuntimeContainerd:
+		return "containerd"
+	default:
+		return "docker"
 	}
-	return "docker"
 }
 
 // detectRuntime classifies the engine from a /version response. Podman's
