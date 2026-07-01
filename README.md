@@ -177,6 +177,8 @@ go run . -version              # вывести версию и выйти
 | SSH | `-H ssh://user@host` | туннель по SSH к локальному сокету демона; ключи из агента/`~/.ssh` |
 | Unix | `-H unix:///var/run/docker.sock` | локальный сокет демона (Linux/macOS) |
 | npipe | `-H npipe:////./pipe/docker_engine` | именованный канал Windows (Docker Desktop / Podman machine) |
+| nerdctl (локально) | `-H nerdctl://` | containerd через локальный `nerdctl` (см. [containerd](#containerd)) |
+| nerdctl (SSH) | `-H nerdctl+ssh://user@host` | containerd через `nerdctl` на удалённом хосте по SSH |
 
 > **TCP против SSH — что доступно.** Почти всё (контейнеры, образы, сети, тома, exec,
 > обзор ФС контейнера, события, дашборд) работает по обоим транспортам через Docker Engine API.
@@ -217,6 +219,37 @@ d9c -H npipe:////./pipe/podman-machine-default
 вместо `docker compose`. Учтите особенности rootless: сокет лежит в `/run/user/<uid>/…`,
 а доступ к нему есть только у владельца — подключайтесь под тем же пользователем (`ssh://user@host`,
 а не `root`), иначе сокет будет не виден.
+
+### containerd
+
+У containerd **нет** Docker-совместимого API, поэтому трюк с Podman тут не работает. Вместо
+нативного gRPC-клиента (тяжёлый, без логов/сетей/томов/compose) d9c управляет containerd через
+[`nerdctl`](https://github.com/containerd/nerdctl) — Docker-совместимый CLI-фронтенд. Нужен
+установленный `nerdctl` на той машине, где живёт containerd:
+
+```
+# containerd на этой же машине
+d9c -H nerdctl://
+
+# containerd на удалённом хосте (nerdctl запускается там по SSH)
+d9c -H nerdctl+ssh://user@host
+```
+
+Когда подключение идёт через nerdctl, в шапке появляется метка **containerd**, а рядом — активный
+**namespace** (`containerd:default`). Работают все разделы: Containers (list/start/stop/restart/
+kill/rm/inspect/logs/stats/run), exec (по SSH-транспорту), Images (pull/rmi/tag/push/build/history),
+Networks, Volumes, Compose (discovery по тем же меткам + `nerdctl compose up/down/pull`), events,
+`system df`/`prune`.
+
+**Namespaces.** containerd раскладывает объекты по namespace (`default`, `k8s.io` для Kubernetes и
+т. д.). Команда `:namespace <имя>` переключает namespace, а `:namespace` без аргумента открывает
+список для выбора. Все команды автоматически скоупятся по активному namespace.
+
+> **Ограничения nerdctl-бэкенда.** `docker cp` в контейнер/из контейнера и редактирование/бэкап
+> compose-файлов доступны только при **локальном** подключении (`nerdctl://`) — по SSH файлы
+> оказались бы на удалённом хосте, а не на машине с d9c. Локальный интерактивный `exec`/`run -it`
+> требует SSH-транспорта (мост локального PTY во встроенный терминал не реализован без доп.
+> зависимостей). Все остальные операции работают и локально, и по SSH.
 
 Раздел **Hosts** — это и список сохранённых хостов, и мульти-хост дашборд: на каждый хост строка
 со статусом (● up/down) и агрегатом из `docker info` (контейнеры/запущено/образы/версия демона).

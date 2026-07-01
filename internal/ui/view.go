@@ -34,6 +34,8 @@ func (m Model) View() string {
 		body = m.viewThemeOverlay()
 	case ModeLangPicker:
 		body = m.viewLangOverlay()
+	case ModeNamespacePicker:
+		body = m.viewNamespaceOverlay()
 	case ModeConfirm:
 		body = m.viewConfirmOverlay()
 	case ModeNotice:
@@ -191,10 +193,15 @@ func (m Model) viewHeader() string {
 		status = styles.HeaderStatusOK
 	}
 	right := status.Render(" ● ") + styles.HeaderHost.Render(m.cfg.Host+" ")
-	// Surface a non-Docker engine (Podman) so the user can confirm the
+	// Surface a non-Docker engine (Podman/containerd) so the user can confirm the
 	// connection lands on the expected runtime; Docker is the implied default.
-	if m.runtime == docker.RuntimePodman {
-		right = styles.HeaderRuntime.Render(" "+m.runtime.Label()+" ") + right
+	// For containerd, append the active namespace ("containerd:k8s.io").
+	if m.runtime == docker.RuntimePodman || m.runtime == docker.RuntimeContainerd {
+		label := m.runtime.Label()
+		if nb, ok := m.backend.(docker.NamespacedBackend); ok {
+			label += ":" + nb.CurrentNamespace()
+		}
+		right = styles.HeaderRuntime.Render(" "+label+" ") + right
 	}
 	if m.reconnecting {
 		right = styles.HeaderStatusRetry.Render(" ● ") +
@@ -295,6 +302,10 @@ func (m Model) viewFooter() string {
 	case ModeLangPicker:
 		sb.WriteString(keyHint("↑↓", "Preview"))
 		sb.WriteString(keyHint("enter", "Apply"))
+		sb.WriteString(keyHint("q/esc", "Cancel"))
+	case ModeNamespacePicker:
+		sb.WriteString(keyHint("↑↓", "Select"))
+		sb.WriteString(keyHint("enter", "Switch"))
 		sb.WriteString(keyHint("q/esc", "Cancel"))
 	case ModeConfirm:
 		sb.WriteString(keyHint("y/enter", "Confirm"))
@@ -554,6 +565,42 @@ func (m Model) viewLangOverlay() string {
 
 	hint := styles.CopyMenuHint.Render(i18n.T("  ↑/↓ превью   enter применить   q/esc отмена", "  ↑/↓ preview   enter apply   q/esc cancel"))
 	title := styles.CopyMenuTitle.Render(i18n.T(" Язык ", " Language "))
+	content := title + "\n\n" +
+		strings.Join(rows, "\n") +
+		"\n\n" + hint
+
+	panel := styles.OverlayPanel.Render(content)
+	return overlayCenter(m.viewNormal(), panel, m.width, bodyH)
+}
+
+// viewNamespaceOverlay renders the containerd namespace selector centered over
+// the current view. There is no live preview (switching re-queries the daemon),
+// so the highlight simply moves until Enter commits.
+func (m Model) viewNamespaceOverlay() string {
+	bodyH := m.height - 2 // header + footer
+
+	maxName := 0
+	for _, n := range m.nsNames {
+		if w := lipgloss.Width(n); w > maxName {
+			maxName = w
+		}
+	}
+
+	var rows []string
+	if len(m.nsNames) == 0 {
+		rows = append(rows, "    "+styles.CopyMenuLabel.Render(i18n.T("нет namespaces", "no namespaces")))
+	}
+	for i, n := range m.nsNames {
+		label := n + strings.Repeat(" ", maxName-lipgloss.Width(n))
+		if i == m.nsCursor {
+			rows = append(rows, " ▶  "+styles.CopyMenuSelected.Render(" "+label+" "))
+		} else {
+			rows = append(rows, "    "+styles.CopyMenuLabel.Render(label))
+		}
+	}
+
+	hint := styles.CopyMenuHint.Render(i18n.T("  ↑/↓ выбор   enter переключить   q/esc отмена", "  ↑/↓ select   enter switch   q/esc cancel"))
+	title := styles.CopyMenuTitle.Render(i18n.T(" Namespace ", " Namespace "))
 	content := title + "\n\n" +
 		strings.Join(rows, "\n") +
 		"\n\n" + hint

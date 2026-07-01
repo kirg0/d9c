@@ -125,6 +125,19 @@ type Backend interface {
 	Close()
 }
 
+// NamespacedBackend is an optional capability a Backend may implement when its
+// engine partitions objects into namespaces (containerd via nerdctl). The UI
+// type-asserts it to expose the :namespace command, the picker and the header
+// badge; backends without namespaces (docker/podman) simply don't implement it.
+type NamespacedBackend interface {
+	// Namespaces lists the available namespaces.
+	Namespaces() ([]string, error)
+	// CurrentNamespace reports the active namespace.
+	CurrentNamespace() string
+	// SetNamespace switches the active namespace for subsequent operations.
+	SetNamespace(name string)
+}
+
 type dockerBackend struct {
 	cli     *client.Client
 	closeFn func()
@@ -149,6 +162,9 @@ type dockerBackend struct {
 func New(cfg *config.Config) (Backend, error) {
 	host := cfg.Host
 
+	if isNerdctlHost(host) {
+		return newNerdctlBackend(cfg)
+	}
 	if strings.HasPrefix(host, "ssh://") {
 		return newSSHBackend(cfg)
 	}

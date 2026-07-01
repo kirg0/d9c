@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -94,6 +95,21 @@ func (m *Model) dispatchCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 			}
 		}
 		return clearCopyNotifCmd(), nil
+	case "namespace", "ns":
+		// containerd namespace selector (nerdctl backend only). No arg opens the
+		// interactive picker; an explicit name switches directly and refreshes.
+		nb, ok := m.backend.(docker.NamespacedBackend)
+		if !ok {
+			return nil, errors.New(i18n.T(
+				"namespace доступен только на бэкенде containerd (nerdctl)",
+				"namespaces are only available on the containerd (nerdctl) backend"))
+		}
+		if len(cmd.Args) == 0 {
+			return loadNamespacesCmd(nb), nil
+		}
+		nb.SetNamespace(cmd.Args[0])
+		m.copyNotif = i18n.T("namespace: ", "namespace: ") + nb.CurrentNamespace()
+		return tea.Batch(m.fetchCurrentResource(), clearCopyNotifCmd()), nil
 	case "interval":
 		// Auto-refresh cadence, available from any view. No arg reports the
 		// current value; `pause`/`resume` toggle the freeze.

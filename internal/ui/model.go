@@ -76,32 +76,33 @@ func (r ResourceView) String() string {
 type Mode int
 
 const (
-	ModeNormal       Mode = iota
-	ModeDetail            // 'i'
-	ModeFilter            // '/'
-	ModeCommand           // ':'
-	ModeLogs              // logs viewer
-	ModeCopy              // right-click / 'y' copy menu
-	ModeHostForm          // add/edit host modal form
-	ModeComposeEdit       // compose file editor
-	ModeBackupPicker      // backup catalog overlay (list/restore/delete)
-	ModeHelp              // keyboard/command reference overlay ('?')
-	ModeShell             // embedded interactive exec terminal ('x')
-	ModeEvents            // live daemon events feed
-	ModePushForm          // registry-credentials modal for image push
-	ModeNetForm           // create-network modal form
-	ModeVolForm           // create-volume modal form
-	ModePullForm          // pull-image modal form (images view)
-	ModeBuildForm         // build-image modal form (images view)
-	ModeRunForm           // run-container wizard modal form
-	ModeExecForm          // one-off interactive run wizard (`run --rm -it`)
-	ModeConfirm           // generic y/esc confirmation overlay
-	ModeFSBrowser         // container filesystem browser ('f' / :files)
-	ModeNotice            // informational modal (e.g. SSH known_hosts mismatch)
-	ModeCpForm            // upload-to-container wizard (`:cp` with no args)
-	ModeThemePicker       // theme selector modal (`:theme` with no args, live preview)
-	ModeLangPicker        // language selector modal (`:lang` with no args, live preview)
-	ModeConnectAuth       // SSH login/password prompt before connecting (password-auth hosts)
+	ModeNormal          Mode = iota
+	ModeDetail               // 'i'
+	ModeFilter               // '/'
+	ModeCommand              // ':'
+	ModeLogs                 // logs viewer
+	ModeCopy                 // right-click / 'y' copy menu
+	ModeHostForm             // add/edit host modal form
+	ModeComposeEdit          // compose file editor
+	ModeBackupPicker         // backup catalog overlay (list/restore/delete)
+	ModeHelp                 // keyboard/command reference overlay ('?')
+	ModeShell                // embedded interactive exec terminal ('x')
+	ModeEvents               // live daemon events feed
+	ModePushForm             // registry-credentials modal for image push
+	ModeNetForm              // create-network modal form
+	ModeVolForm              // create-volume modal form
+	ModePullForm             // pull-image modal form (images view)
+	ModeBuildForm            // build-image modal form (images view)
+	ModeRunForm              // run-container wizard modal form
+	ModeExecForm             // one-off interactive run wizard (`run --rm -it`)
+	ModeConfirm              // generic y/esc confirmation overlay
+	ModeFSBrowser            // container filesystem browser ('f' / :files)
+	ModeNotice               // informational modal (e.g. SSH known_hosts mismatch)
+	ModeCpForm               // upload-to-container wizard (`:cp` with no args)
+	ModeThemePicker          // theme selector modal (`:theme` with no args, live preview)
+	ModeLangPicker           // language selector modal (`:lang` with no args, live preview)
+	ModeConnectAuth          // SSH login/password prompt before connecting (password-auth hosts)
+	ModeNamespacePicker      // containerd namespace selector modal (`:namespace` with no args)
 )
 
 // copyItem is one selectable entry in the copy overlay.
@@ -571,6 +572,12 @@ type Model struct {
 	langNames    []i18n.Lang
 	langCursor   int
 	langOriginal i18n.Lang
+
+	// Namespace picker overlay (ModeNamespacePicker) state: the containerd
+	// namespaces to choose from and the cursor. Unlike theme/lang there is no
+	// live preview — switching happens only on Enter (it re-queries the daemon).
+	nsNames  []string
+	nsCursor int
 
 	// Generic confirmation overlay (ModeConfirm) state.
 	confirmPrompt string
