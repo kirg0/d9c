@@ -1,7 +1,6 @@
 package docker
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -772,37 +771,9 @@ func (b *dockerBackend) sshWriteFile(cmd, content string) error {
 }
 
 // sshPipeReader streams r into a remote command's stdin (e.g. `tee <path>` or
-// `tar xzf - -C <dir>`). On a non-zero exit the trimmed remote stderr becomes
-// the error message.
+// `tar xzf - -C <dir>`). See sshPipe (ssh_exec.go) for the shared implementation.
 func (b *dockerBackend) sshPipeReader(cmd string, r io.Reader) error {
-	session, err := b.sshClient.NewSession()
-	if err != nil {
-		return fmt.Errorf("ssh session: %w", err)
-	}
-	defer func() { _ = session.Close() }()
-
-	stdin, err := session.StdinPipe()
-	if err != nil {
-		return err
-	}
-	var stderr bytes.Buffer
-	session.Stderr = &stderr
-	if err := session.Start(cmd); err != nil {
-		return err
-	}
-	if _, err := io.Copy(stdin, r); err != nil {
-		_ = stdin.Close()
-		return err
-	}
-	_ = stdin.Close()
-	if err := session.Wait(); err != nil {
-		msg := strings.TrimSpace(stderr.String())
-		if msg == "" {
-			msg = err.Error()
-		}
-		return fmt.Errorf("%s", msg)
-	}
-	return nil
+	return sshPipe(b.sshClient, cmd, r)
 }
 
 // runComposeSSHStream builds the `docker compose <action>` command for the
@@ -832,74 +803,9 @@ func (b *dockerBackend) sshNeedsSudo() bool {
 }
 
 // sshExecStream runs a command over SSH and streams its combined stdout/stderr
-// line-by-line into the returned channel. The channel is closed when the command
-// exits; on a non-zero exit a trailing line carries the error. The returned stop
-// aborts the command early: closing the session kills the remote process and
-// unblocks producers stuck on a send nobody reads. The caller MUST call stop
-// when it abandons the channel, otherwise the SSH session and goroutines leak.
+// line-by-line. See sshStream (ssh_exec.go) for the shared implementation.
 func (b *dockerBackend) sshExecStream(cmd string) (<-chan string, func(), error) {
-	session, err := b.sshClient.NewSession()
-	if err != nil {
-		return nil, nil, fmt.Errorf("ssh session: %w", err)
-	}
-	stdout, err := session.StdoutPipe()
-	if err != nil {
-		_ = session.Close()
-		return nil, nil, err
-	}
-	stderr, err := session.StderrPipe()
-	if err != nil {
-		_ = session.Close()
-		return nil, nil, err
-	}
-	if err := session.Start(cmd); err != nil {
-		_ = session.Close()
-		return nil, nil, fmt.Errorf("start %q: %w", cmd, err)
-	}
-
-	out := make(chan string, 256)
-	done := make(chan struct{})
-	var once sync.Once
-	stop := func() {
-		once.Do(func() {
-			close(done)
-			_ = session.Close()
-		})
-	}
-	send := func(line string) bool {
-		select {
-		case out <- line:
-			return true
-		case <-done:
-			return false
-		}
-	}
-	var wg sync.WaitGroup
-	scan := func(r io.Reader) {
-		defer wg.Done()
-		sc := bufio.NewScanner(r)
-		sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-		for sc.Scan() {
-			if !send(sc.Text()) {
-				return
-			}
-		}
-		if err := sc.Err(); err != nil {
-			send("error: read output: " + err.Error())
-		}
-	}
-	wg.Add(2)
-	go scan(stdout)
-	go scan(stderr)
-	go func() {
-		wg.Wait()
-		if err := session.Wait(); err != nil {
-			send("error: " + err.Error())
-		}
-		stop() // release the session when the command ends naturally
-		close(out)
-	}()
-	return out, stop, nil
+	return sshStream(b.sshClient, cmd)
 }
 
 // runComposeSSHOutput runs `docker compose <action>` over SSH using the
@@ -974,22 +880,8 @@ func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-// sshExecOutput runs a command over SSH, returning stdout+stderr. On non-zero
-// exit the trimmed remote output becomes the error message.
+// sshExecOutput runs a command over SSH, returning stdout+stderr. See sshOutput
+// (ssh_exec.go) for the shared implementation.
 func (b *dockerBackend) sshExecOutput(cmd string) (string, error) {
-	session, err := b.sshClient.NewSession()
-	if err != nil {
-		return "", fmt.Errorf("ssh session: %w", err)
-	}
-	defer func() { _ = session.Close() }()
-
-	out, err := session.CombinedOutput(cmd)
-	if err != nil {
-		msg := strings.TrimSpace(string(out))
-		if msg == "" {
-			msg = err.Error()
-		}
-		return "", fmt.Errorf("%s", msg)
-	}
-	return string(out), nil
+	return sshOutput(b.sshClient, cmd)
 }
