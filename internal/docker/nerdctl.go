@@ -1,7 +1,10 @@
 package docker
 
 import (
+	"errors"
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -85,7 +88,55 @@ func (b *nerdctlBackend) args(sub ...string) []string {
 
 // run executes a one-shot nerdctl command scoped to the current namespace.
 func (b *nerdctlBackend) run(sub ...string) (string, error) {
-	return b.runner.output(b.args(sub...))
+	out, err := b.runner.output(b.args(sub...))
+	return out, cleanNerdctlErr(err)
+}
+
+// nerdctlFatalRe matches the logrus-style wrapper nerdctl prints on stderr
+// (`time="…" level=fatal msg="…"`); the capture is the quoted msg content.
+var nerdctlFatalRe = regexp.MustCompile(`level=(?:fatal|error)\s+msg="((?:[^"\\]|\\.)*)"`)
+
+// errCountPrefixRe strips nerdctl's "N errors:" preamble from a fatal message.
+var errCountPrefixRe = regexp.MustCompile(`^\d+ errors?:\s*`)
+
+// cleanNerdctlErr unwraps nerdctl's logrus fatal/error lines into their bare
+// messages, so the UI shows "no such image: foo" instead of
+// `time="…" level=fatal msg="1 errors:\nno such image: foo"`. Lines without the
+// logrus prefix are kept verbatim — they often carry the actual cause (e.g. the
+// `ls: /x: No such file or directory` line before an "exec failed" fatal) —
+// while warn/info logrus noise is dropped. Errors without any logrus line
+// (transport failures, plain CLI output) pass through unchanged.
+func cleanNerdctlErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	var parts []string
+	unwrapped := false
+	for _, line := range strings.Split(err.Error(), "\n") {
+		line = strings.TrimSpace(line)
+		switch m := nerdctlFatalRe.FindStringSubmatch(line); {
+		case line == "":
+		case m != nil:
+			unwrapped = true
+			msg := m[1]
+			if unquoted, uerr := strconv.Unquote(`"` + msg + `"`); uerr == nil {
+				msg = unquoted
+			}
+			msg = errCountPrefixRe.ReplaceAllString(msg, "")
+			msg = strings.TrimSpace(strings.ReplaceAll(msg, "\n", "; "))
+			if msg != "" {
+				parts = append(parts, msg)
+			}
+		case strings.Contains(line, "level="):
+			// logrus warn/info noise — drop.
+		default:
+			parts = append(parts, line)
+		}
+	}
+	if !unwrapped || len(parts) == 0 {
+		return err
+	}
+	return errors.New(strings.Join(parts, "; "))
 }
 
 // ── NamespacedBackend ───────────────────────────────────────────────────────
@@ -109,7 +160,7 @@ func (b *nerdctlBackend) SetNamespace(name string) {
 func (b *nerdctlBackend) Namespaces() ([]string, error) {
 	out, err := b.runner.output([]string{"namespace", "ls", "-q"})
 	if err != nil {
-		return nil, fmt.Errorf("list namespaces: %w", err)
+		return nil, fmt.Errorf("list namespaces: %w", cleanNerdctlErr(err))
 	}
 	return nonEmptyLines(out), nil
 }

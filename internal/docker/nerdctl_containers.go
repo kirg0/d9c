@@ -77,16 +77,42 @@ func (r nerdctlPS) toContainer() Container {
 		name = name[:i]
 	}
 	return Container{
-		ID:      shortID(r.ID),
-		Name:    name,
-		Image:   r.Image,
-		Status:  r.Status,
-		State:   stateFromStatus(r.Status),
-		Health:  parseHealth(r.Status),
-		Ports:   r.Ports,
-		Created: parseNerdctlTime(r.CreatedAt),
-		Labels:  parseLabels(r.Labels),
+		ID:       shortID(r.ID),
+		Name:     name,
+		Image:    r.Image,
+		Status:   r.Status,
+		State:    stateFromStatus(r.Status),
+		Health:   parseHealth(r.Status),
+		Ports:    r.Ports,
+		Created:  parseNerdctlTime(r.CreatedAt),
+		Labels:   parseLabels(r.Labels),
+		Networks: parseNetworksLabel(r.Labels),
 	}
+}
+
+// networksLabelPrefix marks nerdctl's own label carrying the container's
+// attached networks as a JSON array, e.g. `nerdctl/networks=["app_default"]`.
+const networksLabelPrefix = "nerdctl/networks="
+
+// parseNetworksLabel extracts the network names from the raw ps Labels string.
+// nerdctl's ps JSON has no Networks field (unlike docker's), so this label is
+// the only source; it must be cut out of the raw string because its JSON-array
+// value contains commas that the comma-splitting parseLabels would break on.
+func parseNetworksLabel(rawLabels string) []string {
+	i := strings.Index(rawLabels, networksLabelPrefix)
+	if i < 0 {
+		return nil
+	}
+	rest := rawLabels[i+len(networksLabelPrefix):]
+	end := strings.IndexByte(rest, ']')
+	if !strings.HasPrefix(rest, "[") || end < 0 {
+		return nil
+	}
+	var names []string
+	if err := json.Unmarshal([]byte(rest[:end+1]), &names); err != nil {
+		return nil
+	}
+	return names
 }
 
 // stateFromStatus derives the coarse container state the UI colors by from a

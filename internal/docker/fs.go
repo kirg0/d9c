@@ -52,15 +52,26 @@ func (b *dockerBackend) ListPath(containerID, dir string) ([]FileEntry, error) {
 
 // friendlyListErr turns `ls` stderr into an actionable message: a missing `ls`
 // binary (minimal images) and permission/not-found errors are the common cases.
+// "No such file or directory" is ambiguous — ls prints it for a missing dir
+// (`ls: /x: No such file or directory`) and the runtime prints it for a missing
+// binary (`stat /bin/ls: no such file or directory`) — so the message is
+// attributed to the directory whenever it names the requested path.
 func friendlyListErr(dir, stderr string) error {
 	low := strings.ToLower(stderr)
+	mentionsDir := dir != "/" && strings.Contains(low, strings.ToLower(dir))
+	noLs := errors.New(i18n.T("в контейнере нет `ls` — обзор файловой системы недоступен", "the container has no `ls` — filesystem browsing is unavailable"))
+	notFound := fmt.Errorf(i18n.T("путь %s не найден", "path %s not found"), dir)
 	switch {
-	case strings.Contains(low, "executable file not found"), strings.Contains(low, "no such file or directory") && strings.Contains(low, "ls"):
-		return errors.New(i18n.T("в контейнере нет `ls` — обзор файловой системы недоступен", "the container has no `ls` — filesystem browsing is unavailable"))
+	case strings.Contains(low, "executable file not found"):
+		return noLs
 	case strings.Contains(low, "permission denied"):
 		return fmt.Errorf(i18n.T("нет доступа к %s", "no access to %s"), dir)
+	case strings.Contains(low, "no such file or directory") && mentionsDir:
+		return notFound
+	case strings.Contains(low, "no such file or directory") && strings.Contains(low, "ls"):
+		return noLs
 	case strings.Contains(low, "no such file"):
-		return fmt.Errorf(i18n.T("путь %s не найден", "path %s not found"), dir)
+		return notFound
 	}
 	return fmt.Errorf("ls: %s", strings.TrimSpace(stderr))
 }

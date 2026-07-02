@@ -4,16 +4,53 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/docker/go-units"
 )
 
-// SystemDF reports containerd disk usage (`nerdctl system df`) as a detail
-// payload.
+// SystemDF reports containerd disk usage as a detail payload. nerdctl (2.x)
+// has no `system df` subcommand, so the report is assembled from the object
+// lists instead: image count with their summed unpacked sizes, container and
+// volume counts. Volume sizes are not reported (`volume ls --size` walks every
+// volume and can be very slow on real hosts).
 func (b *nerdctlBackend) SystemDF() (*InspectResult, error) {
-	out, err := b.run("system", "df")
+	images, err := b.ListImages()
 	if err != nil {
 		return nil, fmt.Errorf("system df: %w", err)
 	}
-	return &InspectResult{Name: "system df", RawYAML: out}, nil
+	rows, err := b.psRows(true)
+	if err != nil {
+		return nil, fmt.Errorf("system df: %w", err)
+	}
+	volumes, err := b.ListVolumes()
+	if err != nil {
+		return nil, fmt.Errorf("system df: %w", err)
+	}
+	running := 0
+	for _, r := range rows {
+		if stateFromStatus(r.Status) == "running" {
+			running++
+		}
+	}
+	return &InspectResult{
+		Name:    "system df",
+		RawYAML: buildDFReport(images, len(rows), running, len(volumes)),
+	}, nil
+}
+
+// buildDFReport renders the emulated `system df` table from the gathered
+// counts; split out of SystemDF so the formatting is unit-testable.
+func buildDFReport(images []Image, ctrTotal, ctrRunning, volumes int) string {
+	var imgBytes uint64
+	for _, im := range images {
+		imgBytes += parseSize(im.Size)
+	}
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%-15s %-8s %-8s %s\n", "TYPE", "TOTAL", "ACTIVE", "SIZE")
+	fmt.Fprintf(&sb, "%-15s %-8d %-8s %s\n", "Images", len(images), "-", units.HumanSize(float64(imgBytes)))
+	fmt.Fprintf(&sb, "%-15s %-8d %-8d %s\n", "Containers", ctrTotal, ctrRunning, "-")
+	fmt.Fprintf(&sb, "%-15s %-8d %-8s %s\n", "Local Volumes", volumes, "-", "-")
+	return sb.String()
 }
 
 // SystemPrune removes stopped containers, unused networks, dangling images and
@@ -51,14 +88,57 @@ func (b *nerdctlBackend) Info() (HostSummary, error) {
 		}
 	}
 	images, _ := b.ListImages()
+	info := b.infoSummary()
+	version := info.ServerVersion
+	if version == "" {
+		version = b.serverVersion()
+	}
 	return HostSummary{
 		Containers: len(rows),
 		Running:    running,
 		Paused:     paused,
 		Stopped:    stopped,
 		Images:     len(images),
-		Version:    b.serverVersion(),
+		Version:    version,
+		Name:       info.Name,
+		NCPU:       info.NCPU,
+		MemTotal:   info.MemTotal,
 	}, nil
+}
+
+// nerdctlInfo is the subset of `nerdctl info --format '{{json .}}'` the
+// dashboard shows: the host name, CPU/memory capacity and the server version.
+type nerdctlInfo struct {
+	Name          string `json:"Name"`
+	NCPU          int    `json:"NCPU"`
+	MemTotal      int64  `json:"MemTotal"`
+	ServerVersion string `json:"ServerVersion"`
+}
+
+// infoSummary fetches `nerdctl info` (best effort; zero value when it can't be
+// read). The JSON object is picked out line-wise because rootless nerdctl may
+// interleave warning lines with the payload on the combined output.
+func (b *nerdctlBackend) infoSummary() nerdctlInfo {
+	out, err := b.run("info", "--format", jsonFormat)
+	if err != nil {
+		return nerdctlInfo{}
+	}
+	return parseInfoJSON(out)
+}
+
+// parseInfoJSON extracts the first JSON object line of `nerdctl info` output.
+func parseInfoJSON(out string) nerdctlInfo {
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "{") {
+			continue
+		}
+		var info nerdctlInfo
+		if err := json.Unmarshal([]byte(line), &info); err == nil {
+			return info
+		}
+	}
+	return nerdctlInfo{}
 }
 
 // nerdctlVersion is the subset of `nerdctl version --format '{{json .}}'` we use:
