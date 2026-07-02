@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -166,5 +167,60 @@ func TestFakeCopyFromContainer(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "hosts")); err != nil {
 		t.Fatalf("expected ./hosts to exist: %v", err)
+	}
+}
+
+func TestFriendlyListErr(t *testing.T) {
+	tests := []struct {
+		name   string
+		dir    string
+		stderr string
+		want   string // substring of the RU message
+	}{
+		{
+			name:   "missing binary (docker runtime)",
+			dir:    "/etc",
+			stderr: `OCI runtime exec failed: exec: "ls": executable file not found in $PATH`,
+			want:   "нет `ls`",
+		},
+		{
+			name:   "missing binary (stat form)",
+			dir:    "/etc",
+			stderr: "stat /bin/ls: no such file or directory",
+			want:   "нет `ls`",
+		},
+		{
+			name:   "missing dir reported by ls itself",
+			dir:    "/no/such/dir",
+			stderr: "ls: /no/such/dir: No such file or directory",
+			want:   "не найден",
+		},
+		{
+			name: "missing dir with nerdctl fatal trailer",
+			dir:  "/no/such/dir",
+			stderr: "ls: /no/such/dir: No such file or directory\n" +
+				`time="2026-07-02T14:11:36-05:00" level=fatal msg="exec failed with exit code 1"`,
+			want: "не найден",
+		},
+		{
+			name:   "permission denied",
+			dir:    "/root",
+			stderr: "ls: can't open '/root': Permission denied",
+			want:   "нет доступа",
+		},
+		{
+			name:   "unknown error passes through",
+			dir:    "/",
+			stderr: "something exploded",
+			want:   "something exploded",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := friendlyListErr(tt.dir, tt.stderr)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("friendlyListErr(%q, %q) = %v, want substring %q", tt.dir, tt.stderr, err, tt.want)
+			}
+		})
 	}
 }

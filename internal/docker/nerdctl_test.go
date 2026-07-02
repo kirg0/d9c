@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -400,5 +401,164 @@ func TestCopyNeedsLocalOverSSH(t *testing.T) {
 	}
 	if err := b.CopyToContainer("id", "./x", "/tmp"); err == nil {
 		t.Error("CopyToContainer over ssh should error")
+	}
+}
+
+func TestParseNetworksLabel(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want []string
+	}{
+		{
+			name: "single network among other labels",
+			raw:  `nerdctl/name=web,nerdctl/networks=["app_default"],com.docker.compose.project=app`,
+			want: []string{"app_default"},
+		},
+		{
+			name: "multiple networks survive the comma inside the value",
+			raw:  `a=b,nerdctl/networks=["front","back"],c=d`,
+			want: []string{"front", "back"},
+		},
+		{name: "label absent", raw: "a=b,c=d", want: nil},
+		{name: "empty labels", raw: "", want: nil},
+		{name: "malformed value", raw: "nerdctl/networks=oops", want: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := parseNetworksLabel(tt.raw); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parseNetworksLabel(%q) = %v, want %v", tt.raw, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPSNetworksFromLabel(t *testing.T) {
+	out := `{"ID":"abc123","Names":"web","Image":"nginx","Status":"Up","Labels":"nerdctl/networks=[\"app_default\"]"}`
+	rows, err := parsePS(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := rows[0].toContainer()
+	if !reflect.DeepEqual(c.Networks, []string{"app_default"}) {
+		t.Errorf("Networks = %v, want [app_default]", c.Networks)
+	}
+}
+
+func TestCleanNerdctlErr(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "fatal with errors preamble",
+			in:   `time="2026-07-02T14:09:20-05:00" level=fatal msg="1 errors:\nno such image: no-such-image:zzz"`,
+			want: "no such image: no-such-image:zzz",
+		},
+		{
+			name: "plain fatal",
+			in:   `time="2026-07-02T14:09:24-05:00" level=fatal msg="exec failed with exit code 1"`,
+			want: "exec failed with exit code 1",
+		},
+		{
+			name: "no wrapper passes through",
+			in:   "ssh session: connection reset",
+			want: "ssh session: connection reset",
+		},
+		{
+			name: "plain lines around the fatal are kept",
+			in:   "ls: /no/such/dir: No such file or directory\n" + `time="x" level=fatal msg="exec failed with exit code 1"`,
+			want: "ls: /no/such/dir: No such file or directory; exec failed with exit code 1",
+		},
+		{
+			name: "logrus warn noise is dropped",
+			in:   `time="x" level=warn msg="cgroup v1 is deprecated"` + "\n" + `time="x" level=fatal msg="pull access denied"`,
+			want: "pull access denied",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cleanNerdctlErr(errString(tt.in))
+			if got.Error() != tt.want {
+				t.Errorf("cleanNerdctlErr(%q) = %q, want %q", tt.in, got.Error(), tt.want)
+			}
+		})
+	}
+	if cleanNerdctlErr(nil) != nil {
+		t.Error("nil must stay nil")
+	}
+}
+
+// errString builds a plain error with the exact message.
+func errString(s string) error { return errors.New(s) }
+
+func TestParseInfoJSON(t *testing.T) {
+	payload := `{"Name":"containerd-vm","NCPU":4,"MemTotal":2261487616,"ServerVersion":"v2.3.2"}`
+	tests := []struct {
+		name string
+		out  string
+		want nerdctlInfo
+	}{
+		{
+			name: "clean single line",
+			out:  payload,
+			want: nerdctlInfo{Name: "containerd-vm", NCPU: 4, MemTotal: 2261487616, ServerVersion: "v2.3.2"},
+		},
+		{
+			name: "warnings interleaved on combined output",
+			out:  "WARNING: No cpuset support\n" + payload + "\n",
+			want: nerdctlInfo{Name: "containerd-vm", NCPU: 4, MemTotal: 2261487616, ServerVersion: "v2.3.2"},
+		},
+		{name: "garbage yields zero value", out: "not json at all", want: nerdctlInfo{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := parseInfoJSON(tt.out); got != tt.want {
+				t.Errorf("parseInfoJSON = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildDFReport(t *testing.T) {
+	images := []Image{{Size: "66.45MB"}, {Size: "8.5MB"}}
+	got := buildDFReport(images, 3, 2, 1)
+	for _, want := range []string{"TYPE", "Images", "Containers", "Local Volumes"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("report lacks %q:\n%s", want, got)
+		}
+	}
+	if !strings.Contains(got, "Containers      3        2") {
+		t.Errorf("container row wrong:\n%s", got)
+	}
+}
+
+func TestSystemDFEmulated(t *testing.T) {
+	fr := &fakeRunner{fn: func(args []string) (string, error) {
+		cmd := strings.Join(args, " ")
+		switch {
+		case strings.Contains(cmd, "images"):
+			return `{"ID":"sha256:aaa","Repository":"nginx","Tag":"alpine","Size":"66.45MB","CreatedAt":"2026-07-01 10:00:00 +0000 UTC"}`, nil
+		case strings.Contains(cmd, "ps"):
+			return `{"ID":"abc","Names":"web","Image":"nginx","Status":"Up","Labels":""}`, nil
+		case strings.Contains(cmd, "volume ls"):
+			return `{"Name":"vol1","Driver":"local","Mountpoint":"/x"}`, nil
+		}
+		return "", nil
+	}}
+	b := newTestBackend(fr)
+	r, err := b.SystemDF()
+	if err != nil {
+		t.Fatalf("SystemDF: %v", err)
+	}
+	if !strings.Contains(r.RawYAML, "Images") || !strings.Contains(r.RawYAML, "Local Volumes") {
+		t.Errorf("unexpected report:\n%s", r.RawYAML)
+	}
+	// no `system df` invocation may leak to the CLI
+	for _, c := range fr.calls {
+		if contains(c, "df") {
+			t.Errorf("unexpected `df` call: %v", c)
+		}
 	}
 }
