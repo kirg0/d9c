@@ -1418,7 +1418,7 @@ func (m Model) selectedID() string {
 // breadcrumbs short instead of showing the full working_dir.
 func (m Model) composeNameFor(id string) string {
 	for _, p := range m.composes {
-		if p.WorkingDir == id {
+		if p.Identity() == id {
 			return p.Name
 		}
 	}
@@ -1511,7 +1511,7 @@ func (m Model) buildCopyItems() []copyItem {
 		}
 	case ViewCompose:
 		for _, p := range m.composes {
-			if p.WorkingDir == id {
+			if p.Identity() == id {
 				items = []copyItem{
 					{"Project", p.Project},
 					{"Name", p.Name},

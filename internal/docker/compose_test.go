@@ -74,6 +74,12 @@ func TestComposeIdentityAndDisplayName(t *testing.T) {
 	if n := composeDisplayName("solo", ""); n != "solo" {
 		t.Errorf("display name without workdir = %q, want project solo", n)
 	}
+	if id := (ComposeProject{Project: "mcmc", WorkingDir: "/d/a"}).Identity(); id != "/d/a" {
+		t.Errorf("ComposeProject.Identity with workdir = %q, want /d/a", id)
+	}
+	if id := (ComposeProject{Project: "solo"}).Identity(); id != "solo" {
+		t.Errorf("ComposeProject.Identity without workdir = %q, want project fallback solo", id)
+	}
 }
 
 // composeFilter must scope by working_dir for a path identity and by project for
