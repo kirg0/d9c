@@ -403,9 +403,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, streamEvents(m.eventCh)
 
 	case eventsLineMsg:
-		if m.mode == ModeEvents {
+		if m.mode == ModeEvents && msg.ch == m.eventCh {
 			m.eventsModel.AddLine(msg.line)
 			return m, streamEvents(m.eventCh)
+		}
+		return m, nil
+
+	case eventsClosedMsg:
+		// The stream ending on its own (not by esc/q or a resubscribe replacing
+		// it) must be visible: a silently dead feed is indistinguishable from a
+		// quiet daemon.
+		if m.mode == ModeEvents && msg.ch == m.eventCh {
+			m.stopEventStream()
+			m.eventsModel.AddLine(i18n.T(
+				"[error] поток событий завершился — нажмите r для переподключения",
+				"[error] event stream ended — press r to reconnect"))
 		}
 		return m, nil
 

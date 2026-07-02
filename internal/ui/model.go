@@ -305,8 +305,19 @@ type openEventsMsg struct {
 	stop func()
 }
 
-// eventsLineMsg carries one line from the daemon event stream.
-type eventsLineMsg struct{ line string }
+// eventsLineMsg carries one line from the daemon event stream. ch identifies
+// the stream the line came from, so lines racing in from a replaced stream are
+// dropped instead of interleaving with the new one.
+type eventsLineMsg struct {
+	line string
+	ch   <-chan string
+}
+
+// eventsClosedMsg reports that the daemon event stream ended (the channel
+// closed). ch identifies which stream ended: a stale reader left over from a
+// replaced subscription must not paint an end-of-stream notice over the live
+// feed.
+type eventsClosedMsg struct{ ch <-chan string }
 
 // openPushFormMsg requests the registry-credentials modal for pushing ref.
 type openPushFormMsg struct{ ref string }
@@ -1370,15 +1381,17 @@ func openEvents(b docker.Backend) tea.Cmd {
 }
 
 // streamEvents reads the next event line, re-subscribing until the channel
-// closes, at which point it stops (no restart — the user can press :events
-// again if they want to reconnect).
+// closes. The close is reported as eventsClosedMsg (carrying the channel so a
+// stale reader can't be mistaken for the active stream) instead of dying
+// silently — otherwise a stream that ends without an error line leaves the
+// viewer empty forever with no indication.
 func streamEvents(ch <-chan string) tea.Cmd {
 	return func() tea.Msg {
 		line, ok := <-ch
 		if !ok {
-			return nil
+			return eventsClosedMsg{ch: ch}
 		}
-		return eventsLineMsg{line: line}
+		return eventsLineMsg{line: line, ch: ch}
 	}
 }
 

@@ -193,15 +193,75 @@ func TestEventsFlow(t *testing.T) {
 		t.Fatal("events panel width is 0 — relayout missing on open")
 	}
 
-	step(eventsLineMsg{line: "container start 9ae942fd8fbc (local)"})
+	step(eventsLineMsg{line: "container start 9ae942fd8fbc (local)", ch: opened.ch})
 	if got := tm.(Model).eventsModel.LineCount(); got != 1 {
 		t.Errorf("event line count = %d, want 1", got)
+	}
+	// A line from a stale (replaced) stream must be dropped.
+	step(eventsLineMsg{line: "container stop stale (local)", ch: make(chan string)})
+	if got := tm.(Model).eventsModel.LineCount(); got != 1 {
+		t.Errorf("event line count after stale line = %d, want 1", got)
 	}
 
 	// q closes the events view.
 	step(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
 	if m := tm.(Model); m.mode != ModeNormal {
 		t.Fatalf("mode after q = %v, want ModeNormal", m.mode)
+	}
+}
+
+// TestEventsClosedNotice checks a stream that ends on its own paints a visible
+// end-of-stream notice (a silently dead feed looks identical to a quiet
+// daemon), releases the subscription, and that a stale eventsClosedMsg from a
+// replaced stream leaves the live feed alone.
+func TestEventsClosedNotice(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
+	step := func(msg tea.Msg) tea.Cmd { var c tea.Cmd; tm, c = tm.Update(msg); return c }
+	step(tea.WindowSizeMsg{Width: 120, Height: 30})
+
+	ch := make(chan string)
+	stopped := false
+	step(openEventsMsg{ch: ch, stop: func() { stopped = true }})
+	if m := tm.(Model); m.mode != ModeEvents {
+		t.Fatalf("mode = %v, want ModeEvents", m.mode)
+	}
+
+	// A close reported for a different (stale) channel is ignored.
+	step(eventsClosedMsg{ch: make(chan string)})
+	if got := tm.(Model).eventsModel.LineCount(); got != 0 {
+		t.Fatalf("stale close painted %d lines, want 0", got)
+	}
+	if stopped {
+		t.Fatal("stale close released the live subscription")
+	}
+
+	// The live stream closing paints the notice and releases the stream.
+	step(eventsClosedMsg{ch: ch})
+	m := tm.(Model)
+	if got := m.eventsModel.LineCount(); got != 1 {
+		t.Fatalf("line count after close = %d, want the end-of-stream notice", got)
+	}
+	if !strings.Contains(m.eventsModel.RawContent(), "r") || !strings.HasPrefix(m.eventsModel.RawContent(), "[error]") {
+		t.Errorf("notice = %q, want an [error]-prefixed reconnect hint", m.eventsModel.RawContent())
+	}
+	if !stopped {
+		t.Error("closing stream must release the subscription (stop not called)")
+	}
+	if m.eventCh != nil {
+		t.Error("eventCh must be nil after the stream ends")
+	}
+
+	// streamEvents on a closed channel reports eventsClosedMsg with its channel.
+	closed := make(chan string)
+	close(closed)
+	msg := streamEvents(closed)()
+	cm, ok := msg.(eventsClosedMsg)
+	if !ok {
+		t.Fatalf("streamEvents on closed channel = %#v, want eventsClosedMsg", msg)
+	}
+	if cm.ch != (<-chan string)(closed) {
+		t.Error("eventsClosedMsg must carry the channel that closed")
 	}
 }
 

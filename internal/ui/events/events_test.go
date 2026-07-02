@@ -1,6 +1,7 @@
 package events
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -22,6 +23,23 @@ func TestOpenClearsBuffer(t *testing.T) {
 	m.Open()
 	if m.LineCount() != 0 {
 		t.Errorf("expected 0 lines after Open(), got %d", m.LineCount())
+	}
+}
+
+// TestOpenShowsWaitingPlaceholder checks a freshly opened viewer renders the
+// waiting hint (so an idle daemon isn't mistaken for a broken stream) and that
+// the first real event replaces it.
+func TestOpenShowsWaitingPlaceholder(t *testing.T) {
+	m := New()
+	m.SetSize(80, 20)
+	m.Open()
+	if !strings.Contains(m.View(), "ожидание") && !strings.Contains(m.View(), "waiting") {
+		t.Errorf("view after Open() = %q, want the waiting placeholder", m.View())
+	}
+
+	m.AddLine("container start abc (local)")
+	if strings.Contains(m.View(), "ожидание") || strings.Contains(m.View(), "waiting") {
+		t.Error("placeholder must disappear after the first event line")
 	}
 }
 
