@@ -739,7 +739,7 @@ func buildComposeRows(projects []docker.ComposeProject, filterStr string) []tabl
 		rows = append(rows, table.Row{
 			truncate(p.Project, 22),
 			truncate(p.Name, 26),
-			p.WorkingDir, // identity column (selectedID/ComposeIDColumn) — keep intact
+			p.Identity(), // identity column (selectedID/ComposeIDColumn) — keep intact
 			status,
 			truncate(p.Command, 28),
 		})

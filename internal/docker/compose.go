@@ -40,6 +40,14 @@ type ComposeProject struct {
 	Total       int
 }
 
+// Identity returns the stable key distinguishing this deployment from others:
+// the working_dir when present, else the project name. Backends that don't
+// stamp the working_dir label (nerdctl) fall back to the project name, so the
+// identity is never empty for a discovered deployment.
+func (p ComposeProject) Identity() string {
+	return composeIdentity(p.Project, p.WorkingDir)
+}
+
 // composeIdentity is the stable key distinguishing one deployment from another:
 // the working_dir when present (so deployments sharing a project name but living
 // in different directories stay separate), else the project name (older compose

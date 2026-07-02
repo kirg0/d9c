@@ -58,6 +58,13 @@ func TestIdentityColumnsNotTruncated(t *testing.T) {
 	if composeRows[0][ComposeIDColumn] != longDir {
 		t.Errorf("compose identity = %q, want full working_dir", composeRows[0][ComposeIDColumn])
 	}
+
+	// Without a working_dir label (nerdctl) the identity falls back to the
+	// project name — an empty cell would make Enter/i/l/e dead keys.
+	composeRows = buildComposeRows([]docker.ComposeProject{{Project: "solo", Name: "solo", Status: "running"}}, "")
+	if composeRows[0][ComposeIDColumn] != "solo" {
+		t.Errorf("compose identity without workdir = %q, want project fallback solo", composeRows[0][ComposeIDColumn])
+	}
 }
 
 // The hosts STATUS cell reflects per-URL reachability: up/down once probed,
