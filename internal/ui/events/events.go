@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"d9c/internal/i18n"
 	"d9c/internal/ui/styles"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -56,11 +57,15 @@ func (m Model) vpHeight() int {
 	return h
 }
 
-// Open clears the buffer and prepares for a fresh event stream.
+// Open clears the buffer and prepares for a fresh event stream. Until the
+// first event arrives the viewport shows a waiting placeholder, so an idle
+// daemon (no events yet) is distinguishable from a broken stream.
 func (m *Model) Open() {
 	m.lines = nil
 	m.rawLines = nil
-	m.viewport.SetContent("")
+	m.viewport.SetContent(scopeStyle.Render(i18n.T(
+		"ожидание событий… (лента пуста, пока на сервере ничего не происходит)",
+		"waiting for events… (the feed stays empty until something happens on the server)")))
 	m.viewport.GotoTop()
 }
 
