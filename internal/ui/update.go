@@ -368,9 +368,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.mode = ModeLogs
 		return m, streamOp(m.logCh, msg.title)
 
-	case opLineMsg:
+	case opLinesMsg:
 		if msg.title == m.opTitle {
-			m.logs.AddLine(msg.line)
+			m.logs.AddLines(msg.lines)
 			return m, streamOp(m.logCh, msg.title)
 		}
 		return m, nil
@@ -386,9 +386,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case logs.LineMsg:
+	case logs.LinesMsg:
 		if msg.ContainerID == m.logs.ContainerID() {
-			m.logs.AddLine(msg.Line)
+			m.logs.AddLines(msg.Lines)
 			return m, streamLogs(m.logCh, msg.ContainerID)
 		}
 		return m, nil
@@ -402,9 +402,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.eventsModel.Open()
 		return m, streamEvents(m.eventCh)
 
-	case eventsLineMsg:
+	case eventsLinesMsg:
 		if m.mode == ModeEvents && msg.ch == m.eventCh {
-			m.eventsModel.AddLine(msg.line)
+			m.eventsModel.AddLines(msg.lines)
 			return m, streamEvents(m.eventCh)
 		}
 		return m, nil

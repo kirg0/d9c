@@ -12,11 +12,18 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// LineMsg carries a single log line from the streaming goroutine.
-type LineMsg struct {
+// LinesMsg carries a batch of log lines from the streaming goroutine. Lines
+// arrive batched (see ui.streamLogs): one message per channel drain rather than
+// one per line, so a chatty stream costs one re-render per batch.
+type LinesMsg struct {
 	ContainerID string
-	Line        string
+	Lines       []string
 }
+
+// maxBufferLines caps the log buffer: past it the oldest lines are dropped.
+// Without a cap a follow stream on a chatty container grows the buffer — and
+// the per-batch re-render, which joins the whole buffer — without bound.
+const maxBufferLines = 10000
 
 // ── styles ────────────────────────────────────────────────────────────────────
 
@@ -115,15 +122,79 @@ func (m *Model) resetSearch() {
 	m.matchIdx = 0
 }
 
-func (m *Model) AddLine(line string) {
-	m.lines = append(m.lines, colorizeLogLine(line))
-	m.rawLines = append(m.rawLines, line)
+// AddLine appends a single log line (convenience wrapper over AddLines).
+func (m *Model) AddLine(line string) { m.AddLines([]string{line}) }
+
+// AddLines appends a batch of log lines, trimming the buffer to maxBufferLines,
+// keeping search matches current and the view scrolled. Rebuilding the viewport
+// content costs O(buffer), so it runs once per batch — never per line.
+func (m *Model) AddLines(batch []string) {
+	if len(batch) == 0 {
+		return
+	}
+	oldLen := len(m.rawLines)
+	for _, line := range batch {
+		m.lines = append(m.lines, colorizeLogLine(line))
+		m.rawLines = append(m.rawLines, line)
+	}
+	trimmed := m.trimToCap()
 	if m.searchQuery != "" {
-		m.computeMatches() // keep highlights current as new lines stream in
+		// Incremental: rebase the existing matches past the trim, then scan only
+		// the appended lines — a full computeMatches rescan per batch would put
+		// the quadratic cost right back.
+		m.shiftMatches(trimmed)
+		m.appendMatches(max(oldLen-trimmed, 0))
 	}
 	m.viewport.SetContent(m.renderContent())
 	if m.autoScroll {
 		m.viewport.GotoBottom()
+	}
+}
+
+// trimToCap drops the oldest lines once the buffer exceeds maxBufferLines and
+// reports how many were dropped. The tails are copied down in place, so the
+// backing arrays are reused and the dropped strings become collectable.
+func (m *Model) trimToCap() int {
+	over := len(m.rawLines) - maxBufferLines
+	if over <= 0 {
+		return 0
+	}
+	m.lines = m.lines[:copy(m.lines, m.lines[over:])]
+	m.rawLines = m.rawLines[:copy(m.rawLines, m.rawLines[over:])]
+	return over
+}
+
+// shiftMatches rebases match indices after n lines were dropped off the front,
+// discarding matches that slid out of the buffer and keeping the current-match
+// cursor on the same line where possible.
+func (m *Model) shiftMatches(n int) {
+	if n <= 0 || len(m.matches) == 0 {
+		return
+	}
+	dropped := 0
+	kept := m.matches[:0]
+	for _, idx := range m.matches {
+		if idx < n {
+			dropped++
+			continue
+		}
+		kept = append(kept, idx-n)
+	}
+	m.matches = kept
+	m.matchIdx = max(m.matchIdx-dropped, 0)
+	if m.matchIdx >= len(m.matches) {
+		m.matchIdx = 0
+	}
+}
+
+// appendMatches scans lines from index `from` on for the active query — the
+// incremental complement of computeMatches for freshly appended lines.
+func (m *Model) appendMatches(from int) {
+	q := strings.ToLower(m.searchQuery)
+	for i := from; i < len(m.rawLines); i++ {
+		if strings.Contains(strings.ToLower(m.rawLines[i]), q) {
+			m.matches = append(m.matches, i)
+		}
 	}
 }
 

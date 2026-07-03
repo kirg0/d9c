@@ -1,6 +1,7 @@
 package events
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -51,6 +52,26 @@ func TestAddLineAndLineCount(t *testing.T) {
 
 	if got := m.LineCount(); got != 2 {
 		t.Errorf("expected 2 lines, got %d", got)
+	}
+}
+
+// TestAddLinesCap checks the buffer never exceeds maxBufferLines: the oldest
+// events are dropped, the newest kept.
+func TestAddLinesCap(t *testing.T) {
+	m := New()
+	m.SetSize(80, 20)
+	m.Open()
+
+	batch := make([]string, maxBufferLines+50)
+	for i := range batch {
+		batch[i] = fmt.Sprintf("container start c%d (local)", i)
+	}
+	m.AddLines(batch)
+	if got := m.LineCount(); got != maxBufferLines {
+		t.Fatalf("LineCount = %d, want cap %d", got, maxBufferLines)
+	}
+	if got, want := m.rawLines[0], "container start c50 (local)"; got != want {
+		t.Errorf("oldest kept line = %q, want %q", got, want)
 	}
 }
 
