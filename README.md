@@ -225,7 +225,9 @@ d9c -H npipe:////./pipe/podman-machine-default
 У containerd **нет** Docker-совместимого API, поэтому трюк с Podman тут не работает. Вместо
 нативного gRPC-клиента (тяжёлый, без логов/сетей/томов/compose) d9c управляет containerd через
 [`nerdctl`](https://github.com/containerd/nerdctl) — Docker-совместимый CLI-фронтенд. Нужен
-установленный `nerdctl` на той машине, где живёт containerd:
+установленный `nerdctl` на той машине, где живёт containerd
+([инструкция по установке](https://github.com/containerd/nerdctl#install) — бинарники из
+releases + CNI-плагины; rootless-режим — [docs/rootless.md](https://github.com/containerd/nerdctl/blob/main/docs/rootless.md)):
 
 ```
 # containerd на этой же машине

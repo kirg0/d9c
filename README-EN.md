@@ -195,7 +195,8 @@ containerd has **no** Docker-compatible REST API, so d9c cannot talk to it the w
 Docker or Podman. Instead of a native gRPC client (heavy, and lacking logs/networks/volumes/
 compose) d9c drives containerd through [`nerdctl`](https://github.com/containerd/nerdctl) —
 the Docker-compatible CLI frontend. `nerdctl` must be installed on the machine where containerd
-lives:
+lives ([installation guide](https://github.com/containerd/nerdctl#install) — binaries from
+releases + CNI plugins; rootless mode — [docs/rootless.md](https://github.com/containerd/nerdctl/blob/main/docs/rootless.md)):
 
 ```
 # containerd on this machine
