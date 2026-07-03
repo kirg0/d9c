@@ -175,6 +175,8 @@ or add a new one — the connection happens via `Enter` / `:connect`.
 | --- | --- | --- |
 | TCP | `-H tcp://host:2375` | the daemon must listen on TCP (`-H tcp://0.0.0.0:2375` on the server side) |
 | SSH | `-H ssh://user@host` | an SSH tunnel to the local daemon socket; keys from the agent/`~/.ssh` |
+| nerdctl (local) | `-H nerdctl://` | containerd via a local `nerdctl` (see [containerd](#containerd)) |
+| nerdctl (SSH) | `-H nerdctl+ssh://user@host` | containerd via `nerdctl` on a remote host over SSH |
 
 > **TCP vs SSH — what's available.** Almost everything (containers, images, networks, volumes, exec,
 > container FS browser, events, dashboard) works over both transports via the Docker Engine API.
@@ -186,6 +188,78 @@ or add a new one — the connection happens via `Enter` / `:connect`.
 > directory (view and delete archives only — restore requires SSH) and project container
 > management: `start` / `stop` / `restart` / `pause` / `unpause` / `remove`. Need the
 > full Compose set — connect via `-H ssh://...`.
+
+### containerd
+
+containerd has **no** Docker-compatible REST API, so d9c cannot talk to it the way it talks to
+Docker or Podman. Instead of a native gRPC client (heavy, and lacking logs/networks/volumes/
+compose) d9c drives containerd through [`nerdctl`](https://github.com/containerd/nerdctl) —
+the Docker-compatible CLI frontend. `nerdctl` must be installed on the machine where containerd
+lives:
+
+```
+# containerd on this machine
+d9c -H nerdctl://
+
+# containerd on a remote host (nerdctl is executed there over SSH)
+d9c -H nerdctl+ssh://user@host
+```
+
+When connected through nerdctl, the header shows a **containerd** chip together with the active
+**namespace** (`containerd:default`). All sections work: Containers (list/start/stop/restart/
+kill/rm/inspect/logs/stats/run), exec (over the SSH transport), Images (pull/rmi/tag/push/build/
+history), Networks, Volumes, Compose (discovery by the same labels + reconstructed
+`up`/`down`/`pull`), events, `system df`/`prune`.
+
+**Namespaces.** containerd shards its objects by namespace (`default`, `k8s.io` for Kubernetes,
+etc.). The `:namespace <name>` command switches the namespace; `:namespace` with no argument
+opens a picker. Every command is automatically scoped to the active namespace. An unknown name
+is accepted without an error — containerd creates the namespace lazily on the first write.
+
+#### nerdctl backend fine print
+
+- **Local and SSH limitations mirror each other.** Copying files into/out of a container
+  (`cp`) works only with a local nerdctl (`nerdctl://`): over SSH the files would land on the
+  remote host, not on the machine running d9c. Interactive `exec` / `run -it` is the opposite —
+  SSH only (`nerdctl+ssh://`): bridging a local PTY into the built-in terminal is not
+  implemented. Everything else works on both transports.
+- **Compose without a compose file.** nerdctl does not stamp the `working_dir`/`config_files`
+  labels and has no `compose ls`, so the path of a discovered project's compose file cannot be
+  recovered. The `up`/`pull`/`down` commands are reconstructed from the
+  `com.docker.compose.project` labels (present on both containers and networks): `up` = start
+  the project's containers (**not** a recreate from the file), `pull` = pull every service's
+  image, `down` = remove the project's containers and networks (named volumes are kept — same
+  as `docker compose down` by default). `config` / `edit` (the `e` key) / `backup` / `restore`
+  are unavailable — they need the compose file itself.
+- **`system df` is emulated.** nerdctl 2.x has no `system df` subcommand; the report is
+  assembled from the object lists: images with their summed size, containers (total/running),
+  volumes. Volume sizes are not computed: `volume ls --size` walks every volume and can be very
+  slow on real hosts.
+- **Stats are one-shot.** CPU%/MEM in Containers come from `nerdctl stats --no-stream`;
+  nerdctl reports a ready-made CPU%, so no cross-tick delta bookkeeping (as with the Docker
+  API) is needed.
+- **The `network:` filter.** The JSON output of `nerdctl ps` has no Networks field — the
+  container's networks are extracted from nerdctl's own `nerdctl/networks=["…"]` label.
+- **Events are rare.** An idle containerd host emits almost no events (none of the
+  healthchecks and background chatter of a typical docker daemon) — until the first event the
+  viewer shows a "waiting for events…" hint, and if the stream ends (the `nerdctl events`
+  process died, SSH dropped) the feed gets an `[error] event stream ended — press r` line.
+- **PATH and iptables over SSH.** A non-interactive SSH session has no `/usr/sbin` in PATH,
+  while nerdctl invokes `iptables` when publishing ports (`run -p …`) — without it the run
+  fails with `failed to load networking flags`. d9c prepends `/usr/local/sbin:/usr/sbin:/sbin`
+  to PATH for every nerdctl command over SSH.
+- **`nerdctl+ssh://` is a first-class SSH host.** The Hosts section offers it the same
+  authentication options as `ssh://`: a key (custom path or ssh-agent/`~/.ssh`) or a password
+  with the login/password modal on connect.
+- **The Hosts dashboard** is filled from `nerdctl info --format json` (host name, CPUs,
+  memory) and `nerdctl version` (the containerd version from `Server.Components`); the
+  container/image counters are computed from the lists.
+- **Friendly errors.** nerdctl's logrus wrapper (`time="…" level=fatal msg="…"`) is stripped
+  from every error — the UI shows just the substance ("no such image: …").
+- **The container FS browser** works by running `ls -1Ap` inside the container (containerd
+  exposes no readdir API) — the image must contain `ls`.
+- **Rootless is supported** — the backend was live-tested on Debian 13 with containerd v2.3.2
+  and rootless nerdctl 2.3.4.
 
 The **Hosts** section is both the list of saved hosts and a multi-host dashboard: each host gets a row
 with status (● up/down) and an aggregate from `docker info` (containers/running/images/daemon version).
