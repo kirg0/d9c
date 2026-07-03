@@ -69,11 +69,29 @@ func (m *Model) Open() {
 	m.viewport.GotoTop()
 }
 
-// AddLine appends a formatted event line and auto-scrolls.
-func (m *Model) AddLine(line string) {
-	m.lines = append(m.lines, formatEventLine(line))
-	m.rawLines = append(m.rawLines, line)
-	m.viewport.SetContent(m.renderContent())
+// maxBufferLines caps the event buffer: past it the oldest lines are dropped,
+// so a long-running feed can't grow memory (or the per-batch re-render, which
+// joins the whole buffer) without bound.
+const maxBufferLines = 10000
+
+// AddLine appends a single event line (convenience wrapper over AddLines).
+func (m *Model) AddLine(line string) { m.AddLines([]string{line}) }
+
+// AddLines appends a batch of formatted event lines and auto-scrolls.
+// Rebuilding the viewport content costs O(buffer), so it runs once per batch.
+func (m *Model) AddLines(batch []string) {
+	if len(batch) == 0 {
+		return
+	}
+	for _, line := range batch {
+		m.lines = append(m.lines, formatEventLine(line))
+		m.rawLines = append(m.rawLines, line)
+	}
+	if over := len(m.rawLines) - maxBufferLines; over > 0 {
+		m.lines = m.lines[:copy(m.lines, m.lines[over:])]
+		m.rawLines = m.rawLines[:copy(m.rawLines, m.rawLines[over:])]
+	}
+	m.viewport.SetContent(strings.Join(m.lines, "\n"))
 	m.viewport.GotoBottom()
 }
 
@@ -106,13 +124,6 @@ func (m Model) View() string {
 			Render(pctStr)
 
 	return lipgloss.JoinVertical(lipgloss.Left, m.viewport.View(), scrollBar)
-}
-
-// renderContent joins buffered lines with type-aware colorization.
-func (m Model) renderContent() string {
-	out := make([]string, len(m.lines))
-	copy(out, m.lines)
-	return strings.Join(out, "\n")
 }
 
 // formatEventLine colorizes a single event line.

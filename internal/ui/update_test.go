@@ -141,8 +141,7 @@ func TestSaveLogsViaKey(t *testing.T) {
 	ch := make(chan string, 2)
 	close(ch)
 	step(logsOpenedMsg{ch: ch, containerID: "web"})
-	step(logs.LineMsg{ContainerID: "web", Line: "hello"})
-	step(logs.LineMsg{ContainerID: "web", Line: "world"})
+	step(logs.LinesMsg{ContainerID: "web", Lines: []string{"hello", "world"}})
 
 	cmd := step(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
 	if cmd == nil {
@@ -193,12 +192,12 @@ func TestEventsFlow(t *testing.T) {
 		t.Fatal("events panel width is 0 — relayout missing on open")
 	}
 
-	step(eventsLineMsg{line: "container start 9ae942fd8fbc (local)", ch: opened.ch})
+	step(eventsLinesMsg{lines: []string{"container start 9ae942fd8fbc (local)"}, ch: opened.ch})
 	if got := tm.(Model).eventsModel.LineCount(); got != 1 {
 		t.Errorf("event line count = %d, want 1", got)
 	}
 	// A line from a stale (replaced) stream must be dropped.
-	step(eventsLineMsg{line: "container stop stale (local)", ch: make(chan string)})
+	step(eventsLinesMsg{lines: []string{"container stop stale (local)"}, ch: make(chan string)})
 	if got := tm.(Model).eventsModel.LineCount(); got != 1 {
 		t.Errorf("event line count after stale line = %d, want 1", got)
 	}
@@ -716,8 +715,7 @@ func TestLogsSearchEscFlow(t *testing.T) {
 	ch := make(chan string)
 	close(ch)
 	step(logsOpenedMsg{ch: ch, containerID: "web"})
-	step(logs.LineMsg{ContainerID: "web", Line: "INFO a"})
-	step(logs.LineMsg{ContainerID: "web", Line: "ERROR b"})
+	step(logs.LinesMsg{ContainerID: "web", Lines: []string{"INFO a", "ERROR b"}})
 
 	// Start a search and type a query.
 	step(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})

@@ -170,10 +170,11 @@ type (
 		stop  func()
 		title string
 	}
-	// opLineMsg carries one streamed progress line.
-	opLineMsg struct {
+	// opLinesMsg carries a batch of streamed progress lines (one channel drain,
+	// see drainLines).
+	opLinesMsg struct {
 		title string
-		line  string
+		lines []string
 	}
 	// opDoneMsg signals the stream closed (operation finished).
 	opDoneMsg struct{ title string }
@@ -305,12 +306,13 @@ type openEventsMsg struct {
 	stop func()
 }
 
-// eventsLineMsg carries one line from the daemon event stream. ch identifies
-// the stream the line came from, so lines racing in from a replaced stream are
-// dropped instead of interleaving with the new one.
-type eventsLineMsg struct {
-	line string
-	ch   <-chan string
+// eventsLinesMsg carries a batch of lines from the daemon event stream (one
+// channel drain, see drainLines). ch identifies the stream the lines came from,
+// so lines racing in from a replaced stream are dropped instead of interleaving
+// with the new one.
+type eventsLinesMsg struct {
+	lines []string
+	ch    <-chan string
 }
 
 // eventsClosedMsg reports that the daemon event stream ended (the channel
@@ -910,15 +912,39 @@ func streamOpCmd(start func() (<-chan string, func(), error), title string) tea.
 	}
 }
 
-// streamOp reads the next progress line, re-subscribing until the channel
-// closes, at which point it reports completion.
+// streamBatchMax bounds how many lines one stream message may carry: the first
+// receive blocks, then whatever already sits in the channel is drained without
+// blocking, so a chatty stream costs one Update/render per batch instead of one
+// per line, while a slow stream still delivers each line as it lands.
+const streamBatchMax = 256
+
+// drainLines returns first plus up to streamBatchMax-1 more lines already
+// buffered in ch, never blocking past the lines that are immediately ready.
+func drainLines(ch <-chan string, first string) []string {
+	lines := []string{first}
+	for len(lines) < streamBatchMax {
+		select {
+		case line, ok := <-ch:
+			if !ok {
+				return lines
+			}
+			lines = append(lines, line)
+		default:
+			return lines
+		}
+	}
+	return lines
+}
+
+// streamOp reads the next batch of progress lines, re-subscribing until the
+// channel closes, at which point it reports completion.
 func streamOp(ch <-chan string, title string) tea.Cmd {
 	return func() tea.Msg {
 		line, ok := <-ch
 		if !ok {
 			return opDoneMsg{title: title}
 		}
-		return opLineMsg{title: title, line: line}
+		return opLinesMsg{title: title, lines: drainLines(ch, line)}
 	}
 }
 
@@ -1359,13 +1385,15 @@ func sanitizeFileName(s string) string {
 	return strings.Trim(b.String(), "-")
 }
 
+// streamLogs reads the next batch of log lines (blocking for the first, then
+// draining what's buffered — see drainLines), re-subscribing per batch.
 func streamLogs(ch <-chan string, containerID string) tea.Cmd {
 	return func() tea.Msg {
 		line, ok := <-ch
 		if !ok {
 			return nil
 		}
-		return logs.LineMsg{ContainerID: containerID, Line: line}
+		return logs.LinesMsg{ContainerID: containerID, Lines: drainLines(ch, line)}
 	}
 }
 
@@ -1380,18 +1408,18 @@ func openEvents(b docker.Backend) tea.Cmd {
 	}
 }
 
-// streamEvents reads the next event line, re-subscribing until the channel
-// closes. The close is reported as eventsClosedMsg (carrying the channel so a
-// stale reader can't be mistaken for the active stream) instead of dying
-// silently — otherwise a stream that ends without an error line leaves the
-// viewer empty forever with no indication.
+// streamEvents reads the next batch of event lines, re-subscribing until the
+// channel closes. The close is reported as eventsClosedMsg (carrying the
+// channel so a stale reader can't be mistaken for the active stream) instead of
+// dying silently — otherwise a stream that ends without an error line leaves
+// the viewer empty forever with no indication.
 func streamEvents(ch <-chan string) tea.Cmd {
 	return func() tea.Msg {
 		line, ok := <-ch
 		if !ok {
 			return eventsClosedMsg{ch: ch}
 		}
-		return eventsLineMsg{line: line, ch: ch}
+		return eventsLinesMsg{lines: drainLines(ch, line), ch: ch}
 	}
 }
 

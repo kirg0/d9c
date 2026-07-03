@@ -1,6 +1,7 @@
 package logs
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -100,6 +101,144 @@ func TestLogsFollowToggle(t *testing.T) {
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("f")})
 	if m.IsFollowing() {
 		t.Error("'f' should toggle follow off")
+	}
+}
+
+// TestAddLinesCapTrimsOldest checks the buffer never exceeds maxBufferLines and
+// drops the OLDEST lines when it would, keeping the newest.
+func TestAddLinesCapTrimsOldest(t *testing.T) {
+	m := New()
+	m.SetSize(80, 20)
+	m.Open("web")
+
+	var batch []string
+	for i := 0; i < maxBufferLines+500; i++ {
+		batch = append(batch, fmt.Sprintf("line %d", i))
+		if len(batch) == 500 {
+			m.AddLines(batch)
+			batch = batch[:0]
+		}
+	}
+	if got := m.LineCount(); got != maxBufferLines {
+		t.Fatalf("LineCount = %d, want cap %d", got, maxBufferLines)
+	}
+	if got, want := m.rawLines[0], "line 500"; got != want {
+		t.Errorf("oldest kept line = %q, want %q", got, want)
+	}
+	if got, want := m.rawLines[len(m.rawLines)-1], fmt.Sprintf("line %d", maxBufferLines+499); got != want {
+		t.Errorf("newest line = %q, want %q", got, want)
+	}
+}
+
+// TestAddLinesBatchLargerThanCap: one batch bigger than the whole cap keeps
+// only its tail.
+func TestAddLinesBatchLargerThanCap(t *testing.T) {
+	m := New()
+	m.SetSize(80, 20)
+	m.Open("web")
+
+	batch := make([]string, maxBufferLines+100)
+	for i := range batch {
+		batch[i] = fmt.Sprintf("l%d", i)
+	}
+	m.AddLines(batch)
+	if got := m.LineCount(); got != maxBufferLines {
+		t.Fatalf("LineCount = %d, want cap %d", got, maxBufferLines)
+	}
+	if got, want := m.rawLines[0], "l100"; got != want {
+		t.Errorf("oldest kept line = %q, want %q", got, want)
+	}
+}
+
+// TestAddLinesSearchIncremental checks that lines streamed in while a search is
+// active extend the match list without a full rescan invalidating positions.
+func TestAddLinesSearchIncremental(t *testing.T) {
+	m := New()
+	m.SetSize(80, 20)
+	m.Open("web")
+	m.AddLine("ERROR first")
+	m.AddLine("plain")
+
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	m = typeRunes(m, "error")
+	if len(m.matches) != 1 || m.matches[0] != 0 {
+		t.Fatalf("matches = %v, want [0]", m.matches)
+	}
+
+	m.AddLines([]string{"noise", "ERROR second"})
+	if len(m.matches) != 2 || m.matches[1] != 3 {
+		t.Fatalf("matches after batch = %v, want [0 3]", m.matches)
+	}
+}
+
+// TestAddLinesTrimRebasesMatches: when the cap trims lines off the front, match
+// indices must shift down and matches that slid out must disappear.
+func TestAddLinesTrimRebasesMatches(t *testing.T) {
+	m := New()
+	m.SetSize(80, 20)
+	m.Open("web")
+
+	batch := make([]string, maxBufferLines)
+	for i := range batch {
+		batch[i] = fmt.Sprintf("line %d", i)
+	}
+	batch[0] = "ERROR top"
+	batch[7000] = "ERROR mid"
+	m.AddLines(batch)
+
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	m = typeRunes(m, "error")
+	if len(m.matches) != 2 || m.matches[0] != 0 || m.matches[1] != 7000 {
+		t.Fatalf("matches = %v, want [0 7000]", m.matches)
+	}
+
+	// Two more lines push the two oldest out: the match at 0 slides off, the one
+	// at 7000 rebases to 6998, and the fresh match lands at the end.
+	m.AddLines([]string{"tail", "ERROR fresh"})
+	want := []int{6998, maxBufferLines - 1}
+	if len(m.matches) != 2 || m.matches[0] != want[0] || m.matches[1] != want[1] {
+		t.Fatalf("matches after trim = %v, want %v", m.matches, want)
+	}
+	if got, want := m.rawLines[6998], "ERROR mid"; got != want {
+		t.Errorf("rebased match points at %q, want %q", got, want)
+	}
+}
+
+// TestShiftMatches covers the index arithmetic in isolation, including the
+// current-match cursor following its line.
+func TestShiftMatches(t *testing.T) {
+	tests := []struct {
+		name     string
+		matches  []int
+		matchIdx int
+		n        int
+		want     []int
+		wantIdx  int
+	}{
+		{"no trim", []int{2, 5}, 1, 0, []int{2, 5}, 1},
+		{"drop none", []int{4, 9}, 1, 3, []int{1, 6}, 1},
+		{"drop first, cursor follows", []int{2, 5, 9}, 1, 4, []int{1, 5}, 0},
+		{"drop all", []int{1, 2}, 1, 5, []int{}, 0},
+		{"cursor at dropped head", []int{0, 8}, 0, 4, []int{4}, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := New()
+			m.matches = append([]int(nil), tt.matches...)
+			m.matchIdx = tt.matchIdx
+			m.shiftMatches(tt.n)
+			if len(m.matches) != len(tt.want) {
+				t.Fatalf("matches = %v, want %v", m.matches, tt.want)
+			}
+			for i := range tt.want {
+				if m.matches[i] != tt.want[i] {
+					t.Fatalf("matches = %v, want %v", m.matches, tt.want)
+				}
+			}
+			if m.matchIdx != tt.wantIdx {
+				t.Errorf("matchIdx = %d, want %d", m.matchIdx, tt.wantIdx)
+			}
+		})
 	}
 }
 
