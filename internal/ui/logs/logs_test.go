@@ -5,7 +5,10 @@ import (
 	"strings"
 	"testing"
 
+	"d9c/internal/ui/styles"
+
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func typeRunes(m Model, s string) Model {
@@ -253,5 +256,26 @@ func TestLogsSearchNoMatch(t *testing.T) {
 	m = typeRunes(m, "zzz")
 	if v := m.View(); !strings.Contains(v, "no match") {
 		t.Errorf("expected 'no match' in view:\n%s", v)
+	}
+}
+
+// TestLevelStylesTrackPalette guards the pointer indirection in the levels
+// table: it references the styles package vars by address, so a styles.Apply
+// after package init (a `:theme` switch or config theme at startup) must be
+// visible through it. Copying the styles by value at init would freeze the
+// default palette — exactly the P2 hardcoded-colors bug shape.
+func TestLevelStylesTrackPalette(t *testing.T) {
+	t.Cleanup(func() { styles.Apply(styles.DefaultPalette()) })
+
+	p := styles.DefaultPalette()
+	p.Danger = "#ff0000"
+	p.Warning = "#00ff00"
+	styles.Apply(p)
+
+	if got := levels[0].badge.GetForeground(); got != lipgloss.Color("#ff0000") {
+		t.Errorf("error badge fg = %v, want re-themed Danger #ff0000", got)
+	}
+	if got := levels[1].line.GetForeground(); got != lipgloss.Color("#00ff00") {
+		t.Errorf("warn line fg = %v, want re-themed Warning #00ff00", got)
 	}
 }

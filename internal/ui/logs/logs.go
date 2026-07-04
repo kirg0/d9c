@@ -25,39 +25,23 @@ type LinesMsg struct {
 // the per-batch re-render, which joins the whole buffer — without bound.
 const maxBufferLines = 10000
 
-// ── styles ────────────────────────────────────────────────────────────────────
+// ── level colorization ────────────────────────────────────────────────────────
 
-var (
-	tsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#565F89"))
-
-	errorBadge = lipgloss.NewStyle().Foreground(lipgloss.Color("#F7768E")).Bold(true)
-	warnBadge  = lipgloss.NewStyle().Foreground(lipgloss.Color("#E0AF68")).Bold(true)
-	infoBadge  = lipgloss.NewStyle().Foreground(lipgloss.Color("#9ECE6A")).Bold(true)
-	debugBadge = lipgloss.NewStyle().Foreground(lipgloss.Color("#565F89")).Bold(true)
-
-	errorLine = lipgloss.NewStyle().Foreground(lipgloss.Color("#F7768E"))
-	warnLine  = lipgloss.NewStyle().Foreground(lipgloss.Color("#E0AF68"))
-	infoLine  = lipgloss.NewStyle().Foreground(lipgloss.Color("#C0CAF5"))
-	debugLine = lipgloss.NewStyle().Foreground(lipgloss.Color("#565F89"))
-
-	matchLineStyle   = lipgloss.NewStyle().Background(lipgloss.Color("#2D3250"))
-	currentLineStyle = lipgloss.NewStyle().Background(lipgloss.Color("#BB9AF7")).Foreground(lipgloss.Color("#1A1B26")).Bold(true)
-
-	followBadge = lipgloss.NewStyle().Background(lipgloss.Color("#1A1B26")).Foreground(lipgloss.Color("#9ECE6A")).Bold(true)
-)
-
+// levelDef points at the styles package vars rather than copying them: Apply
+// reassigns those vars on a re-theme, so dereferencing at render time always
+// picks up the active palette.
 type levelDef struct {
 	words []string
-	badge lipgloss.Style
-	line  lipgloss.Style
+	badge *lipgloss.Style
+	line  *lipgloss.Style
 }
 
 // Ordered from most to least severe; first match wins.
 var levels = []levelDef{
-	{[]string{"ERROR", "FATAL", "PANIC", "CRITICAL", "CRIT", "ERR"}, errorBadge, errorLine},
-	{[]string{"WARN", "WARNING"}, warnBadge, warnLine},
-	{[]string{"INFO", "INFORMATION", "NOTICE"}, infoBadge, infoLine},
-	{[]string{"DEBUG", "TRACE", "VERBOSE"}, debugBadge, debugLine},
+	{[]string{"ERROR", "FATAL", "PANIC", "CRITICAL", "CRIT", "ERR"}, &styles.LogBadgeError, &styles.LogLineError},
+	{[]string{"WARN", "WARNING"}, &styles.LogBadgeWarn, &styles.LogLineWarn},
+	{[]string{"INFO", "INFORMATION", "NOTICE"}, &styles.LogBadgeInfo, &styles.LogLineInfo},
+	{[]string{"DEBUG", "TRACE", "VERBOSE"}, &styles.LogBadgeDebug, &styles.LogLineDebug},
 }
 
 // ── model ─────────────────────────────────────────────────────────────────────
@@ -332,12 +316,9 @@ func (m Model) View() string {
 	if dashLen < 0 {
 		dashLen = 0
 	}
-	scrollBar := followBadge.Render(followTag) +
+	scrollBar := styles.LogFollowBadge.Render(followTag) +
 		styles.StatusBar.Render(strings.Repeat("─", dashLen)) +
-		lipgloss.NewStyle().
-			Background(lipgloss.Color("#1A1B26")).
-			Foreground(lipgloss.Color("#565F89")).
-			Render(pctStr)
+		styles.ScrollInfo.Render(pctStr)
 
 	parts := []string{m.viewport.View()}
 
@@ -350,10 +331,7 @@ func (m Model) View() string {
 				matchInfo = "  no match  "
 			}
 		}
-		infoRendered := lipgloss.NewStyle().
-			Background(lipgloss.Color("#24283B")).
-			Foreground(lipgloss.Color("#565F89")).
-			Render(matchInfo)
+		infoRendered := styles.SearchCount.Render(matchInfo)
 		prefix := styles.BottomBarPrefix.Render("/")
 		inputW := m.viewport.Width - lipgloss.Width(prefix) - lipgloss.Width(infoRendered)
 		if inputW < 0 {
@@ -384,9 +362,9 @@ func (m Model) renderContent() string {
 	for i := range m.lines {
 		switch {
 		case i == current:
-			out[i] = currentLineStyle.Width(m.width).Render(m.rawLines[i])
+			out[i] = styles.MatchCurrent.Width(m.width).Render(m.rawLines[i])
 		case matchSet[i]:
-			out[i] = matchLineStyle.Width(m.width).Render(m.rawLines[i])
+			out[i] = styles.MatchLine.Width(m.width).Render(m.rawLines[i])
 		default:
 			out[i] = m.lines[i]
 		}
@@ -409,13 +387,13 @@ func colorizeLogLine(line string) string {
 
 	var sb strings.Builder
 	if ts != "" {
-		sb.WriteString(tsStyle.Render(ts))
+		sb.WriteString(styles.LogTimestamp.Render(ts))
 		sb.WriteByte(' ')
 	}
 	if lv != nil {
 		sb.WriteString(highlightLevel(content, lv))
 	} else {
-		sb.WriteString(infoLine.Render(content))
+		sb.WriteString(styles.LogLineInfo.Render(content))
 	}
 	return sb.String()
 }

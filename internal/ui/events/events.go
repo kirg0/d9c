@@ -15,16 +15,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// ── styles ────────────────────────────────────────────────────────────────────
-
-var (
-	typeStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#BB9AF7")).Bold(true)
-	actionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#9ECE6A")).Bold(true)
-	scopeStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#565F89")).Italic(true)
-	infoStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#C0CAF5"))
-	errorStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#F7768E")).Bold(true)
-)
-
 // ── model ─────────────────────────────────────────────────────────────────────
 
 // Model displays a scrolling feed of Docker daemon events.
@@ -63,7 +53,7 @@ func (m Model) vpHeight() int {
 func (m *Model) Open() {
 	m.lines = nil
 	m.rawLines = nil
-	m.viewport.SetContent(scopeStyle.Render(i18n.T(
+	m.viewport.SetContent(styles.EventScope.Render(i18n.T(
 		"ожидание событий… (лента пуста, пока на сервере ничего не происходит)",
 		"waiting for events… (the feed stays empty until something happens on the server)")))
 	m.viewport.GotoTop()
@@ -118,10 +108,7 @@ func (m Model) View() string {
 	dashLen := m.viewport.Width - lipgloss.Width(pctStr)
 	dashLen = max(0, dashLen)
 	scrollBar := styles.StatusBar.Render(strings.Repeat("─", dashLen)) +
-		lipgloss.NewStyle().
-			Background(lipgloss.Color("#1A1B26")).
-			Foreground(lipgloss.Color("#565F89")).
-			Render(pctStr)
+		styles.ScrollInfo.Render(pctStr)
 
 	return lipgloss.JoinVertical(lipgloss.Left, m.viewport.View(), scrollBar)
 }
@@ -134,21 +121,21 @@ func formatEventLine(line string) string {
 
 	// Format: "[type] action name (scope)" or "[error] message"
 	if strings.HasPrefix(line, "[error]") {
-		return errorStyle.Render(line)
+		return styles.EventError.Render(line)
 	}
 	parts := strings.SplitN(line, " ", 3)
 	if len(parts) < 3 { // too few tokens to colorize structurally
-		return infoStyle.Render(line)
+		return styles.EventInfo.Render(line)
 	}
 
-	typ := typeStyle.Render(parts[0])
-	action := actionStyle.Render(parts[1])
+	typ := styles.EventType.Render(parts[0])
+	action := styles.EventAction.Render(parts[1])
 	rest := parts[2]
 
 	// Scope detection: the trailing "(scope)" segment, if present.
 	if idx := strings.LastIndex(rest, "("); idx >= 0 {
 		name := strings.TrimSpace(rest[:idx])
-		scope := scopeStyle.Render(rest[idx:])
+		scope := styles.EventScope.Render(rest[idx:])
 		return fmt.Sprintf("%s  %s  %s %s", typ, action, name, scope)
 	}
 	return fmt.Sprintf("%s  %s  %s", typ, action, rest)

@@ -11,8 +11,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-var ghostStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#414868"))
-
 type cmdDef struct {
 	name string
 	hint string
@@ -236,7 +234,7 @@ func (m Model) View(width int) string {
 
 	rendered := m.input.View()
 	if gs := m.ghostString(); gs != "" {
-		rendered += ghostStyle.Render(gs)
+		rendered += styles.CmdGhost.Render(gs)
 	}
 	inputView := styles.BottomBar.Width(inputWidth).Render(rendered)
 	return lipgloss.JoinHorizontal(lipgloss.Left, prefix, inputView)

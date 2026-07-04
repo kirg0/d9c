@@ -188,6 +188,53 @@ var (
 	ShellCursor lipgloss.Style
 	ShellExited lipgloss.Style
 
+	// ── stream viewers (logs / detail / events) ─────────────────────────────
+	// Shared chrome of the scrolling viewers: search-match highlights, the
+	// scroll-percent segment of the bottom rule and the match counter in the
+	// search bar. Consumer packages must read these at render time (not copy
+	// them into package vars at init), so a re-theme reaches them.
+
+	// MatchLine backs every line matching the active search query; the current
+	// match gets the brighter MatchCurrent instead.
+	MatchLine    lipgloss.Style
+	MatchCurrent lipgloss.Style
+
+	// ScrollInfo renders the " 42% " / " END " segment of the bottom rule;
+	// SearchCount renders the " 3/17 " match counter beside the search input.
+	ScrollInfo  lipgloss.Style
+	SearchCount lipgloss.Style
+
+	// ── log viewer colorization ──────────────────────────────────────────────
+	// Per-severity styles for log lines: badge highlights the level keyword,
+	// line colors the rest of the message.
+	LogTimestamp   lipgloss.Style
+	LogBadgeError  lipgloss.Style
+	LogBadgeWarn   lipgloss.Style
+	LogBadgeInfo   lipgloss.Style
+	LogBadgeDebug  lipgloss.Style
+	LogLineError   lipgloss.Style
+	LogLineWarn    lipgloss.Style
+	LogLineInfo    lipgloss.Style
+	LogLineDebug   lipgloss.Style
+	LogFollowBadge lipgloss.Style
+
+	// ── YAML detail viewer ───────────────────────────────────────────────────
+	YAMLKey    lipgloss.Style
+	YAMLString lipgloss.Style
+	YAMLBool   lipgloss.Style
+	YAMLNull   lipgloss.Style
+	YAMLNumber lipgloss.Style
+
+	// ── events feed ──────────────────────────────────────────────────────────
+	EventType   lipgloss.Style
+	EventAction lipgloss.Style
+	EventScope  lipgloss.Style
+	EventInfo   lipgloss.Style
+	EventError  lipgloss.Style
+
+	// CmdGhost dims the inline autocompletion suggestion in the command line.
+	CmdGhost lipgloss.Style
+
 	// Outer frame — kept for reference but no longer used
 	AppFrame lipgloss.Style
 	AppTitle lipgloss.Style
@@ -495,6 +542,61 @@ func Apply(p Palette) {
 	ShellExited = lipgloss.NewStyle().
 		Foreground(colorMuted).
 		Italic(true)
+
+	// ── stream viewers (logs / detail / events) ─────────────────────────────
+
+	MatchLine = lipgloss.NewStyle().
+		Background(colorBgAlt)
+
+	MatchCurrent = lipgloss.NewStyle().
+		Background(colorSecondary).
+		Foreground(colorBg).
+		Bold(true)
+
+	ScrollInfo = lipgloss.NewStyle().
+		Background(colorBg).
+		Foreground(colorMuted)
+
+	SearchCount = lipgloss.NewStyle().
+		Background(colorBgAlt).
+		Foreground(colorMuted)
+
+	// ── log viewer colorization ──────────────────────────────────────────────
+
+	LogTimestamp = lipgloss.NewStyle().Foreground(colorMuted)
+
+	LogBadgeError = lipgloss.NewStyle().Foreground(colorDanger).Bold(true)
+	LogBadgeWarn = lipgloss.NewStyle().Foreground(colorWarning).Bold(true)
+	LogBadgeInfo = lipgloss.NewStyle().Foreground(colorSuccess).Bold(true)
+	LogBadgeDebug = lipgloss.NewStyle().Foreground(colorMuted).Bold(true)
+
+	LogLineError = lipgloss.NewStyle().Foreground(colorDanger)
+	LogLineWarn = lipgloss.NewStyle().Foreground(colorWarning)
+	LogLineInfo = lipgloss.NewStyle().Foreground(colorFg)
+	LogLineDebug = lipgloss.NewStyle().Foreground(colorMuted)
+
+	LogFollowBadge = lipgloss.NewStyle().
+		Background(colorBg).
+		Foreground(colorSuccess).
+		Bold(true)
+
+	// ── YAML detail viewer ───────────────────────────────────────────────────
+
+	YAMLKey = lipgloss.NewStyle().Foreground(colorPrimary)
+	YAMLString = lipgloss.NewStyle().Foreground(colorSuccess)
+	YAMLBool = lipgloss.NewStyle().Foreground(colorSecondary)
+	YAMLNull = lipgloss.NewStyle().Foreground(colorMuted)
+	YAMLNumber = lipgloss.NewStyle().Foreground(colorWarning)
+
+	// ── events feed ──────────────────────────────────────────────────────────
+
+	EventType = lipgloss.NewStyle().Foreground(colorSecondary).Bold(true)
+	EventAction = lipgloss.NewStyle().Foreground(colorSuccess).Bold(true)
+	EventScope = lipgloss.NewStyle().Foreground(colorMuted).Italic(true)
+	EventInfo = lipgloss.NewStyle().Foreground(colorFg)
+	EventError = lipgloss.NewStyle().Foreground(colorDanger).Bold(true)
+
+	CmdGhost = lipgloss.NewStyle().Foreground(colorMuted)
 
 	// Outer frame — kept for reference but no longer used
 	AppFrame = lipgloss.NewStyle().

@@ -41,6 +41,46 @@ func TestApplyRebuildsStyles(t *testing.T) {
 	if SelectedBg != lipgloss.Color("#888888") {
 		t.Errorf("SelectedBg = %v, want BgAlt #888888", SelectedBg)
 	}
+
+	// Stream-viewer / colorization styles (P2: these lived as hardcoded hex in
+	// ui/logs, ui/detail, ui/events and ui/cmdline and ignored re-theming).
+	checks := []struct {
+		name string
+		got  lipgloss.TerminalColor
+		want lipgloss.Color
+	}{
+		{"LogTimestamp fg", LogTimestamp.GetForeground(), p.Muted},
+		{"LogBadgeError fg", LogBadgeError.GetForeground(), p.Danger},
+		{"LogBadgeWarn fg", LogBadgeWarn.GetForeground(), p.Warning},
+		{"LogBadgeInfo fg", LogBadgeInfo.GetForeground(), p.Success},
+		{"LogBadgeDebug fg", LogBadgeDebug.GetForeground(), p.Muted},
+		{"LogLineError fg", LogLineError.GetForeground(), p.Danger},
+		{"LogLineInfo fg", LogLineInfo.GetForeground(), p.Fg},
+		{"LogFollowBadge fg", LogFollowBadge.GetForeground(), p.Success},
+		{"LogFollowBadge bg", LogFollowBadge.GetBackground(), p.Bg},
+		{"MatchLine bg", MatchLine.GetBackground(), p.BgAlt},
+		{"MatchCurrent bg", MatchCurrent.GetBackground(), p.Secondary},
+		{"MatchCurrent fg", MatchCurrent.GetForeground(), p.Bg},
+		{"ScrollInfo bg", ScrollInfo.GetBackground(), p.Bg},
+		{"ScrollInfo fg", ScrollInfo.GetForeground(), p.Muted},
+		{"SearchCount bg", SearchCount.GetBackground(), p.BgAlt},
+		{"YAMLKey fg", YAMLKey.GetForeground(), p.Primary},
+		{"YAMLString fg", YAMLString.GetForeground(), p.Success},
+		{"YAMLBool fg", YAMLBool.GetForeground(), p.Secondary},
+		{"YAMLNull fg", YAMLNull.GetForeground(), p.Muted},
+		{"YAMLNumber fg", YAMLNumber.GetForeground(), p.Warning},
+		{"EventType fg", EventType.GetForeground(), p.Secondary},
+		{"EventAction fg", EventAction.GetForeground(), p.Success},
+		{"EventScope fg", EventScope.GetForeground(), p.Muted},
+		{"EventInfo fg", EventInfo.GetForeground(), p.Fg},
+		{"EventError fg", EventError.GetForeground(), p.Danger},
+		{"CmdGhost fg", CmdGhost.GetForeground(), p.Muted},
+	}
+	for _, c := range checks {
+		if c.got != c.want {
+			t.Errorf("%s = %v, want %v", c.name, c.got, c.want)
+		}
+	}
 }
 
 // TestSelectionOverride checks that SelectBg/SelectFg, when set, drive the
