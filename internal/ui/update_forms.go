@@ -95,6 +95,22 @@ func (m Model) handleConnectAuth(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// handleConnecting drives the connection-progress window shown while dialing a
+// host that needs no credential prompt: while the dial is in flight all keys
+// are swallowed (Esc, handled globally, dismisses the window without aborting
+// the dial); once a failure is shown, Enter retries the same host and Esc
+// (global) closes the window.
+func (m Model) handleConnecting(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.connWait.Busy() {
+		return m, nil
+	}
+	if msg.String() == "enter" {
+		spin := m.connWait.Retry()
+		return m, tea.Batch(spin, connectCmd(m.cfg, m.connWait.HostURL()))
+	}
+	return m, nil
+}
+
 // handlePushForm drives the registry-credentials modal: Tab/arrows switch
 // fields, Enter starts the push with the entered credentials (an empty username
 // means anonymous), and Esc (handled globally) cancels. Credentials are

@@ -50,6 +50,8 @@ func (m Model) View() string {
 		body = m.hostForm.View(m.width, m.height-2)
 	case ModeConnectAuth:
 		body = m.connForm.View(m.width, m.height-2)
+	case ModeConnecting:
+		body = m.connWait.View(m.width, m.height-2)
 	case ModePushForm:
 		body = m.pushForm.View(m.width, m.height-2)
 	case ModeNetForm:
@@ -334,6 +336,13 @@ func (m Model) viewFooter() string {
 		sb.WriteString(keyHint("tab", "Switch field"))
 		sb.WriteString(keyHint("enter", "Connect"))
 		sb.WriteString(keyHint("esc", "Cancel"))
+	case ModeConnecting:
+		if m.connWait.Busy() {
+			sb.WriteString(keyHint("esc", "Cancel"))
+		} else {
+			sb.WriteString(keyHint("enter", "Retry"))
+			sb.WriteString(keyHint("esc", "Close"))
+		}
 	case ModePushForm:
 		sb.WriteString(keyHint("tab", "Switch field"))
 		sb.WriteString(keyHint("enter", "Push"))
