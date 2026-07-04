@@ -57,6 +57,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.connForm, cmd = m.connForm.Tick(msg)
 			return m, cmd
 		}
+		if m.mode == ModeConnecting && m.connWait.Busy() {
+			var cmd tea.Cmd
+			m.connWait, cmd = m.connWait.Tick(msg)
+			return m, cmd
+		}
 		return m, nil
 
 	case tickMsg:
@@ -259,6 +264,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// except for a host-key mismatch, which needs the dedicated notice.
 			if m.mode == ModeConnectAuth && !docker.IsHostKeyError(msg.err) {
 				m.connForm.SetError(connectModalError(msg.err))
+				return m, nil
+			}
+			// Same for the progress window on plain connects — except the errors
+			// that have a dedicated instructional notice (host key / DNS / socket).
+			if m.mode == ModeConnecting && !docker.IsHostKeyError(msg.err) &&
+				!docker.IsHostNotFoundError(msg.err) && !docker.IsSocketError(msg.err) {
+				m.connWait.SetError(connectModalError(msg.err))
 				return m, nil
 			}
 			if docker.IsHostKeyError(msg.err) {
@@ -825,6 +837,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleHostForm(msg)
 	case ModeConnectAuth:
 		return m.handleConnectAuth(msg)
+	case ModeConnecting:
+		return m.handleConnecting(msg)
 	case ModeComposeEdit:
 		return m.handleComposeEdit(msg)
 	case ModeEvents:

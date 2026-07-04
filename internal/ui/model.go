@@ -23,6 +23,7 @@ import (
 	"d9c/internal/ui/cmdline"
 	"d9c/internal/ui/composeedit"
 	"d9c/internal/ui/connform"
+	"d9c/internal/ui/connwait"
 	"d9c/internal/ui/cpform"
 	"d9c/internal/ui/detail"
 	"d9c/internal/ui/events"
@@ -103,6 +104,7 @@ const (
 	ModeLangPicker           // language selector modal (`:lang` with no args, live preview)
 	ModeConnectAuth          // SSH login/password prompt before connecting (password-auth hosts)
 	ModeNamespacePicker      // containerd namespace selector modal (`:namespace` with no args)
+	ModeConnecting           // connection-progress window for hosts without a credential prompt
 )
 
 // copyItem is one selectable entry in the copy overlay.
@@ -494,6 +496,7 @@ type Model struct {
 	logs        logs.Model
 	hostForm    hostform.Model
 	connForm    connform.Model
+	connWait    connwait.Model
 	composeEdit composeedit.Model
 	help        help.Model
 	shell       shell.Model
@@ -647,6 +650,7 @@ func NewModel(cfg *config.Config, backend docker.Backend, store *hosts.Store, co
 		logs:           logs.New(),
 		hostForm:       hostform.New(),
 		connForm:       connform.New(),
+		connWait:       connwait.New(),
 		composeEdit:    composeedit.New(),
 		help:           help.New(),
 		shell:          shell.New(),
@@ -1115,9 +1119,10 @@ func connectCmd(base *config.Config, hostURL string) tea.Cmd {
 
 // beginConnect starts connecting to a saved host. SSH hosts configured for
 // password auth open the credential prompt first (login pre-filled, editable);
-// every other host connects directly with the host's stored key path (empty =
-// ssh-agent / default keys). The chosen auth fields are written onto m.cfg so a
-// later auto-reconnect reuses them.
+// every other host dials directly with the host's stored key path (empty =
+// ssh-agent / default keys), showing the connection-progress window while the
+// dial is in flight. The chosen auth fields are written onto m.cfg so a later
+// auto-reconnect reuses them.
 func (m Model) beginConnect(h hosts.Host) (tea.Model, tea.Cmd) {
 	if hosts.IsSSH(h.Host) && h.SSHAuth == hosts.SSHAuthPassword {
 		m.connForm.Open(h.Name, h.Host, hosts.SSHUser(h.Host))
@@ -1127,7 +1132,10 @@ func (m Model) beginConnect(h hosts.Host) (tea.Model, tea.Cmd) {
 	}
 	m.cfg.SSHKeyFile = h.SSHKeyPath
 	m.cfg.SSHPassword = ""
-	return m, connectCmd(m.cfg, h.Host)
+	spin := m.connWait.Open(h.Name, h.Host)
+	m.mode = ModeConnecting
+	m.relayout()
+	return m, tea.Batch(spin, connectCmd(m.cfg, h.Host))
 }
 
 // maybeStartReconnect enters the auto-reconnect state when err signals a lost

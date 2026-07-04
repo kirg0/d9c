@@ -33,8 +33,9 @@ func TestBeginConnectPasswordOpensPrompt(t *testing.T) {
 	}
 }
 
-// A key-auth SSH host connects directly, stashing the stored key path on the
-// live config for the SSH dialer and a later auto-reconnect.
+// A key-auth SSH host dials directly (no credential prompt), showing the
+// connection-progress window and stashing the stored key path on the live
+// config for the SSH dialer and a later auto-reconnect.
 func TestBeginConnectKeyConnectsDirectly(t *testing.T) {
 	h := hosts.Host{Name: "lab", Host: "ssh://me@lab", SSHAuth: hosts.SSHAuthKey, SSHKeyPath: "/keys/id"}
 	cfg := &config.Config{SSHPassword: "stale"}
@@ -42,8 +43,11 @@ func TestBeginConnectKeyConnectsDirectly(t *testing.T) {
 
 	model, cmd := m.beginConnect(h)
 	got := model.(Model)
-	if got.mode != ModeNormal {
-		t.Fatalf("mode = %v, want ModeNormal", got.mode)
+	if got.mode != ModeConnecting {
+		t.Fatalf("mode = %v, want ModeConnecting (progress window while dialing)", got.mode)
+	}
+	if !got.connWait.Busy() {
+		t.Error("expected the progress window to be in the connecting/busy state")
 	}
 	if cmd == nil {
 		t.Fatal("expected a connect cmd for key auth")
