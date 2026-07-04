@@ -1,6 +1,8 @@
 package docker
 
 import (
+	"errors"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -240,5 +242,63 @@ func TestBuildComposeCmd(t *testing.T) {
 				t.Errorf("buildComposeCmd = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// probeSudo must classify the host from the plain/sudo probe outcomes and skip
+// the sudo attempt entirely when the plain run already works.
+func TestProbeSudo(t *testing.T) {
+	errFail := errors.New("permission denied")
+	tests := []struct {
+		name      string
+		plain     error // result of the plain run
+		sudo      error // result of the "sudo " run
+		want      sudoState
+		wantCalls []string
+	}{
+		{
+			name: "plain works — no sudo, single call",
+			want: sudoNo, wantCalls: []string{"docker version"},
+		},
+		{
+			name: "only sudo works", plain: errFail,
+			want: sudoYes, wantCalls: []string{"docker version", "sudo docker version"},
+		},
+		{
+			name: "both fail — inconclusive", plain: errFail, sudo: errFail,
+			want: sudoUnknown, wantCalls: []string{"docker version", "sudo docker version"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var calls []string
+			run := func(cmd string) error {
+				calls = append(calls, cmd)
+				if strings.HasPrefix(cmd, "sudo ") {
+					return tt.sudo
+				}
+				return tt.plain
+			}
+			if got := probeSudo(run, "docker version"); got != tt.want {
+				t.Errorf("probeSudo = %v, want %v", got, tt.want)
+			}
+			if !slices.Equal(calls, tt.wantCalls) {
+				t.Errorf("probe calls = %v, want %v", calls, tt.wantCalls)
+			}
+		})
+	}
+}
+
+// A cached verdict must short-circuit sshNeedsSudo without touching SSH: the
+// backend below has no sshClient, so any real probe would fail and flip the
+// sudoNo answer to true.
+func TestSSHNeedsSudoCached(t *testing.T) {
+	b := &dockerBackend{sshSudo: sudoNo}
+	if b.sshNeedsSudo() {
+		t.Error("cached sudoNo must return false without re-probing")
+	}
+	b = &dockerBackend{sshSudo: sudoYes}
+	if !b.sshNeedsSudo() {
+		t.Error("cached sudoYes must return true without re-probing")
 	}
 }

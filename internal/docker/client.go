@@ -155,6 +155,11 @@ type dockerBackend struct {
 	// by runtimeMu and filled lazily on the first Runtime() call. See runtime.go.
 	runtimeMu sync.Mutex
 	runtime   Runtime
+
+	// sshSudo caches whether the host CLI requires sudo (probed over SSH);
+	// guarded by sudoMu and filled lazily by sshNeedsSudo(). See compose.go.
+	sudoMu  sync.Mutex
+	sshSudo sudoState
 }
 
 // New creates a Backend from the provided config.
