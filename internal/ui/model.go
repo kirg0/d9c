@@ -1363,6 +1363,9 @@ func logFileName(name string) string {
 // text (e.g. Cyrillic error messages / names) is never split mid-character —
 // the same invariant table.truncate keeps for table cells.
 func truncateRunes(s string, max int) string {
+	if max <= 0 { // guard: r[:max-1] below would panic on max == 0
+		return ""
+	}
 	r := []rune(s)
 	if len(r) <= max {
 		return s
