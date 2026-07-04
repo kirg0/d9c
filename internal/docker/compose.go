@@ -802,12 +802,47 @@ func (b *dockerBackend) runComposeSSHStream(identity, action string) (<-chan str
 	return b.sshExecStream(base)
 }
 
-// sshNeedsSudo probes once whether the engine CLI on the host requires sudo,
+// sshNeedsSudo reports whether the engine CLI on the host requires sudo,
 // mirroring the sudo fallback used by sshExecOutput. A streamed command can't be
-// retried mid-flight, so the privilege is decided before it starts.
+// retried mid-flight, so the privilege is decided before it starts. The probe
+// costs an SSH round-trip, so the verdict is cached for the lifetime of the
+// connection (a reconnect builds a fresh backend, resetting the cache, same as
+// Runtime()); an inconclusive probe — both attempts fail, likely a dropped
+// connection — is not cached and is retried on the next call.
 func (b *dockerBackend) sshNeedsSudo() bool {
-	_, err := b.sshExecOutput(b.engineCmd() + " version --format '{{.Server.Version}}'")
-	return err != nil
+	b.sudoMu.Lock()
+	defer b.sudoMu.Unlock()
+	if b.sshSudo == sudoUnknown {
+		probe := b.engineCmd() + " version --format '{{.Server.Version}}'"
+		b.sshSudo = probeSudo(func(cmd string) error {
+			_, err := b.sshExecOutput(cmd)
+			return err
+		}, probe)
+	}
+	return b.sshSudo != sudoNo
+}
+
+// sudoState is the tri-state cached verdict of the sshNeedsSudo probe.
+type sudoState int8
+
+const (
+	sudoUnknown sudoState = iota // not probed yet, or probe was inconclusive
+	sudoNo                       // plain command works
+	sudoYes                      // only "sudo <cmd>" works
+)
+
+// probeSudo classifies the host by running cmd plainly and, on failure, under
+// sudo: sudoNo if the plain run works, sudoYes if only the sudo run works, and
+// sudoUnknown when both fail (the connection is likely down, so the verdict
+// must not be cached).
+func probeSudo(run func(string) error, cmd string) sudoState {
+	if run(cmd) == nil {
+		return sudoNo
+	}
+	if run("sudo "+cmd) == nil {
+		return sudoYes
+	}
+	return sudoUnknown
 }
 
 // sshExecStream runs a command over SSH and streams its combined stdout/stderr
