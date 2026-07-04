@@ -13,17 +13,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-var (
-	keyStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#7DCFFF"))
-	strStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#9ECE6A"))
-	boolStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#BB9AF7"))
-	nullStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#565F89"))
-	numStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#E0AF68"))
-
-	matchLineStyle   = lipgloss.NewStyle().Background(lipgloss.Color("#2D3250"))
-	currentLineStyle = lipgloss.NewStyle().Background(lipgloss.Color("#BB9AF7")).Foreground(lipgloss.Color("#1A1B26")).Bold(true)
-)
-
 type Model struct {
 	viewport viewport.Model
 	resource *docker.InspectResult
@@ -205,10 +194,7 @@ func (m Model) View() string {
 		dashLen = 0
 	}
 	scrollBar := styles.StatusBar.Render(strings.Repeat("─", dashLen)) +
-		lipgloss.NewStyle().
-			Background(lipgloss.Color("#1A1B26")).
-			Foreground(lipgloss.Color("#565F89")).
-			Render(pctStr)
+		styles.ScrollInfo.Render(pctStr)
 
 	parts := []string{m.viewport.View()}
 
@@ -221,10 +207,7 @@ func (m Model) View() string {
 				matchInfo = "  no match  "
 			}
 		}
-		infoRendered := lipgloss.NewStyle().
-			Background(lipgloss.Color("#24283B")).
-			Foreground(lipgloss.Color("#565F89")).
-			Render(matchInfo)
+		infoRendered := styles.SearchCount.Render(matchInfo)
 		prefix := styles.BottomBarPrefix.Render("/")
 		inputW := m.viewport.Width - lipgloss.Width(prefix) - lipgloss.Width(infoRendered)
 		if inputW < 0 {
@@ -258,9 +241,9 @@ func (m Model) renderContent() string {
 	for i, line := range lines {
 		if matchSet[i] {
 			if i == currentLine {
-				sb.WriteString(currentLineStyle.Width(m.width).Render(line))
+				sb.WriteString(styles.MatchCurrent.Width(m.width).Render(line))
 			} else {
-				sb.WriteString(matchLineStyle.Width(m.width).Render(line))
+				sb.WriteString(styles.MatchLine.Width(m.width).Render(line))
 			}
 		} else {
 			sb.WriteString(colorizeLine(line))
@@ -277,11 +260,11 @@ func colorizeLine(line string) string {
 	case colonIdx > 0:
 		key := line[:colonIdx+1]
 		val := line[colonIdx+1:]
-		return keyStyle.Render(key) + colorizeValue(val)
+		return styles.YAMLKey.Render(key) + colorizeValue(val)
 	case dashIdx == 0:
 		indent := len(line) - len(strings.TrimLeft(line, " "))
 		rest := strings.TrimLeft(line, " ")
-		return strings.Repeat(" ", indent) + strStyle.Render("- ") + colorizeValue(rest[2:])
+		return strings.Repeat(" ", indent) + styles.YAMLString.Render("- ") + colorizeValue(rest[2:])
 	default:
 		return line
 	}
@@ -291,9 +274,9 @@ func colorizeValue(val string) string {
 	v := strings.TrimSpace(val)
 	switch v {
 	case "true", "false":
-		return " " + boolStyle.Render(v)
+		return " " + styles.YAMLBool.Render(v)
 	case "null", "~", "":
-		return " " + nullStyle.Render(v)
+		return " " + styles.YAMLNull.Render(v)
 	}
 	isNum := true
 	for _, c := range v {
@@ -303,7 +286,7 @@ func colorizeValue(val string) string {
 		}
 	}
 	if isNum && v != "" {
-		return " " + numStyle.Render(v)
+		return " " + styles.YAMLNumber.Render(v)
 	}
-	return strStyle.Render(" " + v)
+	return styles.YAMLString.Render(" " + v)
 }
