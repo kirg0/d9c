@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync/atomic"
 )
 
 // Target holds the searchable attributes of a single table row. Resources fill
@@ -34,8 +35,9 @@ type Target struct {
 // A bare word containing none of the prefixes is a plain substring, so the
 // common case ("just type part of a name") keeps working unchanged.
 type Matcher struct {
-	terms []term
-	err   error
+	terms   []term
+	err     error
+	needNet bool // any network: term present — Match pre-lowers Networks once
 }
 
 type term struct {
@@ -56,20 +58,39 @@ const (
 	termNetwork
 )
 
+// compileCache memoizes the last Compile result. The row builders recompile
+// the same (usually empty) query for every resource on every refresh tick;
+// a Matcher is immutable after Compile, so sharing one instance is safe.
+// Single-entry is enough: within one refresh the query string doesn't change.
+var compileCache atomic.Pointer[cacheEntry]
+
+type cacheEntry struct {
+	query string
+	m     *Matcher
+}
+
 // Compile parses a filter query into a Matcher. A malformed regexp leaves the
 // Matcher in an error state (Err != nil); Match then rejects every row so the
 // table goes empty rather than ignoring the broken term. Compile never returns
-// nil — callers use the zero-term Matcher for an empty query.
+// nil — callers use the zero-term Matcher for an empty query. Results are
+// memoized by query value (single entry), so per-tick recompiles are free.
 func Compile(query string) *Matcher {
+	if c := compileCache.Load(); c != nil && c.query == query {
+		return c.m
+	}
 	m := &Matcher{}
 	for tok := range strings.FieldsSeq(query) {
 		t, err := parseTerm(tok)
 		if err != nil {
 			m.err = err
-			return m
+			break
 		}
 		m.terms = append(m.terms, t)
+		if t.kind == termNetwork {
+			m.needNet = true
+		}
 	}
+	compileCache.Store(&cacheEntry{query: query, m: m})
 	return m
 }
 
@@ -109,12 +130,27 @@ func (m *Matcher) Err() error {
 
 // Match reports whether t satisfies every term in the query. An empty query
 // (no terms) matches everything; a query with a parse error matches nothing.
+// The haystack fields are lowered once here (not per term), so a multi-term
+// query doesn't re-lower the same strings for every term on every row.
 func (m *Matcher) Match(t Target) bool {
 	if m == nil {
 		return true
 	}
 	if m.err != nil {
 		return false
+	}
+	if len(m.terms) == 0 {
+		return true
+	}
+	t.Text = strings.ToLower(t.Text)
+	t.Status = strings.ToLower(t.Status)
+	if m.needNet && len(t.Networks) > 0 {
+		// Copy: t.Networks shares its backing array with the caller's slice.
+		low := make([]string, len(t.Networks))
+		for i, n := range t.Networks {
+			low[i] = strings.ToLower(n)
+		}
+		t.Networks = low
 	}
 	for _, term := range m.terms {
 		if !term.match(t) {
@@ -124,12 +160,14 @@ func (m *Matcher) Match(t Target) bool {
 	return true
 }
 
+// match evaluates one term against a Target whose Text/Status/Networks have
+// already been lowercased by Match.
 func (t term) match(tgt Target) bool {
 	switch t.kind {
 	case termRegex:
 		return t.re.MatchString(tgt.Text)
 	case termStatus:
-		return strings.Contains(strings.ToLower(tgt.Status), t.text)
+		return strings.Contains(tgt.Status, t.text)
 	case termLabel:
 		for k, v := range tgt.Labels {
 			if !strings.EqualFold(k, t.text) {
@@ -145,12 +183,12 @@ func (t term) match(tgt Target) bool {
 		return false
 	case termNetwork:
 		for _, n := range tgt.Networks {
-			if strings.Contains(strings.ToLower(n), t.text) {
+			if strings.Contains(n, t.text) {
 				return true
 			}
 		}
 		return false
 	default: // termText
-		return strings.Contains(strings.ToLower(tgt.Text), t.text)
+		return strings.Contains(tgt.Text, t.text)
 	}
 }

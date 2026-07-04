@@ -26,6 +26,11 @@ func TestMatch(t *testing.T) {
 		{"substring hit", "nginx", web, true},
 		{"substring miss", "redis", web, false},
 		{"substring case-insensitive", "NGINX", web, true},
+		// Uppercase HAYSTACK: Match lowers Text/Status/Networks once per row,
+		// so case-insensitivity must hold from that side too.
+		{"uppercase haystack text", "nginx", Target{Text: "WEBNGINX:1.25"}, true},
+		{"uppercase haystack status", "status:running", Target{Status: "UP 2 HOURS RUNNING"}, true},
+		{"uppercase haystack network", "net:bridge", Target{Networks: []string{"BRIDGE"}}, true},
 		{"two words both match (AND)", "web nginx", web, true},
 		{"two words one misses", "web redis", web, false},
 
@@ -70,6 +75,39 @@ func TestCompileBadRegexp(t *testing.T) {
 	// A broken query rejects every row rather than silently ignoring the term.
 	if m.Match(Target{Text: "anything"}) {
 		t.Error("Match should be false when the query has a parse error")
+	}
+}
+
+// Compile memoizes the last query: per-tick recompiles of the same string
+// must return the same Matcher, and a query change must invalidate the cache.
+func TestCompileCached(t *testing.T) {
+	a1 := Compile("web")
+	a2 := Compile("web")
+	if a1 != a2 {
+		t.Error("same query should return the cached Matcher instance")
+	}
+	b := Compile("db")
+	if b == a1 {
+		t.Error("different query must not reuse the cached Matcher")
+	}
+	if !b.Match(Target{Text: "db"}) || b.Match(Target{Text: "web"}) {
+		t.Error("cached-then-replaced Matcher matches the wrong rows")
+	}
+	a3 := Compile("web")
+	if a3 == b {
+		t.Error("query change back must recompile, not return the stale entry")
+	}
+	if !a3.Match(Target{Text: "webnginx"}) {
+		t.Error("recompiled Matcher lost its terms")
+	}
+}
+
+// Match must not mutate the caller's Networks slice when lowering it.
+func TestMatchDoesNotMutateNetworks(t *testing.T) {
+	nets := []string{"BRIDGE", "Frontend"}
+	Compile("net:bridge").Match(Target{Networks: nets})
+	if nets[0] != "BRIDGE" || nets[1] != "Frontend" {
+		t.Errorf("caller's Networks mutated: %v", nets)
 	}
 }
 

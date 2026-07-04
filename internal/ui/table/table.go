@@ -596,11 +596,21 @@ func sortByName[T any](items []T, key func(T) string) []T {
 	if len(items) < 2 {
 		return items
 	}
-	out := make([]T, len(items))
-	copy(out, items)
-	sort.SliceStable(out, func(i, j int) bool {
-		return strings.ToLower(key(out[i])) < strings.ToLower(key(out[j]))
+	// Precompute the lowered keys once: ToLower inside the comparator would
+	// re-allocate two strings per comparison, O(n log n) times per tick.
+	keys := make([]string, len(items))
+	idx := make([]int, len(items))
+	for i, it := range items {
+		keys[i] = strings.ToLower(key(it))
+		idx[i] = i
+	}
+	sort.SliceStable(idx, func(i, j int) bool {
+		return keys[idx[i]] < keys[idx[j]]
 	})
+	out := make([]T, len(items))
+	for i, j := range idx {
+		out[i] = items[j]
+	}
 	return out
 }
 
@@ -785,6 +795,9 @@ func (m *Model) RefreshStyles() { m.table.SetStyles(tableStyles()) }
 // would no longer match the real resource name. Rune-based so multi-byte text
 // (e.g. Cyrillic image names or paths) is never cut mid-character.
 func truncate(s string, max int) string {
+	if max <= 0 { // guard: runes[:max-1] below would panic on max == 0
+		return ""
+	}
 	if utf8.RuneCountInString(s) <= max {
 		return s
 	}
@@ -832,5 +845,5 @@ func Summary(total, shown int) string {
 	if total == shown {
 		return fmt.Sprintf(" %d container(s) ", total)
 	}
-	return lipgloss.NewStyle().Render(fmt.Sprintf(" %d/%d containers (filtered) ", shown, total))
+	return fmt.Sprintf(" %d/%d containers (filtered) ", shown, total)
 }

@@ -27,6 +27,10 @@ func TestTruncate(t *testing.T) {
 		{"привет-мир", 20, "привет-мир"},
 		{"привет-мир", 7, "привет…"},
 		{"данные-проекта", 8, "данные-…"},
+		// Degenerate widths: max<=0 must not panic (runes[:max-1]).
+		{"hello", 0, ""},
+		{"hello", -3, ""},
+		{"hello", 1, "…"},
 	}
 	for _, tt := range tests {
 		got := truncate(tt.input, tt.max)
@@ -168,6 +172,22 @@ func TestSortByName(t *testing.T) {
 	// The input slice must not be mutated.
 	if in[0].Name != "Zeta" {
 		t.Errorf("input slice was mutated: first = %q, want Zeta", in[0].Name)
+	}
+}
+
+func TestSortByName_StableOnEqualKeys(t *testing.T) {
+	in := []docker.Network{
+		{ID: "1", Name: "same"},
+		{ID: "2", Name: "SAME"}, // equal after ToLower — order must hold
+		{ID: "3", Name: "aaa"},
+		{ID: "4", Name: "same"},
+	}
+	got := sortByName(in, func(n docker.Network) string { return n.Name })
+	want := []string{"3", "1", "2", "4"}
+	for i, w := range want {
+		if got[i].ID != w {
+			t.Errorf("order[%d] ID = %q, want %q", i, got[i].ID, w)
+		}
 	}
 }
 

@@ -20,6 +20,8 @@ func TestTruncateRunes(t *testing.T) {
 		// 2-byte rune; rune-based clipping keeps 4 whole runes plus the ellipsis.
 		{"cyrillic clipped on rune boundary", "контейнерр", 5, "конт…"},
 		{"mixed clipped", "abвгдè", 4, "abв…"},
+		{"zero max no panic", "abc", 0, ""},
+		{"negative max no panic", "abc", -1, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -31,8 +33,8 @@ func TestTruncateRunes(t *testing.T) {
 			if !utf8.ValidString(got) {
 				t.Errorf("truncateRunes(%q, %d) = %q is not valid UTF-8", tt.in, tt.max, got)
 			}
-			// And never exceed max runes.
-			if n := utf8.RuneCountInString(got); n > tt.max {
+			// And never exceed max runes (negative max behaves like 0).
+			if n := utf8.RuneCountInString(got); n > max(tt.max, 0) {
 				t.Errorf("truncateRunes(%q, %d) returned %d runes, exceeds max", tt.in, tt.max, n)
 			}
 		})
