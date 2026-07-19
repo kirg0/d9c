@@ -24,6 +24,11 @@ const (
 	// RuntimeContainerd backs the nerdctl CLI backend (containerd has no Docker
 	// API, so it cannot reuse dockerBackend). See nerdctl.go.
 	RuntimeContainerd Runtime = "containerd"
+	// RuntimeCRIO and RuntimeCRI back the crictl backend (crio:// / cri://
+	// schemes): CRI-O when the runtime identifies itself as such, the generic
+	// CRI label for any other CRI implementation. See cri.go.
+	RuntimeCRIO Runtime = "cri-o"
+	RuntimeCRI  Runtime = "cri"
 )
 
 // Label renders the runtime for display in the header; an unknown engine is
@@ -34,6 +39,10 @@ func (r Runtime) Label() string {
 		return "podman"
 	case RuntimeContainerd:
 		return "containerd"
+	case RuntimeCRIO:
+		return "cri-o"
+	case RuntimeCRI:
+		return "cri"
 	default:
 		return "docker"
 	}

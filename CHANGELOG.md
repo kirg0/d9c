@@ -4,6 +4,31 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 проект следует [семантическому версионированию](https://semver.org/lang/ru/).
 
+## [1.22.0] - 2026-07-19
+
+### Добавлено
+
+- **Бэкенд CRI-O / generic CRI поверх `crictl`.** Новые схемы хоста:
+  `crio://` / `cri://` (crictl на локальной машине, опционально с путём к
+  сокету — `crio:///var/run/crio/crio.sock`) и `crio+ssh://user@host`
+  / `cri+ssh://user@host[/путь/к.sock]` (crictl на удалённом хосте по SSH,
+  та же аутентификация ключом/паролем, что и у ssh://). Работает с CRI-O,
+  CRI-плагином containerd и любым рантаймом с CRI-сокетом; в шапке — метка
+  `cri-o` (или `cri` для прочих рантаймов) по `RuntimeName` из
+  `crictl version`. Покрыто: контейнеры (имя показывается как
+  `pod/container`, состояние из CRI-статуса), inspect, start/stop/rm,
+  kill (= CRI stop с таймаутом 0; другие сигналы CRI не поддерживает),
+  логи `-f/--tail/--since`, метрики CPU/MEM (CPU% по дельте
+  cumulative-счётчика между тиками), интерактивный exec (по SSH), обзор
+  файловой системы, образы (список/inspect/rmi/pull/prune), events
+  (cri-tools ≥ 1.26), эмуляция `system df`, счётчики для дашборда Hosts.
+  Вне модели CRI — мягкая деградация: Networks/Volumes/Compose показывают
+  пустые списки, build/tag/push/run/cp отвечают понятной ошибкой
+  «CRI управляет только pod'ами, контейнерами и образами». Реализация — по
+  образцу nerdctl-бэкенда (runner local/ssh, чистые парсеры под
+  table-тестами); чистый CRI gRPC отклонён: он не покрывает логи (файлы на
+  хосте) и exec (SPDY-стриминг), так что SSH нужен в любом случае.
+
 ## [1.21.0] - 2026-07-04
 
 ### Добавлено

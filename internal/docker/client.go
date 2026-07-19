@@ -170,6 +170,9 @@ func New(cfg *config.Config) (Backend, error) {
 	if isNerdctlHost(host) {
 		return newNerdctlBackend(cfg)
 	}
+	if isCRIHost(host) {
+		return newCRIBackend(cfg)
+	}
 	if strings.HasPrefix(host, "ssh://") {
 		return newSSHBackend(cfg)
 	}

@@ -172,14 +172,15 @@ func (s *Store) EditHost(name string, h Host) error {
 }
 
 // sshSchemes are the host-URL prefixes reached over SSH: a plain Docker ssh://
-// host and a nerdctl+ssh:// containerd host. SSH auth metadata (key/password)
-// applies to both. Order matters — the longer prefix is tried first so the
-// remaining "user@host:port" body is extracted correctly.
-var sshSchemes = []string{"nerdctl+ssh://", "ssh://"}
+// host, a nerdctl+ssh:// containerd host and a crio+ssh:// / cri+ssh:// CRI
+// host. SSH auth metadata (key/password) applies to all. Order matters — the
+// longer prefix is tried first so the remaining "user@host:port" body is
+// extracted correctly.
+var sshSchemes = []string{"nerdctl+ssh://", "crio+ssh://", "cri+ssh://", "ssh://"}
 
-// IsSSH reports whether a host URL is reached over SSH (ssh:// or nerdctl+ssh://),
-// so the UI shows the auth selector / credential prompt and the store keeps the
-// SSH auth fields for it.
+// IsSSH reports whether a host URL is reached over SSH (ssh://, nerdctl+ssh://,
+// crio+ssh:// or cri+ssh://), so the UI shows the auth selector / credential
+// prompt and the store keeps the SSH auth fields for it.
 func IsSSH(hostURL string) bool {
 	_, _, ok := sshParts(hostURL)
 	return ok
