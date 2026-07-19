@@ -332,6 +332,35 @@ events (нужен cri-tools ≥ 1.26); `system df` эмулируется из 
 рантаймы отказываются стартовать exited-контейнер (`restart` может вернуть ошибку рантайма) —
 в Kubernetes контейнеры пересоздаёт kubelet.
 
+#### Настройка хоста CRI-O
+
+Проверено живым прогоном на Debian 13 + CRI-O 1.33. Чтобы d9c работал полноценно:
+
+- **`crictl`** — пакет `cri-tools` есть не во всех репозиториях (например, в openSUSE OBS
+  `isv:/cri-o` его нет) — тогда возьмите бинарник из
+  [releases cri-tools](https://github.com/kubernetes-sigs/cri-tools/releases). Эндпоинт
+  пропишите в `/etc/crictl.yaml`, иначе crictl будет перебирать сокеты с предупреждениями:
+
+  ```yaml
+  runtime-endpoint: unix:///var/run/crio/crio.sock
+  image-endpoint: unix:///var/run/crio/crio.sock
+  ```
+
+- **Доступ к сокету.** `/var/run/crio/crio.sock` принадлежит root — подключайтесь
+  `crio+ssh://root@host` (или дайте пользователю права на сокет).
+- **События (`:events`).** CRI-O отдаёт поток событий только при `enable_pod_events = true`
+  (drop-in в `/etc/crio/crio.conf.d/`), иначе стрим закрывается сразу после открытия и
+  viewer сообщает о завершении потока.
+- **Идемпотентный stop.** `crictl stop` несуществующего контейнера завершается успехом
+  (особенность CRI-O) — stop по устаревшей строке списка не покажет ошибку.
+- **Standalone-стенд без Kubernetes.** Пакетный CNI-конфиг CRI-O поставляется отключённым
+  (`/etc/cni/net.d/10-crio-bridge.conflist.disabled` — переименуйте, убрав `.disabled`), а
+  старые CNI-плагины (например, 1.1.1 из Debian) не проходят bridge-CHECK
+  («Interface veth… Mac doesn't match») — поставьте плагины ≥ 1.5 из
+  [containernetworking/plugins](https://github.com/containernetworking/plugins/releases) в
+  `/opt/cni/bin`. Это нужно для создания pod'ов (`crictl runp`); сам d9c pod'ы не создаёт,
+  но без CNI на стенде нечем наполнить списки.
+
 Раздел **Hosts** — это и список сохранённых хостов, и мульти-хост дашборд: на каждый хост строка
 со статусом (● up/down) и агрегатом из `docker info` (контейнеры/запущено/образы/версия демона).
 Данные собираются по одному соединению на хост, обновляются раз в ~10 секунд. `Enter` — подключиться
