@@ -303,6 +303,35 @@ containers is the kubelet/orchestrator's job, not a TUI's. Also note that some r
 to start an exited container (`restart` may return the runtime's error) — in Kubernetes the
 kubelet recreates containers instead.
 
+#### Setting up a CRI-O host
+
+Verified with a live run against Debian 13 + CRI-O 1.33. For d9c to work fully:
+
+- **`crictl`** — the `cri-tools` package is missing from some repositories (e.g. openSUSE OBS
+  `isv:/cri-o`) — grab the binary from
+  [cri-tools releases](https://github.com/kubernetes-sigs/cri-tools/releases) instead. Set the
+  endpoint in `/etc/crictl.yaml`, otherwise crictl probes sockets with warnings:
+
+  ```yaml
+  runtime-endpoint: unix:///var/run/crio/crio.sock
+  image-endpoint: unix:///var/run/crio/crio.sock
+  ```
+
+- **Socket access.** `/var/run/crio/crio.sock` is owned by root — connect as
+  `crio+ssh://root@host` (or grant your user access to the socket).
+- **Events (`:events`).** CRI-O only serves the event stream with `enable_pod_events = true`
+  (a drop-in under `/etc/crio/crio.conf.d/`); without it the stream closes right after opening
+  and the viewer reports a finished stream.
+- **Idempotent stop.** `crictl stop` of a nonexistent container succeeds (a CRI-O trait) —
+  stopping a stale list row won't surface an error.
+- **Standalone rigs without Kubernetes.** CRI-O's packaged CNI config ships disabled
+  (`/etc/cni/net.d/10-crio-bridge.conflist.disabled` — rename it, dropping `.disabled`), and
+  old CNI plugins (e.g. 1.1.1 from Debian) fail the bridge CHECK
+  ("Interface veth… Mac doesn't match") — install plugins ≥ 1.5 from
+  [containernetworking/plugins](https://github.com/containernetworking/plugins/releases) into
+  `/opt/cni/bin`. This matters for creating pods (`crictl runp`); d9c itself never creates
+  pods, but without CNI a test rig has nothing to fill the lists with.
+
 The **Hosts** section is both the list of saved hosts and a multi-host dashboard: each host gets a row
 with status (● up/down) and an aggregate from `docker info` (containers/running/images/daemon version).
 Data is collected over a single connection per host, refreshed roughly every 10 seconds. `Enter` — connect
