@@ -179,6 +179,8 @@ go run . -version              # вывести версию и выйти
 | npipe | `-H npipe:////./pipe/docker_engine` | именованный канал Windows (Docker Desktop / Podman machine) |
 | nerdctl (локально) | `-H nerdctl://` | containerd через локальный `nerdctl` (см. [containerd](#containerd)) |
 | nerdctl (SSH) | `-H nerdctl+ssh://user@host` | containerd через `nerdctl` на удалённом хосте по SSH |
+| CRI (локально) | `-H crio://` | CRI-O / любой CRI-рантайм через локальный `crictl` (см. [CRI-O](#cri-o--generic-cri)) |
+| CRI (SSH) | `-H crio+ssh://user@host` | CRI-рантайм через `crictl` на удалённом хосте по SSH |
 
 > **TCP против SSH — что доступно.** Почти всё (контейнеры, образы, сети, тома, exec,
 > обзор ФС контейнера, события, дашборд) работает по обоим транспортам через Docker Engine API.
@@ -290,6 +292,45 @@ Networks, Volumes, Compose (discovery по тем же меткам + `nerdctl c
   нет API чтения каталогов) — в образе должен быть `ls`.
 - **Rootless поддерживается** — бэкенд проверен живым прогоном на Debian 13 с containerd
   v2.3.2 и rootless nerdctl 2.3.4.
+
+### CRI-O / generic CRI
+
+Для рантаймов, говорящих на **CRI** (Container Runtime Interface Kubernetes) — CRI-O,
+CRI-плагин containerd, cri-dockerd — d9c работает через
+[`crictl`](https://github.com/kubernetes-sigs/cri-tools), официальный CRI-клиент. Нужен
+установленный `crictl` на машине с рантаймом:
+
+```
+# CRI-рантайм на этой же машине (crictl сам найдёт сокет или возьмёт /etc/crictl.yaml)
+d9c -H crio://
+
+# явный путь к сокету
+d9c -H crio:///var/run/crio/crio.sock
+d9c -H cri:///run/containerd/containerd.sock
+
+# рантайм на удалённом хосте (crictl запускается там по SSH)
+d9c -H crio+ssh://user@host
+d9c -H cri+ssh://user@host/run/crio/crio.sock
+```
+
+`crio://` и `cri://` — синонимы (бэкенд общий); `crio+ssh://` — полноценный SSH-хост с той же
+аутентификацией ключом/паролем, что и `ssh://`. В шапке появляется метка **cri-o** (или **cri**
+для другого рантайма — по `RuntimeName` из `crictl version`).
+
+**Что работает.** Containers — списки (имя показывается как `pod/container`: pod — единица
+группировки в CRI), inspect, start/stop/rm, kill (маппится на CRI `stop` с таймаутом 0 —
+других сигналов в CRI нет), логи (`-f/--tail/--since`), метрики CPU/MEM (CPU% считается по
+дельте кумулятивного счётчика между тиками), интерактивный exec (по SSH-транспорту, как у
+nerdctl), обзор ФС (`ls` внутри контейнера); Images — список/inspect/`rmi`/`pull`/`prune`;
+events (нужен cri-tools ≥ 1.26); `system df` эмулируется из списков; дашборд Hosts получает
+счётчики и версию рантайма.
+
+**Чего в CRI нет по определению** — деградация мягкая: Networks/Volumes/Compose показывают
+пустые списки (сетями заведует CNI, томами и compose — оркестратор), а build/tag/push/`run`/
+`cp` отвечают понятной ошибкой «CRI управляет только pod'ами, контейнерами и образами».
+Создание контейнеров — задача kubelet/оркестратора, а не TUI. Учтите также, что некоторые
+рантаймы отказываются стартовать exited-контейнер (`restart` может вернуть ошибку рантайма) —
+в Kubernetes контейнеры пересоздаёт kubelet.
 
 Раздел **Hosts** — это и список сохранённых хостов, и мульти-хост дашборд: на каждый хост строка
 со статусом (● up/down) и агрегатом из `docker info` (контейнеры/запущено/образы/версия демона).

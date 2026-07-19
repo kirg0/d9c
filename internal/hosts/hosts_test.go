@@ -123,6 +123,9 @@ func TestSSHUserHelpers(t *testing.T) {
 		{"nerdctl+ssh://cont@192.168.1.249", "", "cont"},
 		{"nerdctl+ssh://host", "", ""},
 		{"nerdctl://", "", ""},
+		{"crio+ssh://core@node1", "", "core"},
+		{"cri+ssh://core@node1/run/crio/crio.sock", "", "core"},
+		{"crio://", "", ""},
 	}
 	for _, c := range cases {
 		if got := SSHUser(c.url); got != c.want {
@@ -139,6 +142,8 @@ func TestSSHUserHelpers(t *testing.T) {
 		{"tcp://host:2375", "new", "tcp://host:2375"},
 		{"nerdctl+ssh://old@host:22", "new", "nerdctl+ssh://new@host:22"},
 		{"nerdctl+ssh://host", "cont", "nerdctl+ssh://cont@host"},
+		{"crio+ssh://old@node1", "core", "crio+ssh://core@node1"},
+		{"cri+ssh://node1", "core", "cri+ssh://core@node1"},
 	}
 	for _, c := range repl {
 		if got := WithSSHUser(c.url, c.user); got != c.want {
@@ -154,7 +159,11 @@ func TestIsSSHAndAuthKept(t *testing.T) {
 	}{
 		{"ssh://user@host", true},
 		{"nerdctl+ssh://cont@host", true},
+		{"crio+ssh://core@node1", true},
+		{"cri+ssh://core@node1", true},
 		{"nerdctl://", false},
+		{"crio://", false},
+		{"cri://", false},
 		{"tcp://host:2375", false},
 		{"unix:///run/docker.sock", false},
 	} {

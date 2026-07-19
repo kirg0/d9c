@@ -177,6 +177,8 @@ or add a new one — the connection happens via `Enter` / `:connect`.
 | SSH | `-H ssh://user@host` | an SSH tunnel to the local daemon socket; keys from the agent/`~/.ssh` |
 | nerdctl (local) | `-H nerdctl://` | containerd via a local `nerdctl` (see [containerd](#containerd)) |
 | nerdctl (SSH) | `-H nerdctl+ssh://user@host` | containerd via `nerdctl` on a remote host over SSH |
+| CRI (local) | `-H crio://` | CRI-O / any CRI runtime via a local `crictl` (see [CRI-O](#cri-o--generic-cri)) |
+| CRI (SSH) | `-H crio+ssh://user@host` | a CRI runtime via `crictl` on a remote host over SSH |
 
 > **TCP vs SSH — what's available.** Almost everything (containers, images, networks, volumes, exec,
 > container FS browser, events, dashboard) works over both transports via the Docker Engine API.
@@ -261,6 +263,45 @@ is accepted without an error — containerd creates the namespace lazily on the 
   exposes no readdir API) — the image must contain `ls`.
 - **Rootless is supported** — the backend was live-tested on Debian 13 with containerd v2.3.2
   and rootless nerdctl 2.3.4.
+
+### CRI-O / generic CRI
+
+For runtimes speaking **CRI** (the Kubernetes Container Runtime Interface) — CRI-O,
+containerd's CRI plugin, cri-dockerd — d9c works through
+[`crictl`](https://github.com/kubernetes-sigs/cri-tools), the official CRI client. `crictl`
+must be installed on the machine where the runtime lives:
+
+```
+# CRI runtime on this machine (crictl finds the socket itself or reads /etc/crictl.yaml)
+d9c -H crio://
+
+# explicit socket path
+d9c -H crio:///var/run/crio/crio.sock
+d9c -H cri:///run/containerd/containerd.sock
+
+# runtime on a remote host (crictl is executed there over SSH)
+d9c -H crio+ssh://user@host
+d9c -H cri+ssh://user@host/run/crio/crio.sock
+```
+
+`crio://` and `cri://` are synonyms (one shared backend); `crio+ssh://` is a first-class SSH
+host with the same key/password authentication as `ssh://`. The header shows a **cri-o** chip
+(or **cri** for another runtime — from the `RuntimeName` of `crictl version`).
+
+**What works.** Containers — listings (names render as `pod/container`: the pod is CRI's
+grouping unit), inspect, start/stop/rm, kill (maps to CRI `stop` with a zero timeout — CRI has
+no other signals), logs (`-f/--tail/--since`), CPU/MEM metrics (CPU% is derived as the delta of
+the cumulative counter between refresh ticks), interactive exec (over the SSH transport, like
+nerdctl), the container FS browser (`ls` inside the container); Images — list/inspect/`rmi`/
+`pull`/`prune`; events (requires cri-tools ≥ 1.26); `system df` is emulated from the lists;
+the Hosts dashboard gets the counters and the runtime version.
+
+**What CRI has no notion of** — soft degradation: Networks/Volumes/Compose show empty lists
+(networking belongs to CNI, volumes and compose to the orchestrator), while build/tag/push/
+`run`/`cp` answer with a clear "CRI manages only pods, containers and images" error. Creating
+containers is the kubelet/orchestrator's job, not a TUI's. Also note that some runtimes refuse
+to start an exited container (`restart` may return the runtime's error) — in Kubernetes the
+kubelet recreates containers instead.
 
 The **Hosts** section is both the list of saved hosts and a multi-host dashboard: each host gets a row
 with status (● up/down) and an aggregate from `docker info` (containers/running/images/daemon version).

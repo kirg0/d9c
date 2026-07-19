@@ -31,7 +31,7 @@ type Config struct {
 func Load() *Config {
 	cfg := &Config{}
 
-	flag.StringVar(&cfg.Host, "H", getenv("DOCKER_HOST", DefaultHost), "Docker host (tcp://host:port or ssh://user@host)")
+	flag.StringVar(&cfg.Host, "H", getenv("DOCKER_HOST", DefaultHost), "Docker host (tcp://host:port, ssh://user@host, nerdctl[+ssh]:// or crio[+ssh]://)")
 	flag.StringVar(&cfg.TLSCACert, "tlscacert", getenv("DOCKER_TLS_CACERT", ""), "TLS CA certificate")
 	flag.StringVar(&cfg.TLSCert, "tlscert", getenv("DOCKER_TLS_CERT", ""), "TLS certificate")
 	flag.StringVar(&cfg.TLSKey, "tlskey", getenv("DOCKER_TLS_KEY", ""), "TLS key")

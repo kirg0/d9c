@@ -195,10 +195,10 @@ func (m Model) viewHeader() string {
 		status = styles.HeaderStatusOK
 	}
 	right := status.Render(" ● ") + styles.HeaderHost.Render(m.cfg.Host+" ")
-	// Surface a non-Docker engine (Podman/containerd) so the user can confirm the
-	// connection lands on the expected runtime; Docker is the implied default.
+	// Surface a non-Docker engine (Podman/containerd/CRI) so the user can confirm
+	// the connection lands on the expected runtime; Docker is the implied default.
 	// For containerd, append the active namespace ("containerd:k8s.io").
-	if m.runtime == docker.RuntimePodman || m.runtime == docker.RuntimeContainerd {
+	if m.runtime != docker.RuntimeUnknown && m.runtime != docker.RuntimeDocker {
 		label := m.runtime.Label()
 		if nb, ok := m.backend.(docker.NamespacedBackend); ok {
 			label += ":" + nb.CurrentNamespace()
