@@ -149,11 +149,12 @@ func (m Model) pluginCmd(p plugins.Plugin) tea.Cmd {
 // streamLocalProcess starts a local command and streams its combined
 // stdout/stderr line-by-line into the returned channel, which closes when the
 // process exits (a non-zero exit appends a trailing "error: …" line). The
-// returned stop kills the process and unblocks producers stuck on a send nobody
-// reads; the caller MUST call it when it abandons the channel, otherwise the
-// process and goroutines leak.
+// returned stop kills the process tree, closes the pipes and unblocks producers
+// stuck on a send nobody reads; the caller MUST call it when it abandons the
+// channel, otherwise the process and goroutines leak.
 func streamLocalProcess(name string, args []string) (<-chan string, func(), error) {
 	c := exec.Command(name, args...)
+	setProcessGroup(c)
 	stdout, err := c.StdoutPipe()
 	if err != nil {
 		return nil, nil, err
@@ -172,9 +173,12 @@ func streamLocalProcess(name string, args []string) (<-chan string, func(), erro
 	stop := func() {
 		once.Do(func() {
 			close(done)
-			if c.Process != nil {
-				_ = c.Process.Kill()
-			}
+			killProcessTree(c)
+			// Killing the process is not enough to unblock the readers: a
+			// surviving grandchild (or a buffer still in flight) keeps the write
+			// end open, so close the pipes to make the scanners return.
+			_ = stdout.Close()
+			_ = stderr.Close()
 		})
 	}
 	send := func(line string) bool {
