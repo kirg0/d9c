@@ -97,7 +97,7 @@ func TestPluginVarsPerResource(t *testing.T) {
 
 func TestStreamLocalProcess(t *testing.T) {
 	// Success: output line arrives, channel closes.
-	ch, stop, err := streamLocalProcess("cmd", []string{"/c", "echo hello"})
+	ch, stop, err := streamLocalProcess(testShell(), testShellArgs("echo hello"))
 	if err != nil {
 		t.Fatalf("start: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestStreamLocalProcess(t *testing.T) {
 	}
 
 	// Non-zero exit appends a trailing error line.
-	ch, stop, err = streamLocalProcess("cmd", []string{"/c", "exit 3"})
+	ch, stop, err = streamLocalProcess(testShell(), testShellArgs("exit 3"))
 	if err != nil {
 		t.Fatalf("start: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestStreamLocalProcess(t *testing.T) {
 	}
 
 	// stop kills a long-running process and the channel still closes.
-	ch, stop, err = streamLocalProcess("cmd", []string{"/c", "ping -n 30 127.0.0.1 >nul"})
+	ch, stop, err = streamLocalProcess(testShell(), testShellArgs(testSleepScript))
 	if err != nil {
 		t.Fatalf("start: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestPluginCmdBackground(t *testing.T) {
 	h.step(containersUpdatedMsg{h.fb.Containers})
 	m := h.cur()
 
-	p := plugins.Plugin{Name: "echoer", Command: "cmd", Args: []string{"/c", "echo ${NAME}"}, Background: true}
+	p := plugins.Plugin{Name: "echoer", Command: testShell(), Args: testShellArgs("echo ${NAME}"), Background: true}
 	cmd := m.pluginCmd(p)
 	msg := cmd()
 	op, ok := msg.(opStartedMsg)
@@ -179,7 +179,7 @@ func TestPluginCmdBackground(t *testing.T) {
 	}
 
 	// Interactive plugin returns a tea.ExecProcess command.
-	inter := plugins.Plugin{Name: "shell", Command: "cmd"}
+	inter := plugins.Plugin{Name: "shell", Command: testShell()}
 	if c := m.pluginCmd(inter); c == nil {
 		t.Error("interactive plugin should return a cmd")
 	}
