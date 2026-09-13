@@ -181,32 +181,32 @@ func TestFriendlyListErr(t *testing.T) {
 			name:   "missing binary (docker runtime)",
 			dir:    "/etc",
 			stderr: `OCI runtime exec failed: exec: "ls": executable file not found in $PATH`,
-			want:   "нет `ls`",
+			want:   "has no `ls`",
 		},
 		{
 			name:   "missing binary (stat form)",
 			dir:    "/etc",
 			stderr: "stat /bin/ls: no such file or directory",
-			want:   "нет `ls`",
+			want:   "has no `ls`",
 		},
 		{
 			name:   "missing dir reported by ls itself",
 			dir:    "/no/such/dir",
 			stderr: "ls: /no/such/dir: No such file or directory",
-			want:   "не найден",
+			want:   "not found",
 		},
 		{
 			name: "missing dir with nerdctl fatal trailer",
 			dir:  "/no/such/dir",
 			stderr: "ls: /no/such/dir: No such file or directory\n" +
 				`time="2026-07-02T14:11:36-05:00" level=fatal msg="exec failed with exit code 1"`,
-			want: "не найден",
+			want: "not found",
 		},
 		{
 			name:   "permission denied",
 			dir:    "/root",
 			stderr: "ls: can't open '/root': Permission denied",
-			want:   "нет доступа",
+			want:   "no access",
 		},
 		{
 			name:   "unknown error passes through",

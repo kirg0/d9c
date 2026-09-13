@@ -17,7 +17,7 @@ import (
 // :lang with no args opens the picker; an explicit code switches and notifies;
 // an unknown code errors without changing the active language.
 func TestLangCommand(t *testing.T) {
-	t.Cleanup(func() { i18n.Set(i18n.RU) })
+	t.Cleanup(func() { i18n.Set(i18n.EN) })
 
 	fb := docker.NewFakeBackend()
 	var tm tea.Model = NewModel(&config.Config{}, fb, nil, nil, false)
@@ -57,7 +57,7 @@ func TestLangCommand(t *testing.T) {
 // The language picker previews the highlighted language live as the cursor
 // moves, keeps it on Enter, and rolls back on cancel.
 func TestLangPicker(t *testing.T) {
-	t.Cleanup(func() { i18n.Set(i18n.RU) })
+	t.Cleanup(func() { i18n.Set(i18n.EN) })
 
 	i18n.Set(i18n.RU)
 	fb := docker.NewFakeBackend()
@@ -74,8 +74,8 @@ func TestLangPicker(t *testing.T) {
 		t.Fatal("picker should be populated with language names")
 	}
 
-	// Moving the cursor to English previews it live.
-	tm, _ = tm.Update(tea.KeyMsg{Type: tea.KeyDown})
+	// Moving the cursor to English (listed first) previews it live.
+	tm, _ = tm.Update(tea.KeyMsg{Type: tea.KeyUp})
 	m = tm.(Model)
 	if i18n.Current() != m.langNames[m.langCursor] {
 		t.Error("moving the cursor should apply the highlighted language as a preview")
@@ -94,9 +94,12 @@ func TestLangPicker(t *testing.T) {
 	// Reopen, move to English, confirm with Enter: the preview is kept and the
 	// help screen now renders in English.
 	tm, _ = tm.Update(openLangPickerMsg{})
-	tm, _ = tm.Update(tea.KeyMsg{Type: tea.KeyDown})
+	tm, _ = tm.Update(tea.KeyMsg{Type: tea.KeyUp})
 	m = tm.(Model)
 	chosen := m.langNames[m.langCursor]
+	if chosen != i18n.EN {
+		t.Fatalf("cursor on %q, want %q", chosen, i18n.EN)
+	}
 	tm, _ = tm.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = tm.(Model)
 	if m.mode != ModeNormal {
@@ -105,7 +108,7 @@ func TestLangPicker(t *testing.T) {
 	if i18n.Current() != chosen {
 		t.Error("Enter should keep the previewed language")
 	}
-	if chosen == i18n.EN && !strings.Contains(m.buildHelpContent(), "Navigation") {
+	if !strings.Contains(m.buildHelpContent(), "Navigation") {
 		t.Error("help should render in English after switching to EN")
 	}
 }
@@ -113,7 +116,7 @@ func TestLangPicker(t *testing.T) {
 // TestLangPickerPersists verifies that confirming a language writes it to the
 // unified config store, so the choice survives a restart.
 func TestLangPickerPersists(t *testing.T) {
-	t.Cleanup(func() { i18n.Set(i18n.RU) })
+	t.Cleanup(func() { i18n.Set(i18n.EN) })
 
 	path := filepath.Join(t.TempDir(), "d9c-config.yaml")
 	set, err := settings.Load(path)
@@ -128,7 +131,7 @@ func TestLangPickerPersists(t *testing.T) {
 	tm, _ = tm.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 
 	tm, _ = tm.Update(openLangPickerMsg{})
-	tm, _ = tm.Update(tea.KeyMsg{Type: tea.KeyDown}) // move to English
+	tm, _ = tm.Update(tea.KeyMsg{Type: tea.KeyDown}) // move from the English default to Russian
 	mm := tm.(Model)
 	chosen := mm.langNames[mm.langCursor]
 	_, _ = tm.Update(tea.KeyMsg{Type: tea.KeyEnter})

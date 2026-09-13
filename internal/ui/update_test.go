@@ -1846,8 +1846,8 @@ func TestThemeCommand(t *testing.T) {
 	if styles.Active() != want {
 		t.Error("active palette should be dracula after switch")
 	}
-	if m.copyNotif != "тема: dracula" {
-		t.Errorf("copyNotif = %q, want %q", m.copyNotif, "тема: dracula")
+	if m.copyNotif != "theme: dracula" {
+		t.Errorf("copyNotif = %q, want %q", m.copyNotif, "theme: dracula")
 	}
 	if cmd == nil {
 		t.Error("theme switch should return a clear-notif command")
@@ -1907,8 +1907,8 @@ func TestThemePicker(t *testing.T) {
 	if styles.Active() != chosen {
 		t.Error("Enter should keep the previewed theme")
 	}
-	if m.copyNotif != "тема: "+name {
-		t.Errorf("copyNotif = %q, want %q", m.copyNotif, "тема: "+name)
+	if m.copyNotif != "theme: "+name {
+		t.Errorf("copyNotif = %q, want %q", m.copyNotif, "theme: "+name)
 	}
 }
 
@@ -1978,7 +1978,7 @@ func TestSystemPruneConfirmFlow(t *testing.T) {
 	if got := tm.(Model); got.mode != ModeConfirm {
 		t.Fatalf("mode = %v, want ModeConfirm", got.mode)
 	}
-	if view := tm.(Model).View(); !strings.Contains(view, "Подтверждение") {
+	if view := tm.(Model).View(); !strings.Contains(view, "Confirm") {
 		t.Error("confirm overlay should be rendered")
 	}
 
@@ -2316,7 +2316,7 @@ func TestImageBulkRemoveConfirmKeepsList(t *testing.T) {
 	}
 
 	view := tm.(Model).View()
-	if !strings.Contains(view, "Удалить выбранные образы") {
+	if !strings.Contains(view, "Remove selected images") {
 		t.Errorf("confirm prompt missing from view")
 	}
 	// The image list must remain visible behind the modal.

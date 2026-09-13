@@ -2,22 +2,28 @@ package i18n
 
 import "testing"
 
+func TestDefaultIsEnglish(t *testing.T) {
+	if Current() != EN {
+		t.Fatalf("package default Current() = %q, want %q", Current(), EN)
+	}
+}
+
 func TestResolve(t *testing.T) {
 	tests := []struct {
 		in      string
 		want    Lang
 		wantErr bool
 	}{
-		{"", RU, false},
+		{"", EN, false},
+		{"en", EN, false},
+		{"English", EN, false},
+		{"английский", EN, false},
 		{"ru", RU, false},
 		{"RU", RU, false},
 		{" russian ", RU, false},
 		{"русский", RU, false},
-		{"en", EN, false},
-		{"English", EN, false},
-		{"английский", EN, false},
-		{"fr", RU, true},
-		{"de", RU, true},
+		{"fr", EN, true},
+		{"de", EN, true},
 	}
 	for _, tt := range tests {
 		got, err := Resolve(tt.in)
@@ -31,7 +37,7 @@ func TestResolve(t *testing.T) {
 }
 
 func TestTAndSet(t *testing.T) {
-	t.Cleanup(func() { Set(RU) }) // restore the package default for other tests
+	t.Cleanup(func() { Set(EN) }) // restore the package default for other tests
 
 	Set(RU)
 	if Current() != RU {
@@ -49,17 +55,18 @@ func TestTAndSet(t *testing.T) {
 		t.Errorf("T under EN = %q, want %q", got, "hello")
 	}
 
-	// Any unknown code falls back to RU.
+	// Any unknown code falls back to EN.
+	Set(RU)
 	Set(Lang("xx"))
-	if Current() != RU {
-		t.Errorf("Set(unknown) Current() = %q, want %q", Current(), RU)
+	if Current() != EN {
+		t.Errorf("Set(unknown) Current() = %q, want %q", Current(), EN)
 	}
 }
 
 func TestNamesAndDisplay(t *testing.T) {
 	names := Names()
-	if len(names) != 2 || names[0] != RU || names[1] != EN {
-		t.Fatalf("Names() = %v, want [ru en]", names)
+	if len(names) != 2 || names[0] != EN || names[1] != RU {
+		t.Fatalf("Names() = %v, want [en ru]", names)
 	}
 	if RU.Display() != "Русский" || EN.Display() != "English" {
 		t.Errorf("Display() = %q/%q", RU.Display(), EN.Display())

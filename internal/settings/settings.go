@@ -95,7 +95,7 @@ func (s *Store) Save() error {
 	return nil
 }
 
-// Lang resolves the configured UI language (default RU when the section is
+// Lang resolves the configured UI language (default EN when the section is
 // empty or invalid handling is delegated to i18n.Resolve).
 func (s *Store) Lang() (i18n.Lang, error) {
 	return i18n.Resolve(s.File.Lang)
