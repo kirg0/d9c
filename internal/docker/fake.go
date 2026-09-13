@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"d9c/internal/i18n"
+	"github.com/kirg0/d9c/internal/i18n"
 )
 
 // FakeBackend is an in-memory Backend implementation used for the --demo mode

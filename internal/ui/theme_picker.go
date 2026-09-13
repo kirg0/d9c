@@ -1,9 +1,9 @@
 package ui
 
 import (
-	"d9c/internal/i18n"
-	"d9c/internal/theme"
-	"d9c/internal/ui/styles"
+	"github.com/kirg0/d9c/internal/i18n"
+	"github.com/kirg0/d9c/internal/theme"
+	"github.com/kirg0/d9c/internal/ui/styles"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

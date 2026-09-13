@@ -1,7 +1,7 @@
 package ui
 
 import (
-	"d9c/internal/i18n"
+	"github.com/kirg0/d9c/internal/i18n"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

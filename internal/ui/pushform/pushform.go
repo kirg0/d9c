@@ -5,7 +5,7 @@ package pushform
 import (
 	"strings"
 
-	"d9c/internal/ui/styles"
+	"github.com/kirg0/d9c/internal/ui/styles"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"

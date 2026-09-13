@@ -1,11 +1,14 @@
 package ui
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/exp/teatest"
 )
 
 // TestDemo_FilesBrowse opens the filesystem browser with 'f', descends into a
@@ -72,11 +75,18 @@ func TestDemo_FilesCommandUpload(t *testing.T) {
 	tm := newTestModel(t)
 	waitFor(t, tm, "web", "api")
 
+	// First a failing upload (missing local path): the error lands in the footer.
+	tm.Type(":cp " + filepath.Join(dir, "missing.txt") + " /tmp")
+	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+	waitFor(t, tm, "✖", "missing.txt")
+
+	// A successful upload clears that error, which forces the footer to repaint
+	// without it. Waiting for the plain hint bar is therefore a real signal that
+	// the upload finished OK — an unchanged screen would emit no new output.
 	tm.Type(":cp " + local + " /tmp")
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
-
-	// A successful upload returns to the table with no error footer; assert the
-	// container list still renders (the action completed without surfacing an err).
-	waitFor(t, tm, "web", "nginx:1.25")
+	teatest.WaitFor(t, tm.Output(), func(b []byte) bool {
+		return bytes.Contains(b, []byte("Navigate")) && !bytes.Contains(b, []byte("✖"))
+	}, teatest.WithDuration(5*time.Second))
 	tm.Quit()
 }

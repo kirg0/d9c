@@ -5,8 +5,9 @@
 #
 #     vhs docs/demo.tape          # writes docs/demo.gif
 #
-# Requirements: https://github.com/charmbracelet/vhs (vhs + ffmpeg + ttyd).
-# See docs/README.md for install notes.
+# Requirements: https://github.com/charmbracelet/vhs (vhs + ffmpeg + ttyd),
+# or just Docker — see docs/README.md (the vhs image has no Go, so pre-build a
+# linux ./d9c first; the tape only builds when the binary is missing).
 
 Output docs/demo.gif
 
@@ -20,12 +21,16 @@ Set Theme "TokyoNight"
 
 # --- Off-camera: build once, then launch the demo backend. ---
 Hide
-Type "go build -o d9c . && clear"
+Type "{ test -x ./d9c || go build -o d9c .; } && clear"
 Enter
 Sleep 4s
 Type "./d9c -demo"
 Enter
 Sleep 2s
+# Force a redraw once the terminal has its final size (otherwise the header
+# row of the first frame is scrolled out of view).
+Type "r"
+Sleep 1s
 Show
 
 # --- Containers: browse the list. ---

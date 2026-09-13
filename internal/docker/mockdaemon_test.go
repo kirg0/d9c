@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"d9c/internal/config"
+	"github.com/kirg0/d9c/internal/config"
 )
 
 // apiVersionRe strips the /v1.xx prefix the SDK prepends after negotiation.

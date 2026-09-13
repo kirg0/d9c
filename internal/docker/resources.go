@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"d9c/internal/i18n"
+	"github.com/kirg0/d9c/internal/i18n"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"

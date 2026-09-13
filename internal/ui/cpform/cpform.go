@@ -10,8 +10,8 @@ import (
 	"sort"
 	"strings"
 
-	"d9c/internal/i18n"
-	"d9c/internal/ui/styles"
+	"github.com/kirg0/d9c/internal/i18n"
+	"github.com/kirg0/d9c/internal/ui/styles"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"

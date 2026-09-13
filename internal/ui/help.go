@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"d9c/internal/i18n"
-	"d9c/internal/keymap"
-	"d9c/internal/ui/cmdline"
-	"d9c/internal/ui/styles"
+	"github.com/kirg0/d9c/internal/i18n"
+	"github.com/kirg0/d9c/internal/keymap"
+	"github.com/kirg0/d9c/internal/ui/cmdline"
+	"github.com/kirg0/d9c/internal/ui/styles"
 )
 
 type helpRow struct{ key, desc string }

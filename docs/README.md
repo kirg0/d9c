@@ -1,46 +1,61 @@
 # docs/ — ассеты документации
 
-## `demo.png` — скриншот для README
+## `demo.gif` — анимированный обзор для README
 
-Статический скриншот раздела Containers; на него ссылается корневой
-[`README.md`](../README.md). Чтобы обновить — снимите новый кадр (`go run . -demo`
-или реальный хост) и перезапишите `docs/demo.png` тем же именем.
-
-## `demo.gif` — анимированный обзор (опционально)
-
+На него ссылаются корневые [`README.md`](../README.md) и [`README-RU.md`](../README-RU.md).
 GIF генерируется из сценария [`demo.tape`](demo.tape) утилитой
 [VHS](https://github.com/charmbracelet/vhs) от Charm. Сценарий детерминирован и
-гоняет встроенный демо-бэкенд (`-demo`) — **реальный Docker не нужен**.
+гоняет встроенный демо-бэкенд (`-demo`) — **реальный Docker-хост не нужен**.
 
-### Сгенерировать / обновить
+### Сгенерировать / обновить через Docker (любая ОС, в т. ч. Windows)
 
-Из корня репозитория:
+В образе vhs нет Go, поэтому сначала соберите linux-бинарник в корне репозитория —
+сценарий пересобирает его только при отсутствии `./d9c`:
 
 ```sh
-vhs docs/demo.tape      # пересоберёт docs/demo.gif
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o d9c .
+docker run --rm -v "$PWD:/vhs" ghcr.io/charmbracelet/vhs:v0.9.0 docs/demo.tape
 ```
 
-### Установка VHS
+```powershell
+# Windows (PowerShell)
+$env:GOOS='linux'; $env:GOARCH='amd64'; $env:CGO_ENABLED='0'; go build -o d9c .
+docker run --rm -v "${PWD}:/vhs" ghcr.io/charmbracelet/vhs:v0.9.0 docs/demo.tape
+```
 
-VHS требует `ffmpeg` и `ttyd`.
+### Сгенерировать нативно
 
 ```sh
-# через Go
-go install github.com/charmbracelet/vhs@latest
+vhs docs/demo.tape      # пересоберёт docs/demo.gif (соберёт ./d9c, если его нет)
+```
 
-# macOS (Homebrew) — тянет зависимости автоматически
-brew install vhs
+VHS требует `ffmpeg` и `ttyd`:
 
-# затем установите ffmpeg и ttyd, если их нет:
+```sh
+go install github.com/charmbracelet/vhs@latest   # или: brew install vhs
 #   macOS:        brew install ffmpeg ttyd
 #   Linux (apt):  sudo apt install ffmpeg ttyd
-#   Windows:      проще всего собрать GIF из WSL/Linux или macOS
 ```
 
-> На Windows `ttyd` ставится тяжело — удобнее сгенерировать GIF из WSL, Linux или
-> macOS, закоммитить готовый `docs/demo.gif` и отредактировать `demo.tape` при
-> необходимости.
+На Windows `ttyd` ставится тяжело — используйте вариант через Docker.
 
-После генерации закоммитьте `docs/demo.gif`. Чтобы показывать в README анимацию
-вместо скриншота, поменяйте `src="docs/demo.png"` на `src="docs/demo.gif"` в
-корневом [`README.md`](../README.md).
+После генерации закоммитьте `docs/demo.gif`.
+
+## `demo.png` — статический скриншот
+
+Кадр раздела Containers (запасной вариант, например для статей). Обновить — снять новый
+кадр (`go run . -demo`) и перезаписать `docs/demo.png` тем же именем.
+
+## `social-preview.png` — картинка для соцсетей
+
+1280×640 — последний кадр ролика из сценария [`social.tape`](social.tape):
+
+```sh
+docker run --rm -v "$PWD:/vhs" ghcr.io/charmbracelet/vhs:v0.9.0 docs/social.tape
+docker run --rm -v "$PWD:/vhs" --entrypoint sh ghcr.io/charmbracelet/vhs:v0.9.0 -c \
+  'ffmpeg -y -sseof -0.3 -i docs/social.gif -update 1 -frames:v 1 docs/social-preview.png && rm docs/social.gif'
+```
+
+Загружается вручную: GitHub → Settings → General → Social preview.
+
+> Образ `vhs:latest` на момент 2026-09 молча не пишет выходные файлы — используйте `v0.9.0`.

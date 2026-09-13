@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"d9c/internal/i18n"
+	"github.com/kirg0/d9c/internal/i18n"
 )
 
 // SystemDF reports CRI disk usage as a detail payload, assembled from the

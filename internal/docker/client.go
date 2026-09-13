@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"d9c/internal/config"
-	"d9c/internal/i18n"
+	"github.com/kirg0/d9c/internal/config"
+	"github.com/kirg0/d9c/internal/i18n"
 
 	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/client"

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"d9c/internal/config"
+	"github.com/kirg0/d9c/internal/config"
 )
 
 // HostSummary is a one-shot snapshot of a Docker daemon used by the multi-host

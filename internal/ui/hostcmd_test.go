@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"d9c/internal/hosts"
-	"d9c/internal/ui/cmdline"
+	"github.com/kirg0/d9c/internal/hosts"
+	"github.com/kirg0/d9c/internal/ui/cmdline"
 )
 
 // hostsModel builds a sized model in the hosts view with a working store.

@@ -9,10 +9,10 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"d9c/internal/docker"
-	"d9c/internal/hosts"
-	"d9c/internal/ui/filter"
-	"d9c/internal/ui/styles"
+	"github.com/kirg0/d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/hosts"
+	"github.com/kirg0/d9c/internal/ui/filter"
+	"github.com/kirg0/d9c/internal/ui/styles"
 
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/lipgloss"
@@ -68,6 +68,10 @@ type Colorizer func(plainCell string) (lipgloss.Style, bool)
 type Model struct {
 	table table.Model
 	width int
+	// height is the total height (column header + rows) last passed to
+	// SetSize; SetColumns re-applies it because bubbles derives the viewport
+	// height from the header height only at SetHeight time.
+	height int
 
 	// colorize[i], when non-nil, colors column i after bubbles has laid the row
 	// out in plain text. Colored cells MUST be stored as plain text in the row:
@@ -92,6 +96,7 @@ func New() Model {
 // SetSize sets width and height. Caller must call SetColumns separately.
 func (m *Model) SetSize(width, height int) {
 	m.width = width
+	m.height = height
 	m.table.SetWidth(width)
 	m.table.SetHeight(height)
 }
@@ -109,6 +114,13 @@ func (m *Model) SetColumns(cols []table.Column) {
 		m.table.SetRows(nil)
 	}
 	m.table.SetColumns(cols)
+	// The column header's height can change with the columns (width-0
+	// placeholders render shorter), so recompute the viewport; otherwise the
+	// table renders one row taller than its budget and pushes the app header
+	// off-screen.
+	if m.height > 0 {
+		m.table.SetHeight(m.height)
+	}
 }
 
 // ── resource-specific row setters ─────────────────────────────────────────────

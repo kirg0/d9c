@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/docker"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"

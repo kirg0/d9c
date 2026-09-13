@@ -5,8 +5,8 @@ import (
 	"strings"
 	"sync"
 
-	"d9c/internal/config"
-	"d9c/internal/i18n"
+	"github.com/kirg0/d9c/internal/config"
+	"github.com/kirg0/d9c/internal/i18n"
 )
 
 // criBackend implements Backend by shelling out to `crictl`, the official CRI

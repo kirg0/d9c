@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"d9c/internal/alerts"
-	"d9c/internal/hosts"
-	"d9c/internal/plugins"
+	"github.com/kirg0/d9c/internal/alerts"
+	"github.com/kirg0/d9c/internal/hosts"
+	"github.com/kirg0/d9c/internal/plugins"
 )
 
 func TestSetAlerts(t *testing.T) {

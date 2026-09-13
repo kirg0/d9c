@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"d9c/internal/config"
+	"github.com/kirg0/d9c/internal/config"
 )
 
 func TestHostConfigured(t *testing.T) {

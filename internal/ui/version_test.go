@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"d9c/internal/config"
-	"d9c/internal/docker"
-	"d9c/internal/hosts"
-	"d9c/internal/version"
+	"github.com/kirg0/d9c/internal/config"
+	"github.com/kirg0/d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/hosts"
+	"github.com/kirg0/d9c/internal/version"
 )
 
 // TestHeaderShowsVersion verifies the app version is rendered in the top bar.

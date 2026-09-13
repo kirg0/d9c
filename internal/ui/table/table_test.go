@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"d9c/internal/docker"
-	"d9c/internal/hosts"
-	"d9c/internal/ui/styles"
+	"github.com/kirg0/d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/hosts"
+	"github.com/kirg0/d9c/internal/ui/styles"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"d9c/internal/config"
+	"github.com/kirg0/d9c/internal/config"
 )
 
 // nerdctlBackend implements Backend by shelling out to the `nerdctl` CLI (the

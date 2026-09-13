@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"d9c/internal/docker"
-	"d9c/internal/ui/styles"
+	"github.com/kirg0/d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/ui/styles"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"

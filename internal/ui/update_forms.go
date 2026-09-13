@@ -4,10 +4,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"d9c/internal/docker"
-	"d9c/internal/hosts"
-	"d9c/internal/i18n"
-	"d9c/internal/ui/cpform"
+	"github.com/kirg0/d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/hosts"
+	"github.com/kirg0/d9c/internal/i18n"
+	"github.com/kirg0/d9c/internal/ui/cpform"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

@@ -8,10 +8,10 @@ import (
 	"strings"
 	"sync"
 
-	"d9c/internal/alerts"
-	"d9c/internal/keymap"
-	"d9c/internal/plugins"
-	"d9c/internal/settings"
+	"github.com/kirg0/d9c/internal/alerts"
+	"github.com/kirg0/d9c/internal/keymap"
+	"github.com/kirg0/d9c/internal/plugins"
+	"github.com/kirg0/d9c/internal/settings"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

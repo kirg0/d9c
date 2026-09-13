@@ -18,8 +18,8 @@ import (
 	"strings"
 	"time"
 
-	"d9c/internal/config"
-	"d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/config"
+	"github.com/kirg0/d9c/internal/docker"
 
 	"golang.org/x/crypto/ssh"
 )
