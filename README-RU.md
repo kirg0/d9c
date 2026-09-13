@@ -17,7 +17,7 @@ Docker **по TCP или SSH**. Один бинарник, без агентов
 ![license](https://img.shields.io/badge/license-MIT-blue)
 [![release](https://img.shields.io/github/v/release/kirg0/d9c)](https://github.com/kirg0/d9c/releases/latest)
 [![ci](https://github.com/kirg0/d9c/actions/workflows/ci.yml/badge.svg)](https://github.com/kirg0/d9c/actions/workflows/ci.yml)
-[![go report](https://goreportcard.com/badge/github.com/kirg0/d9c)](https://goreportcard.com/report/github.com/kirg0/d9c)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kirg0/d9c.svg)](https://pkg.go.dev/github.com/kirg0/d9c)
 ![go](https://img.shields.io/github/go-mod/go-version/kirg0/d9c?logo=go&logoColor=white)
 ![platform](https://img.shields.io/badge/platform-linux%20%7C%20macOS%20%7C%20windows-lightgrey)
 [![donate](https://img.shields.io/badge/donate-dalink.to-ff5e5b)](https://dalink.to/kirg08)
