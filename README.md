@@ -408,7 +408,7 @@ are written back immediately — the other sections are preserved. An old standa
 (the file is renamed to `d9c-hosts.json.migrated`).
 
 ```yaml
-lang: ru                  # UI language: ru (default) or en
+lang: en                  # UI language: en (default) or ru
 theme: dracula            # built-in palette (tokyonight by default)
 colors:                   # optional pointwise color overrides
   primary: "#ff79c6"
@@ -437,7 +437,7 @@ selected theme:
 **The UI language** is switched the same way: the `:lang` command with no argument opens a
 picker modal (`Русский` / `English`, arrows — preview, Enter — apply, q/Esc — cancel), while
 `:lang en` / `:lang ru` change the language directly. The choice is **saved to the config**
-(`lang:`) and survives a restart. The interface is Russian by default.
+(`lang:`) and survives a restart. The interface is English by default.
 
 | Key | Purpose |
 | --- | --- |

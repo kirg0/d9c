@@ -54,7 +54,7 @@ func TestDemo_FilesDownload(t *testing.T) {
 		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 	}
 	tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
-	waitFor(t, tm, "скопировано", "hello.txt")
+	waitFor(t, tm, "downloaded", "hello.txt")
 
 	tm.Quit()
 

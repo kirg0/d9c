@@ -135,7 +135,7 @@ func TestDemo_ContainerRemoveError(t *testing.T) {
 	waitFor(t, tm, "web", "api")
 	tm.Type(":rm")
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
-	waitFor(t, tm, "контейнер запущен")
+	waitFor(t, tm, "the container is running")
 	tm.Quit()
 }
 
@@ -175,7 +175,7 @@ func TestDemo_RemoveImageFriendlyError(t *testing.T) {
 	tm.Type(":rm")
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 
-	waitFor(t, tm, "зависимые образы")
+	waitFor(t, tm, "dependent images")
 	tm.Quit()
 }
 
@@ -280,7 +280,7 @@ func TestDemo_ComposeUp(t *testing.T) {
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 
 	// Progress console shows the title, a streamed line, and the completion mark.
-	waitFor(t, tm, "compose up: legacy", "Started", "готово")
+	waitFor(t, tm, "compose up: legacy", "Started", "done")
 	// Close the console; the project list now reflects the running status.
 	tm.Send(tea.KeyMsg{Type: tea.KeyEsc})
 	waitFor(t, tm, "running 2/2")
@@ -302,7 +302,7 @@ func TestDemo_ComposePull(t *testing.T) {
 	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 	tm.Type(":pull")
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
-	waitFor(t, tm, "compose pull: webapp", "Pull complete", "готово")
+	waitFor(t, tm, "compose pull: webapp", "Pull complete", "done")
 	tm.Quit()
 }
 
@@ -321,7 +321,7 @@ func TestDemo_ComposeDown(t *testing.T) {
 	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 	tm.Type(":down")
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
-	waitFor(t, tm, "compose down: webapp", "Removed", "готово")
+	waitFor(t, tm, "compose down: webapp", "Removed", "done")
 	tm.Send(tea.KeyMsg{Type: tea.KeyEsc})
 	waitFor(t, tm, "stopped 0/3")
 	tm.Quit()
@@ -342,7 +342,7 @@ func TestDemo_ComposeCreate(t *testing.T) {
 	waitFor(t, tm, "create: /srv/newapp", "services:")
 
 	tm.Send(tea.KeyMsg{Type: tea.KeyCtrlS})
-	waitFor(t, tm, "compose create: /srv/newapp", "Started", "готово")
+	waitFor(t, tm, "compose create: /srv/newapp", "Started", "done")
 	tm.Quit()
 }
 
@@ -394,7 +394,7 @@ func TestDemo_ComposeRestore(t *testing.T) {
 	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 	tm.Type(":restore webapp.tar.gz")
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
-	waitFor(t, tm, "compose restore: webapp", "Started", "готово")
+	waitFor(t, tm, "compose restore: webapp", "Started", "done")
 	tm.Quit()
 }
 
@@ -608,7 +608,7 @@ func TestDemo_HostsDeleteViaKey(t *testing.T) {
 	waitFor(t, tm, "prod")
 
 	tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")}) // arm delete
-	waitFor(t, tm, "Удалить хост prod")
+	waitFor(t, tm, "Remove host prod")
 	tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")}) // confirm
 	waitFor(t, tm, "Hosts")
 

@@ -81,7 +81,7 @@ func TestFakeSystemDFAndPrune(t *testing.T) {
 	if err != nil {
 		t.Fatalf("system prune: %v", err)
 	}
-	if !strings.Contains(summary, "контейнеров 1") || !strings.Contains(summary, "образов 1") {
+	if !strings.Contains(summary, "containers 1") || !strings.Contains(summary, "images 1") {
 		t.Errorf("summary = %q, want 1 stopped container and 1 dangling image pruned", summary)
 	}
 	for _, c := range f.Containers {

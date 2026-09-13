@@ -15,8 +15,8 @@ func TestBuildHelpContentContainers(t *testing.T) {
 	m := NewModel(&config.Config{}, docker.NewFakeBackend(), nil, nil, false)
 	got := m.buildHelpContent()
 	for _, want := range []string{
-		"Навигация", "Containers", "Shell в контейнере",
-		":logs", "Разделы", "Плагины не настроены",
+		"Navigation", "Containers", "Shell in the container",
+		":logs", "Sections", "No plugins configured",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("help content missing %q", want)
@@ -33,7 +33,7 @@ func TestBuildHelpContentWithPlugins(t *testing.T) {
 	if !strings.Contains(got, "dive") || !strings.Contains(got, "ctrl+d") {
 		t.Errorf("help should list the plugin and its key:\n%s", got)
 	}
-	if strings.Contains(got, "Плагины не настроены") {
+	if strings.Contains(got, "No plugins configured") {
 		t.Error("should not show the no-plugins note when plugins exist")
 	}
 }
@@ -42,7 +42,7 @@ func TestBuildHelpContentCompose(t *testing.T) {
 	m := NewModel(&config.Config{}, docker.NewFakeBackend(), nil, nil, false)
 	m.resource = ViewCompose
 	got := m.buildHelpContent()
-	if !strings.Contains(got, "Открыть контейнеры проекта") {
+	if !strings.Contains(got, "Open the project's containers") {
 		t.Error("compose help missing the drill-down key")
 	}
 	if !strings.Contains(got, ":backups") {
@@ -68,7 +68,7 @@ func TestBuildHelpContentComposeOverTCP(t *testing.T) {
 			t.Errorf("tcp compose help must NOT list SSH-only command %q:\n%s", hidden, got)
 		}
 	}
-	if strings.Contains(got, "Редактировать compose-файл") {
+	if strings.Contains(got, "Edit the compose file") {
 		t.Error("tcp compose help must not show the edit key row")
 	}
 }
@@ -104,7 +104,7 @@ func TestHelpOpenClose(t *testing.T) {
 	if tm.(Model).mode != ModeHelp {
 		t.Fatalf("mode = %v, want ModeHelp", tm.(Model).mode)
 	}
-	if !strings.Contains(tm.(Model).View(), "Навигация") {
+	if !strings.Contains(tm.(Model).View(), "Navigation") {
 		t.Error("help view should render the reference")
 	}
 

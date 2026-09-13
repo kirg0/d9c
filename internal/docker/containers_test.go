@@ -64,7 +64,7 @@ func TestFriendlyRunErr(t *testing.T) {
 		want string // substring of the rewritten message
 	}{
 		{"missing image", "Error response from daemon: No such image: nginx:9.9", "pull"},
-		{"name conflict", `Error response from daemon: Conflict. The container name "/web" is already in use by container abc`, "имя контейнера занято"},
+		{"name conflict", `Error response from daemon: Conflict. The container name "/web" is already in use by container abc`, "container name is taken"},
 		{"bad port", "Error response from daemon: invalid containerPort: abc", "host:container"},
 		{"other passes wrapped", "Error response from daemon: mounts denied", "create container"},
 	}
@@ -139,7 +139,7 @@ func TestFakeRunContainer(t *testing.T) {
 	t.Run("duplicate name rejected", func(t *testing.T) {
 		f := NewFakeBackend()
 		err := f.RunContainer(RunOptions{Image: "nginx:1.25", Name: "web"})
-		if err == nil || !strings.Contains(err.Error(), "занято") {
+		if err == nil || !strings.Contains(err.Error(), "is taken") {
 			t.Errorf("err = %v, want name-conflict hint", err)
 		}
 	})

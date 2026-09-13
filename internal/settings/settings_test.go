@@ -158,26 +158,26 @@ colors:
 }
 
 func TestLangRoundTripAndDefault(t *testing.T) {
-	// Missing/empty lang resolves to the default (RU).
+	// Missing/empty lang resolves to the default (EN).
 	s, err := Load(filepath.Join(t.TempDir(), "d9c-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load missing: %v", err)
 	}
-	if lang, _ := s.Lang(); lang != i18n.RU {
-		t.Errorf("missing lang = %q, want %q", lang, i18n.RU)
+	if lang, _ := s.Lang(); lang != i18n.EN {
+		t.Errorf("missing lang = %q, want %q", lang, i18n.EN)
 	}
 
 	// A configured lang resolves; an unknown value reports an error.
 	path := filepath.Join(t.TempDir(), "d9c-config.yaml")
-	if err := os.WriteFile(path, []byte("lang: en\n"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte("lang: ru\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	s2, err := Load(path)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if lang, _ := s2.Lang(); lang != i18n.EN {
-		t.Errorf("lang = %q, want %q", lang, i18n.EN)
+	if lang, _ := s2.Lang(); lang != i18n.RU {
+		t.Errorf("lang = %q, want %q", lang, i18n.RU)
 	}
 }
 

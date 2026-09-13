@@ -67,15 +67,15 @@ func TestRemappedHelpReflectsKeys(t *testing.T) {
 	m := newKeysTestModel(t)
 	m.SetKeymap(km)
 	help := m.buildHelpContent()
-	if !strings.Contains(help, "Логи") {
+	if !strings.Contains(help, "Logs") {
 		t.Fatal("help is missing the logs row")
 	}
 	// The containers section row for logs should advertise "g" now.
 	for _, r := range m.resourceKeyRows() {
-		if r.desc == "Логи" && r.key != "g" {
+		if r.desc == "Logs" && r.key != "g" {
 			t.Errorf("logs help key = %q, want g", r.key)
 		}
-		if strings.HasPrefix(r.desc, "Метрики") && r.key != "z" {
+		if strings.HasPrefix(r.desc, "CPU/MEM metrics") && r.key != "z" {
 			t.Errorf("stats help key = %q, want z", r.key)
 		}
 	}
