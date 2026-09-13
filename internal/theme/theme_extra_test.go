@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"d9c/internal/ui/styles"
+	"github.com/kirg0/d9c/internal/ui/styles"
 )
 
 func TestDefaultPathTheme(t *testing.T) {

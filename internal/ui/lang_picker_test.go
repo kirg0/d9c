@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"d9c/internal/config"
-	"d9c/internal/docker"
-	"d9c/internal/i18n"
-	"d9c/internal/settings"
-	"d9c/internal/ui/cmdline"
+	"github.com/kirg0/d9c/internal/config"
+	"github.com/kirg0/d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/i18n"
+	"github.com/kirg0/d9c/internal/settings"
+	"github.com/kirg0/d9c/internal/ui/cmdline"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"d9c/internal/hosts"
+	"github.com/kirg0/d9c/internal/hosts"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

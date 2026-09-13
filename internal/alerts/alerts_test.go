@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/docker"
 )
 
 func TestThresholds_Active(t *testing.T) {

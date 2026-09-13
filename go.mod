@@ -1,5 +1,4 @@
-module d9c
-
+module github.com/kirg0/d9c
 go 1.25.0
 
 require (

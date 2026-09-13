@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"d9c/internal/ui/styles"
+	"github.com/kirg0/d9c/internal/ui/styles"
 )
 
 func TestResolve(t *testing.T) {

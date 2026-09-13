@@ -1,13 +1,13 @@
 package ui
 
 import (
-	"d9c/internal/alerts"
-	"d9c/internal/config"
-	"d9c/internal/docker"
-	"d9c/internal/hosts"
-	"d9c/internal/keymap"
-	"d9c/internal/plugins"
-	"d9c/internal/settings"
+	"github.com/kirg0/d9c/internal/alerts"
+	"github.com/kirg0/d9c/internal/config"
+	"github.com/kirg0/d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/hosts"
+	"github.com/kirg0/d9c/internal/keymap"
+	"github.com/kirg0/d9c/internal/plugins"
+	"github.com/kirg0/d9c/internal/settings"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

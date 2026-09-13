@@ -3,10 +3,10 @@ package ui
 import (
 	"testing"
 
-	"d9c/internal/alerts"
-	"d9c/internal/config"
-	"d9c/internal/docker"
-	"d9c/internal/ui/cmdline"
+	"github.com/kirg0/d9c/internal/alerts"
+	"github.com/kirg0/d9c/internal/config"
+	"github.com/kirg0/d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/ui/cmdline"
 )
 
 // TestAlertCommand exercises :alert — setting CPU/MEM thresholds, partial and

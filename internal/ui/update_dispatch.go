@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"d9c/internal/alerts"
-	"d9c/internal/docker"
-	"d9c/internal/i18n"
-	"d9c/internal/theme"
-	"d9c/internal/ui/cmdline"
+	"github.com/kirg0/d9c/internal/alerts"
+	"github.com/kirg0/d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/i18n"
+	"github.com/kirg0/d9c/internal/theme"
+	"github.com/kirg0/d9c/internal/ui/cmdline"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

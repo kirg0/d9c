@@ -24,7 +24,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"gopkg.in/yaml.v3"
 
-	"d9c/internal/ui/styles"
+	"github.com/kirg0/d9c/internal/ui/styles"
 )
 
 // DefaultName is the built-in palette used when the config file is absent or

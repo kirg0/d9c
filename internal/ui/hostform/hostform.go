@@ -4,8 +4,8 @@ package hostform
 import (
 	"strings"
 
-	"d9c/internal/hosts"
-	"d9c/internal/ui/styles"
+	"github.com/kirg0/d9c/internal/hosts"
+	"github.com/kirg0/d9c/internal/ui/styles"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"

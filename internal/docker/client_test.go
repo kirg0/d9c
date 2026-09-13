@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"d9c/internal/config"
+	"github.com/kirg0/d9c/internal/config"
 
 	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/client"

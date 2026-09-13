@@ -7,7 +7,7 @@ package connwait
 import (
 	"strings"
 
-	"d9c/internal/ui/styles"
+	"github.com/kirg0/d9c/internal/ui/styles"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"

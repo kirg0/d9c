@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"d9c/internal/i18n"
+	"github.com/kirg0/d9c/internal/i18n"
 
 	"github.com/docker/go-units"
 )

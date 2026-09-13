@@ -3,10 +3,10 @@ package ui
 import (
 	"testing"
 
-	"d9c/internal/config"
-	"d9c/internal/docker"
-	"d9c/internal/plugins"
-	"d9c/internal/ui/cmdline"
+	"github.com/kirg0/d9c/internal/config"
+	"github.com/kirg0/d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/plugins"
+	"github.com/kirg0/d9c/internal/ui/cmdline"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

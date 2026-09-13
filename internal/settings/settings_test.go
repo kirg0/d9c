@@ -5,11 +5,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"d9c/internal/hosts"
-	"d9c/internal/i18n"
-	"d9c/internal/keymap"
-	"d9c/internal/theme"
-	"d9c/internal/ui/styles"
+	"github.com/kirg0/d9c/internal/hosts"
+	"github.com/kirg0/d9c/internal/i18n"
+	"github.com/kirg0/d9c/internal/keymap"
+	"github.com/kirg0/d9c/internal/theme"
+	"github.com/kirg0/d9c/internal/ui/styles"
 )
 
 func TestLoadMissingFileYieldsDefaults(t *testing.T) {

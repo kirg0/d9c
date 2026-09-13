@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/docker"
 )
 
 func main() {

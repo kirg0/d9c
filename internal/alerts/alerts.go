@@ -18,7 +18,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/docker"
 )
 
 // Thresholds defines the resource-usage limits that mark a running container as

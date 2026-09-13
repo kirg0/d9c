@@ -9,10 +9,10 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"d9c/internal/docker"
-	"d9c/internal/hosts"
-	"d9c/internal/ui/filter"
-	"d9c/internal/ui/styles"
+	"github.com/kirg0/d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/hosts"
+	"github.com/kirg0/d9c/internal/ui/filter"
+	"github.com/kirg0/d9c/internal/ui/styles"
 
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/lipgloss"
