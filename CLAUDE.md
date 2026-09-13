@@ -1,63 +1,65 @@
 # d9c — guidance for Claude
 
-Go TUI для мониторинга/управления Docker на удалённом хосте (bubbletea + Docker SDK, подключение по TCP/SSH).
+A Go TUI for monitoring/managing Docker on a remote host (bubbletea + Docker SDK, connecting over TCP/SSH).
 
-## Дорожная карта
+## Roadmap
 
-Актуальный план развития — в [PLANE.md](PLANE.md). Сверяйся с ним в начале работы, бери оттуда следующий пункт, и **после реализации фичи и прохождения quality gate отмечай пункт как выполненный (`[x]`)**.
+The current development plan lives in [PLANE.md](PLANE.md). Check it at the start of work, take the next item from it, and **after implementing a feature and passing the quality gate, mark the item as done (`[x]`)**.
 
-## База знаний (память) — `.claude/memory/`
+## Knowledge base (memory) — `.claude/memory/`
 
-В каталоге [.claude/memory/](.claude/memory/) лежит перенесённая база знаний по проекту
-(заметки по каждой фиче, ловушки, паттерны тестов, инварианты, инструментарий). Индекс —
-[.claude/memory/MEMORY.md](.claude/memory/MEMORY.md). **В начале работы прочитай индекс и
-открой релевантные заметки** — это копия рабочей памяти, которая едет вместе с КАТАЛОГОМ
-проекта (копируется при переносе папки на другой ПК), но **не контролируется git** (`.claude/`
-в `.gitignore`), поэтому через `git clone` она не подтянется — переносить каталог целиком.
-Заметки — снимки на момент написания: сверяй `file:line`-ссылки и поведение с текущим кодом,
-при существенных изменениях обновляй соответствующий файл памяти.
+The [.claude/memory/](.claude/memory/) directory holds the project's migrated knowledge base
+(notes per feature, pitfalls, test patterns, invariants, tooling). The index is
+[.claude/memory/MEMORY.md](.claude/memory/MEMORY.md). **At the start of work, read the index and
+open the relevant notes** — it is a copy of the working memory that travels with the project
+DIRECTORY (copied when the folder is moved to another PC), but it is **not tracked by git** (`.claude/`
+is in `.gitignore`), so a `git clone` will not bring it along — move the whole directory.
+Notes are snapshots from the time of writing: verify `file:line` references and behavior against
+the current code, and update the corresponding memory file after significant changes.
 
-## Quality gate — обязательно перед тем, как считать задачу готовой
+## Quality gate — mandatory before considering a task done
 
-Прогоняй полный набор проверок (PowerShell, Go в `C:\Program Files\Go\bin`, инструменты в `%USERPROFILE%\go\bin`):
+Run the full set of checks (PowerShell, Go in `C:\Program Files\Go\bin`, tools in `%USERPROFILE%\go\bin`):
 
 ```
 make check      # = fmtcheck + vet + golangci-lint + test
 ```
 
-или вручную:
+or manually:
 
 ```
-gofmt -l .               # должно быть пусто
+gofmt -l .               # must be empty
 go vet ./...
-golangci-lint run ./...  # конфиг в .golangci.yml; установка: make tools
+golangci-lint run ./...  # config in .golangci.yml; install: make tools
 go test ./...
 ```
 
-`golangci-lint` (v2) включает errcheck, errorlint, gocritic, revive, staticcheck, misspell, unparam и др. `cmd/*` (диагностические утилиты) из линтера исключены.
+`golangci-lint` (v2) enables errcheck, errorlint, gocritic, revive, staticcheck, misspell, unparam, and more. `cmd/*` (diagnostic utilities) are excluded from the linter.
 
-Не отчитывайся об успехе, пока всё не зелёное. Для конкурентного кода добавляй `go test -race ./...`.
+Do not report success until everything is green. For concurrent code, add `go test -race ./...`.
 
-## Тесты — для каждой новой/изменённой функции
+## Tests — for every new/changed function
 
-- Чистую логику выноси в отдельные функции и покрывай table-driven тестами (`internal/ui/update_test.go`, `internal/docker/resources_test.go` — образцы).
-- TUI проверяй headless через `teatest` (`internal/ui/app_test.go`). Запуск без Docker: `go run . -demo` (фейковый бэкенд в `internal/docker/fake.go`).
-- Две ловушки teatest: (1) в начале шли nudge-клавишу `r`, иначе первый кадр не флашится; (2) `WaitFor` опустошает буфер `Output()` — несколько подстрок одного кадра проверяй ОДНИМ условием.
+- Extract pure logic into separate functions and cover it with table-driven tests (`internal/ui/update_test.go`, `internal/docker/resources_test.go` are the reference examples).
+- Test the TUI headlessly via `teatest` (`internal/ui/app_test.go`). Running without Docker: `go run . -demo` (fake backend in `internal/docker/fake.go`).
+- Two teatest pitfalls: (1) send the nudge key `r` first, otherwise the first frame is not flushed; (2) `WaitFor` drains the `Output()` buffer — check several substrings of one frame in a SINGLE condition.
+- The UI language defaults to English (`i18n.EN`), so tests assert the English variant of `i18n.T(ru, en)` strings; a test that switches the language must restore `i18n.EN` in `t.Cleanup`.
 
-## Конвенции Go в этом проекте
+## Go conventions in this project
 
-- **Ошибки:** оборачивай через `fmt.Errorf("...: %w", err)`, сохраняя контекст операции. Сообщения — со строчной буквы, без точки (ST1005). Сырые ошибки Docker-демона переводи в понятный текст с рекомендацией (`friendlyImageRemoveErr` в `resources.go`).
-- **Архитектура:** все операции Docker — за интерфейсом `docker.Backend` (`client.go`). Новый бэкенд = реализация интерфейса (см. `FakeBackend`). Не обращайся к `*client.Client` в обход интерфейса из слоя UI.
-- **bubbletea (Elm):** `Update` не мутирует внешнее состояние и не делает блокирующих/IO-вызовов — всё через `tea.Cmd`, результат возвращается типизированным `Msg`. Длинные операции не блокируют event loop.
-- **UI-слои:** каждый компонент (`table`, `detail`, `logs`, `cmdline`, `filter`) самодостаточен и реализует свой `Update/View`; корневая модель делегирует. Новый режим = константа `Mode` + ветка в `handleKey` + рендерер в `view.go`. Новая команда `:` = case в `dispatchCommand`. Новый раздел (resource) = константа `ResourceView` + ветки в `relayout`/`fetchCurrentResource`/`refreshTableRows`/`buildCopyItems` + колонки/строки в `table` + набор команд в `cmdline`.
-- **bubbles/table инвариант:** число ячеек в каждой строке ДОЛЖНО равняться числу колонок — `renderRow` итерирует по ячейкам и индексирует `cols[i]`, иначе паника `index out of range`. Не клади «скрытую» ID-ячейку сверх колонок. Идентификатор строки бери через `Model.selectedID()` (NAME=первая колонка для hosts/volumes, ID=последняя для остальных).
-- **Стиль:** только `gofmt`/табы. Группируй импорты (stdlib / внешние / `d9c/...`). Экспортируемые символы — с doc-комментариями, начинающимися с имени. Платформо-зависимый код — через build-теги (`*_windows.go` / `*_other.go`).
-- **Стилизация:** все цвета/стили — только в `internal/ui/styles/styles.go`, не хардкодь lipgloss-стили по месту.
+- **Errors:** wrap with `fmt.Errorf("...: %w", err)`, preserving the operation context. Messages start lowercase, with no trailing period (ST1005). Translate raw Docker daemon errors into readable text with a recommendation (`friendlyImageRemoveErr` in `resources.go`).
+- **Architecture:** all Docker operations go through the `docker.Backend` interface (`client.go`). A new backend = an implementation of the interface (see `FakeBackend`). Do not reach `*client.Client` around the interface from the UI layer.
+- **bubbletea (Elm):** `Update` does not mutate external state and makes no blocking/IO calls — everything goes through `tea.Cmd`, with the result returned as a typed `Msg`. Long operations must not block the event loop.
+- **UI layers:** each component (`table`, `detail`, `logs`, `cmdline`, `filter`) is self-contained and implements its own `Update/View`; the root model delegates. A new mode = a `Mode` constant + a branch in `handleKey` + a renderer in `view.go`. A new `:` command = a case in `dispatchCommand`. A new section (resource) = a `ResourceView` constant + branches in `relayout`/`fetchCurrentResource`/`refreshTableRows`/`buildCopyItems` + columns/rows in `table` + a command set in `cmdline`.
+- **bubbles/table invariant:** the number of cells in every row MUST equal the number of columns — `renderRow` iterates over cells and indexes `cols[i]`, otherwise it panics with `index out of range`. Do not add a "hidden" ID cell beyond the columns. Get the row identifier via `Model.selectedID()` (NAME = first column for hosts/volumes, ID = last column for the rest).
+- **Style:** `gofmt`/tabs only. Group imports (stdlib / external / `d9c/...`). Exported symbols get doc comments starting with the symbol name. Platform-specific code goes behind build tags (`*_windows.go` / `*_other.go`).
+- **Styling:** all colors/styles live only in `internal/ui/styles/styles.go`; do not hardcode lipgloss styles in place.
+- **Localization:** user-facing strings go through `i18n.T(ru, en)`; English is the default language, Russian is selected via `:lang ru` / `lang: ru` in the config.
 
-## Запуск
+## Running
 
 ```
-go run . -demo                 # демо-данные, без Docker
+go run . -demo                 # demo data, no Docker
 go run . -H tcp://host:2375
 go run . -H ssh://user@host
 ```

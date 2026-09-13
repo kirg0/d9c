@@ -1,434 +1,459 @@
 # Changelog
 
-Все заметные изменения проекта документируются в этом файле.
-Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
-проект следует [семантическому версионированию](https://semver.org/lang/ru/).
+All notable changes to this project are documented in this file.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and the project adheres to [Semantic Versioning](https://semver.org/).
+
+## [1.23.0] - 2026-09-13
+
+### Changed
+
+- **English is now the default UI language.** Without a `lang:` key in
+  `d9c-config.yaml` the interface starts in English (previously Russian).
+  Russian remains fully supported: `:lang ru` or `lang: ru` in the config.
+  An existing `lang:` setting is honored as before. The `:lang` picker now
+  lists `English` first.
+- **`CLAUDE.md` and `CHANGELOG.md` translated to English.**
 
 ## [1.22.4] - 2026-09-13
 
-### Изменено
+### Changed
 
-- **Путь Go-модуля `d9c` → `github.com/kirg0/d9c`.** Теперь работает
-  `go install github.com/kirg0/d9c@latest`; ldflags для версии —
+- **Go module path `d9c` → `github.com/kirg0/d9c`.** `go install
+  github.com/kirg0/d9c@latest` now works; the version ldflags are
   `-X github.com/kirg0/d9c/internal/version.Version=...`.
-- **Основной README — английский** (`README.md`), русский — `README-RU.md`;
-  динамические бейджи (release, CI, Go Report Card), анимированное демо
+- **The main README is now English** (`README.md`), the Russian one is
+  `README-RU.md`; dynamic badges (release, CI, Go Report Card), animated demo
   `docs/demo.gif`.
 
-### Исправлено
+### Fixed
 
-- **Пропадала верхняя строка (шапка) в разделе Containers.** При старте
-  высота таблицы считалась по колонкам-заглушкам нулевой ширины, и тело
-  получалось на строку выше окна — терминал прокручивался и шапка
-  `d9c vX.Y.Z › Containers` уезжала за экран (в том числе в stats-режиме `s`).
-  Теперь смена колонок пересчитывает высоту вьюпорта.
+- **The top line (header) disappeared in the Containers section.** At startup
+  the table height was computed from zero-width placeholder columns, so the
+  body came out one line taller than the window — the terminal scrolled and the
+  `d9c vX.Y.Z › Containers` header went off-screen (including in stats mode `s`).
+  Changing columns now recalculates the viewport height.
 
 ## [1.22.0] - 2026-07-19
 
-### Добавлено
+### Added
 
-- **Бэкенд CRI-O / generic CRI поверх `crictl`.** Новые схемы хоста:
-  `crio://` / `cri://` (crictl на локальной машине, опционально с путём к
-  сокету — `crio:///var/run/crio/crio.sock`) и `crio+ssh://user@host`
-  / `cri+ssh://user@host[/путь/к.sock]` (crictl на удалённом хосте по SSH,
-  та же аутентификация ключом/паролем, что и у ssh://). Работает с CRI-O,
-  CRI-плагином containerd и любым рантаймом с CRI-сокетом; в шапке — метка
-  `cri-o` (или `cri` для прочих рантаймов) по `RuntimeName` из
-  `crictl version`. Покрыто: контейнеры (имя показывается как
-  `pod/container`, состояние из CRI-статуса), inspect, start/stop/rm,
-  kill (= CRI stop с таймаутом 0; другие сигналы CRI не поддерживает),
-  логи `-f/--tail/--since`, метрики CPU/MEM (CPU% по дельте
-  cumulative-счётчика между тиками), интерактивный exec (по SSH), обзор
-  файловой системы, образы (список/inspect/rmi/pull/prune), events
-  (cri-tools ≥ 1.26), эмуляция `system df`, счётчики для дашборда Hosts.
-  Вне модели CRI — мягкая деградация: Networks/Volumes/Compose показывают
-  пустые списки, build/tag/push/run/cp отвечают понятной ошибкой
-  «CRI управляет только pod'ами, контейнерами и образами». Реализация — по
-  образцу nerdctl-бэкенда (runner local/ssh, чистые парсеры под
-  table-тестами); чистый CRI gRPC отклонён: он не покрывает логи (файлы на
-  хосте) и exec (SPDY-стриминг), так что SSH нужен в любом случае.
+- **CRI-O / generic CRI backend on top of `crictl`.** New host schemes:
+  `crio://` / `cri://` (crictl on the local machine, optionally with a socket
+  path — `crio:///var/run/crio/crio.sock`) and `crio+ssh://user@host`
+  / `cri+ssh://user@host[/path/to.sock]` (crictl on a remote host over SSH,
+  with the same key/password authentication as ssh://). Works with CRI-O, the
+  containerd CRI plugin and any runtime with a CRI socket; the header shows a
+  `cri-o` label (or `cri` for other runtimes) based on `RuntimeName` from
+  `crictl version`. Covered: containers (name shown as `pod/container`, state
+  from the CRI status), inspect, start/stop/rm, kill (= CRI stop with a zero
+  timeout; CRI supports no other signals), logs `-f/--tail/--since`, CPU/MEM
+  metrics (CPU% from the delta of the cumulative counter between ticks),
+  interactive exec (over SSH), filesystem browsing, images
+  (list/inspect/rmi/pull/prune), events (cri-tools ≥ 1.26), `system df`
+  emulation, counters for the Hosts dashboard. Outside the CRI model — graceful
+  degradation: Networks/Volumes/Compose show empty lists, build/tag/push/run/cp
+  return a clear error "CRI manages only pods, containers and images". The
+  implementation follows the nerdctl backend (local/ssh runner, pure parsers
+  under table tests); pure CRI gRPC was rejected: it covers neither logs
+  (files on the host) nor exec (SPDY streaming), so SSH is needed anyway.
 
 ## [1.21.0] - 2026-07-04
 
-### Добавлено
+### Added
 
-- **Окно статуса подключения для всех типов хостов** (#22). Раньше модалка со
-  спиннером «connecting to …» показывалась только для SSH-хостов с парольной
-  аутентификацией — подключение по ключу или TCP (Enter в Hosts, `:connect`)
-  шло «молча», а ошибка падала строкой в футер. Теперь при любом подключении
-  открывается окно статуса: спиннер пока идёт дозвон, при ошибке окно остаётся
-  открытым с сообщением (Enter — повторить, Esc — закрыть), при успехе
-  закрывается само. Спец-ошибки (смена SSH-ключа хоста, host not found,
-  недоступный unix-сокет) по-прежнему показываются отдельными
-  информационными окнами с инструкцией.
+- **Connection status window for all host types** (#22). Previously the modal
+  with a "connecting to …" spinner was shown only for SSH hosts with password
+  authentication — connecting with a key or over TCP (Enter in Hosts,
+  `:connect`) happened "silently", and an error landed as a line in the footer.
+  Now every connection opens a status window: a spinner while dialing; on error
+  the window stays open with the message (Enter — retry, Esc — close); on
+  success it closes by itself. Special errors (changed SSH host key, host not
+  found, unreachable unix socket) are still shown in separate informational
+  windows with instructions.
 
 ## [1.20.7] - 2026-07-04
 
-### Исправлено
+### Fixed
 
-- **Микрооптимизации фильтра, сортировки и таблиц** (#21). `filter.Match`
-  понижает регистр строки один раз, а не на каждый терм; `filter.Compile`
-  мемоизирован; сортировка по имени предвычисляет ключи; защита от паники
-  в `truncate` при нулевой ширине. (Запись восстановлена задним числом —
-  релиз v1.20.7 вышел без заметки в CHANGELOG.)
+- **Micro-optimizations of the filter, sorting and tables** (#21). `filter.Match`
+  lowercases the string once rather than per term; `filter.Compile` is
+  memoized; name sorting precomputes keys; a guard against a panic in
+  `truncate` at zero width. (Entry restored retroactively — the v1.20.7
+  release shipped without a CHANGELOG note.)
 
 ## [1.20.6] - 2026-07-04
 
-### Исправлено
+### Fixed
 
-- **Compose-операции по SSH больше не гоняют лишнюю пробу `docker version`
-  перед каждым запуском.** `sshNeedsSudo()` выполнял SSH round-trip при каждом
-  up/down/pull/create/restore. Теперь вердикт «нужен ли sudo» кэшируется на
-  время жизни соединения (по образцу `Runtime()`; реконнект создаёт новый
-  бэкенд и сбрасывает кэш). Неоднозначная проба — обе попытки упали, вероятно
-  обрыв связи — не кэшируется и повторяется при следующем вызове.
+- **Compose operations over SSH no longer run an extra `docker version` probe
+  before every run.** `sshNeedsSudo()` made an SSH round-trip on every
+  up/down/pull/create/restore. The "is sudo needed" verdict is now cached for
+  the lifetime of the connection (following `Runtime()`; a reconnect creates a
+  new backend and resets the cache). An ambiguous probe — both attempts failed,
+  likely a dropped connection — is not cached and is retried on the next call.
 
 ## [1.20.5] - 2026-07-04
 
-### Исправлено
+### Fixed
 
-- **Темы теперь действуют на просмотр логов, inspect, события и подсказку
-  командной строки.** Раскраска уровней логов (ERROR/WARN/INFO/DEBUG и
-  таймстамп), YAML-подсветка в inspect (ключи/строки/числа/bool/null),
-  лента `docker events` (type/action/scope), подсветка совпадений поиска,
-  строка-скроллбар и ghost-текст автодополнения были захардкожены в палитре
-  Tokyo Night (~35 hex-значений вне `styles.go`) и игнорировали `:theme` /
-  `theme:` из конфига. Все стили перенесены в `styles.Palette`/`styles.Apply`
-  и переключаются вместе с темой, включая живое превью в пикере. Конвенция
-  закреплена тестом: hex-литерал вне пакета `styles` роняет `go test`.
+- **Themes now apply to the log viewer, inspect, events and the command-line
+  hint.** Log level coloring (ERROR/WARN/INFO/DEBUG and the timestamp), YAML
+  highlighting in inspect (keys/strings/numbers/bool/null), the `docker events`
+  feed (type/action/scope), search match highlighting, the scrollbar line and
+  the autocomplete ghost text were hardcoded to the Tokyo Night palette (~35 hex
+  values outside `styles.go`) and ignored `:theme` / `theme:` from the config.
+  All styles were moved into `styles.Palette`/`styles.Apply` and switch together
+  with the theme, including the live preview in the picker. The convention is
+  enforced by a test: a hex literal outside the `styles` package fails `go test`.
 
 ## [1.20.4] - 2026-07-03
 
-### Исправлено
+### Fixed
 
-- **Логи и события больше не подвешивают интерфейс на болтливых потоках.**
-  Раньше каждая строка лога/события шла отдельным сообщением через event loop,
-  и на каждую строку буфер пере-джойнился целиком (а при активном поиске ещё и
-  полностью ресканировался) — на живом `docker logs -f` нагруженного контейнера
-  это давало квадратичный рост CPU и заметные подвисания. Теперь строки
-  доставляются пачками (первая — блокирующе, остальное добирается из канала без
-  ожидания, до 256 за раз), перерисовка — одна на пачку, а поиск обновляется
-  инкрементально: проверяются только добавленные строки.
-- **Буфер логов/событий больше не растёт бесконечно.** Введён потолок 10 000
-  строк (как scrollback): старые строки вытесняются новыми, индексы найденных
-  совпадений корректно сдвигаются вслед за обрезкой (курсор текущего совпадения
-  остаётся на своей строке). Ранее `:logs` без `--tail` на активном контейнере
-  постепенно съедал память и замедлял каждую перерисовку.
+- **Logs and events no longer hang the interface on chatty streams.**
+  Previously every log/event line went through the event loop as a separate
+  message, and on every line the buffer was re-joined in full (and, with an
+  active search, fully rescanned) — on a live `docker logs -f` of a busy
+  container this caused quadratic CPU growth and noticeable stalls. Lines are
+  now delivered in batches (the first one blocking, the rest drained from the
+  channel without waiting, up to 256 at a time), with one redraw per batch, and
+  search is updated incrementally: only the appended lines are checked.
+- **The log/event buffer no longer grows without bound.** A cap of 10,000
+  lines was introduced (like scrollback): old lines are evicted by new ones, and
+  the indices of found matches are shifted correctly after trimming (the
+  current match cursor stays on its line). Previously `:logs` without `--tail`
+  on an active container gradually ate memory and slowed down every redraw.
 
 ## [1.20.3] - 2026-07-02
 
-### Исправлено
+### Fixed
 
-По итогам полного live-прогона всех операций бэкенда на containerd-хосте
+Following a full live run of every backend operation on a containerd host
 (Debian 13, containerd v2.3.2, rootless nerdctl 2.3.4):
 
-- **containerd: `:system df` больше не падает.** У nerdctl (2.x) нет команды
-  `system df`, и пользователь видел сырое `level=fatal msg="unknown subcommand
-  \"df\""`. Теперь отчёт собирается из списков объектов: количество образов с
-  суммарным размером, контейнеры (всего/запущено) и тома.
-- **containerd: дашборд хостов больше не пустой.** `Info()` не заполнял имя
-  хоста, число CPU и объём памяти — теперь они берутся из
-  `nerdctl info --format json` (Name/NCPU/MemTotal, заодно и ServerVersion
-  без разбора Components).
-- **containerd: заработал фильтр `network:`.** В JSON-выводе `nerdctl ps` нет
-  поля Networks, поэтому список сетей контейнера был всегда пуст. Теперь сети
-  извлекаются из служебной метки `nerdctl/networks=["…"]` (аккуратно, минуя
-  запятые внутри JSON-значения, которые ломают обычный разбор меток).
-- **Браузер файлов: несуществующий каталог больше не выдаёт «в контейнере нет
-  `ls`».** Сообщение `ls: /путь: No such file or directory` ошибочно ловилось
-  проверкой на отсутствие самого `ls` (префикс `ls:` совпадал). Теперь ошибка
-  привязывается к каталогу, если stderr упоминает запрошенный путь; ложное
-  сообщение исправлено для обоих бэкендов (docker и nerdctl).
-- **containerd: дружелюбные ошибки вместо сырых фаталов.** Обёртка logrus
+- **containerd: `:system df` no longer fails.** nerdctl (2.x) has no
+  `system df` command, and the user saw a raw `level=fatal msg="unknown
+  subcommand \"df\""`. The report is now assembled from object lists: the
+  number of images with their total size, containers (total/running) and
+  volumes.
+- **containerd: the hosts dashboard is no longer empty.** `Info()` did not fill
+  in the host name, CPU count and memory size — they are now taken from
+  `nerdctl info --format json` (Name/NCPU/MemTotal, plus ServerVersion without
+  parsing Components).
+- **containerd: the `network:` filter now works.** The JSON output of
+  `nerdctl ps` has no Networks field, so a container's network list was always
+  empty. Networks are now extracted from the internal label
+  `nerdctl/networks=["…"]` (carefully, bypassing commas inside the JSON value
+  that break regular label parsing).
+- **File browser: a nonexistent directory no longer reports "the container has
+  no `ls`".** The message `ls: /path: No such file or directory` was wrongly
+  caught by the check for a missing `ls` itself (the `ls:` prefix matched). The
+  error is now attributed to the directory if stderr mentions the requested
+  path; the false message is fixed for both backends (docker and nerdctl).
+- **containerd: friendly errors instead of raw fatals.** The logrus wrapper
   (`time="…" level=fatal msg="1 errors:
-no such image: …"`) срезается со всех
-  ошибок одношаговых nerdctl-команд — в интерфейсе остаётся только суть
-  («no such image: …»).
+no such image: …"`) is stripped from all
+  errors of single-step nerdctl commands — the interface shows only the gist
+  ("no such image: …").
 
 ## [1.20.2] - 2026-07-02
 
-### Исправлено
+### Fixed
 
-- **Events: пустой viewer больше не выглядит сломанным.** Лента событий на
-  containerd-хосте без активности (нет healthcheck'ов и фоновых операций, в
-  отличие от типичного docker-демона) оставалась пустой и была неотличима от
-  неработающего стрима. Теперь: (1) до первого события viewer показывает
-  подсказку «ожидание событий…»; (2) если поток завершился сам по себе (процесс
-  `nerdctl events` умер, разрыв SSH) — в ленте появляется заметная строка
-  `[error] поток событий завершился — нажмите r для переподключения` вместо
-  вечной тишины. Строки/закрытия устаревшего (заменённого) стрима не
-  подмешиваются в живую ленту (сообщения несут идентификатор канала).
+- **Events: an empty viewer no longer looks broken.** The event feed on a
+  containerd host without activity (no healthchecks or background operations,
+  unlike a typical docker daemon) stayed empty and was indistinguishable from a
+  broken stream. Now: (1) until the first event the viewer shows a "waiting for
+  events…" hint; (2) if the stream ended on its own (the `nerdctl events`
+  process died, SSH dropped) — the feed shows a prominent line
+  `[error] event stream ended — press r to reconnect` instead of eternal
+  silence. Lines/closures of a stale (replaced) stream are not mixed into the
+  live feed (messages carry a channel identifier).
 
 ## [1.20.1] - 2026-07-02
 
-### Исправлено
+### Fixed
 
-- **containerd/nerdctl: в разделе Compose не работали `Enter`/`i`/`l`/`e`.**
-  nerdctl не проставляет метку `working_dir`, поэтому ячейка идентификатора
-  (колонка PATH, `ComposeIDColumn`) была пустой и `selectedID()` возвращал `""` —
-  клавиши молча ничего не делали. Теперь ячейка идентификатора берётся из
-  `ComposeProject.Identity()` (working_dir, при его отсутствии — имя проекта);
-  тот же фолбэк применён в `composeNameFor`, меню копирования и переменных
-  плагинов. Фильтр по метке проекта в бэкендах уже поддерживал такой
-  идентификатор.
+- **containerd/nerdctl: `Enter`/`i`/`l`/`e` did not work in the Compose section.**
+  nerdctl does not set the `working_dir` label, so the identifier cell (the PATH
+  column, `ComposeIDColumn`) was empty and `selectedID()` returned `""` — the keys
+  silently did nothing. The identifier cell is now taken from
+  `ComposeProject.Identity()` (working_dir, falling back to the project name);
+  the same fallback is applied in `composeNameFor`, the copy menu and plugin
+  variables. Filtering by the project label in the backends already supported
+  such an identifier.
 
 ## [1.20.0] - 2026-07-01
 
-### Добавлено
+### Added
 
-- **containerd/nerdctl: рабочие `up`/`pull`/`down` для Compose без compose-файла.**
-  nerdctl (в отличие от docker compose) не проставляет метки `working_dir`/
-  `config_files`, а `nerdctl compose ls` в 2.x отсутствует — путь к compose-файлу
-  обнаруженного проекта восстановить неоткуда, поэтому команды движка раньше падали.
-  Теперь они реконструируются из меток `com.docker.compose.project` (есть и на
-  контейнерах, и на сетях): **up** запускает контейнеры проекта, **pull** тянет
-  образы сервисов (со стримингом прогресса), **down** останавливает и удаляет
-  контейнеры проекта и его сети (именованные тома не трогает, как `docker compose
-  down` по умолчанию). Проверено на реальном стенде. `config`/`edit`/`backup`
-  для containerd остаются недоступны (нужен compose-файл) (#19).
+- **containerd/nerdctl: working `up`/`pull`/`down` for Compose without a compose
+  file.** nerdctl (unlike docker compose) does not set the `working_dir`/
+  `config_files` labels, and `nerdctl compose ls` is missing in 2.x — there is
+  nowhere to recover the compose file path of a discovered project from, so the
+  engine commands used to fail. They are now reconstructed from the
+  `com.docker.compose.project` labels (present on both containers and networks):
+  **up** starts the project's containers, **pull** pulls the service images
+  (with streamed progress), **down** stops and removes the project's containers
+  and its networks (named volumes are left alone, like `docker compose down` by
+  default). Verified on a real test stand. `config`/`edit`/`backup` remain
+  unavailable for containerd (they need a compose file) (#19).
 
 ## [1.19.3] - 2026-07-01
 
-### Исправлено
+### Fixed
 
-- **containerd/nerdctl: запуск контейнера с портом (`-p`) падал `iptables not
-  found`.** У неинтерактивной SSH-сессии PATH = `/usr/local/bin:/usr/bin:/bin`
-  (без `/usr/sbin`), где лежит `iptables`; nerdctl на стороне клиента дёргает его
-  при публикации порта и не находил → `failed to load networking flags` (внешне —
-  «зависание» на докачке образа, затем ошибка). Теперь SSH-runner добавляет
-  `/usr/local/sbin:/usr/sbin:/sbin` в PATH для всех nerdctl-команд. Проверено на
-  реальном хосте: `run -d -p 8080:80 nginx` стартует штатно (#18).
+- **containerd/nerdctl: starting a container with a port (`-p`) failed with
+  `iptables not found`.** A non-interactive SSH session has
+  PATH = `/usr/local/bin:/usr/bin:/bin` (without `/usr/sbin`, where `iptables`
+  lives); nerdctl calls it client-side when publishing a port and could not find
+  it → `failed to load networking flags` (visible as a "hang" while pulling the
+  image, then an error). The SSH runner now adds
+  `/usr/local/sbin:/usr/sbin:/sbin` to PATH for all nerdctl commands. Verified on
+  a real host: `run -d -p 8080:80 nginx` starts normally (#18).
 
 ## [1.19.2] - 2026-07-01
 
-### Исправлено
+### Fixed
 
-- **`nerdctl+ssh://`-хосты не распознавались как SSH в UI.** Вся SSH-аутентификация
-  (форма хоста, хранилище, connect-модалка, разбор логина) была завязана на
-  `HasPrefix(host, "ssh://")`, поэтому containerd-хосты со схемой `nerdctl+ssh://`
-  не показывали выбор ключ/пароль, теряли сохранённую авторизацию и **не запрашивали
-  пароль при подключении** → соединение падало. Добавлен единый хелпер `hosts.IsSSH`
-  (ssh:// | nerdctl+ssh://); `SSHUser`/`WithSSHUser` понимают и сохраняют префикс
-  `nerdctl+`. Теперь модалка логин/пароль открывается и для containerd-хостов по SSH
-  (#17). Прямая схема без пароля по-прежнему: `-H nerdctl+ssh://user@host` (ключ/агент)
-  или `-ssh-password` в CLI.
+- **`nerdctl+ssh://` hosts were not recognized as SSH in the UI.** All SSH
+  authentication (host form, storage, connect modal, login parsing) was tied to
+  `HasPrefix(host, "ssh://")`, so containerd hosts with the `nerdctl+ssh://`
+  scheme did not offer the key/password choice, lost their saved authentication
+  and **did not prompt for a password on connect** → the connection failed. A
+  single helper `hosts.IsSSH` (ssh:// | nerdctl+ssh://) was added;
+  `SSHUser`/`WithSSHUser` understand and preserve the `nerdctl+` prefix. The
+  login/password modal now opens for containerd hosts over SSH too (#17). The
+  direct passwordless form is unchanged: `-H nerdctl+ssh://user@host` (key/agent)
+  or `-ssh-password` on the CLI.
 
 ## [1.19.1] - 2026-07-01
 
-### Исправлено
+### Fixed
 
-- **containerd/nerdctl: пустая версия сервера в дашборде Hosts.** `Info().Version`
-  собирался неверным шаблоном `nerdctl version --format '{{.Server.Version}}'` — у
-  nerdctl версия сервера лежит в `Server.Components[]` (containerd), а не в плоском
-  поле `.Server.Version`. Теперь парсится `nerdctl version --format json` → версия
-  компонента containerd. Найдено при живой проверке на реальном хосте (containerd
-  v2.3.2, rootless-режим; #16).
+- **containerd/nerdctl: empty server version in the Hosts dashboard.**
+  `Info().Version` was built with the wrong template
+  `nerdctl version --format '{{.Server.Version}}'` — nerdctl keeps the server
+  version in `Server.Components[]` (containerd), not in a flat
+  `.Server.Version` field. It now parses `nerdctl version --format json` → the
+  containerd component version. Found during a live check on a real host
+  (containerd v2.3.2, rootless mode; #16).
 
 ## [1.19.0] - 2026-07-01
 
-### Добавлено
+### Added
 
-- **Поддержка containerd через nerdctl.** У containerd нет Docker-совместимого API,
-  поэтому d9c управляет им через `nerdctl` (Docker-совместимый CLI-фронтенд) — новый
-  бэкенд `nerdctlBackend` за тем же интерфейсом `docker.Backend`. Подключение по новым
-  схемам хоста: `nerdctl://` (nerdctl на локальной машине) и `nerdctl+ssh://user@host`
-  (nerdctl на удалённом хосте по SSH, поверх существующей SSH-обвязки). Реализован весь
-  набор разделов: контейнеры (list/start/stop/restart/kill/rm/inspect/logs/stats/run),
-  exec (по SSH-транспорту), образы (list/pull/rmi/tag/push/build/history/prune), сети,
-  тома, Compose (discovery по тем же `com.docker.compose.*` меткам + `nerdctl compose
-  up/down/pull`), events, `system df`/`prune`. В шапке — метка **containerd**.
-- **Namespaces containerd.** Новый опциональный интерфейс `docker.NamespacedBackend`;
-  команда `:namespace <имя>` переключает namespace, `:namespace` без аргумента открывает
-  picker (список из `nerdctl namespace ls`). Активный namespace виден в шапке как
-  `containerd:<ns>`. Все команды nerdctl автоматически скоупятся `--namespace`.
-- Транспортные SSH-хелперы вынесены в `internal/docker/ssh_exec.go` (client-
-  параметризованные `sshOutput`/`sshStream`/`sshPipe`/`sshInteractive`) и делятся между
-  docker- и nerdctl-бэкендами; методы docker-бэкенда стали тонкими обёртками (поведение
-  не изменилось).
+- **containerd support via nerdctl.** containerd has no Docker-compatible API,
+  so d9c drives it through `nerdctl` (a Docker-compatible CLI frontend) — a new
+  `nerdctlBackend` behind the same `docker.Backend` interface. Connect using the
+  new host schemes: `nerdctl://` (nerdctl on the local machine) and
+  `nerdctl+ssh://user@host` (nerdctl on a remote host over SSH, on top of the
+  existing SSH plumbing). The full set of sections is implemented: containers
+  (list/start/stop/restart/kill/rm/inspect/logs/stats/run), exec (over the SSH
+  transport), images (list/pull/rmi/tag/push/build/history/prune), networks,
+  volumes, Compose (discovery via the same `com.docker.compose.*` labels +
+  `nerdctl compose up/down/pull`), events, `system df`/`prune`. The header shows
+  a **containerd** label.
+- **containerd namespaces.** A new optional `docker.NamespacedBackend`
+  interface; the `:namespace <name>` command switches the namespace,
+  `:namespace` without an argument opens a picker (list from
+  `nerdctl namespace ls`). The active namespace is shown in the header as
+  `containerd:<ns>`. All nerdctl commands are automatically scoped with
+  `--namespace`.
+- SSH transport helpers were moved to `internal/docker/ssh_exec.go`
+  (client-parameterized `sshOutput`/`sshStream`/`sshPipe`/`sshInteractive`) and
+  are shared between the docker and nerdctl backends; the docker backend methods
+  became thin wrappers (behavior unchanged).
 
-### Ограничения
+### Limitations
 
-- `docker cp` и редактирование/бэкап compose-файлов доступны только когда nerdctl
-  запущен локально (по SSH файлы жили бы на удалённом хосте). Локальный интерактивный
-  exec требует ssh-транспорта.
+- `docker cp` and editing/backing up compose files are available only when
+  nerdctl runs locally (over SSH the files would live on the remote host). Local
+  interactive exec requires the ssh transport.
 
 ## [1.18.0] - 2026-07-01
 
-### Добавлено
+### Added
 
-- **Поддержка Podman поверх Docker-совместимого API.** d9c подключается к Podman
-  (`podman system service`) тем же бэкендом, что и к Docker — по `tcp://`, `unix://`
-  или `ssh://`, без отдельного флага. Движок определяется по ответу `/version`
-  (`docker.Runtime`: компонент/платформа «Podman Engine»), результат кешируется и
-  перепроверяется при смене хоста/реконнекте. Когда на той стороне Podman, в шапке
-  рядом с хостом появляется метка **podman**. Операции Compose по SSH
-  (`up`/`pull`/`down`/`config`/`create`) и проба `version` автоматически используют
-  `podman compose` / `podman` вместо `docker compose` / `docker`. В README — раздел
-  про rootless-сокеты и подключение. `Backend.Runtime()` добавлен во все реализации
-  (real/fake/disconnected); `FakeBackend.RuntimeKind` позволяет проигрывать Podman-
-  пути в demo/тестах.
+- **Podman support over the Docker-compatible API.** d9c connects to Podman
+  (`podman system service`) with the same backend as Docker — over `tcp://`,
+  `unix://` or `ssh://`, without a separate flag. The engine is detected from
+  the `/version` response (`docker.Runtime`: the "Podman Engine"
+  component/platform); the result is cached and rechecked on host
+  change/reconnect. When Podman is on the other side, a **podman** label appears
+  in the header next to the host. Compose operations over SSH
+  (`up`/`pull`/`down`/`config`/`create`) and the `version` probe automatically
+  use `podman compose` / `podman` instead of `docker compose` / `docker`. The
+  README has a section on rootless sockets and connecting. `Backend.Runtime()`
+  was added to all implementations (real/fake/disconnected);
+  `FakeBackend.RuntimeKind` allows exercising Podman paths in demo/tests.
 
 ## [1.17.0] - 2026-06-30
 
-### Добавлено
+### Added
 
-- **Статус подключения в модалке учётных данных.** При подключении к парольному
-  `ssh://`-хосту модалка «Connect to …» больше не закрывается сразу: пока идёт
-  SSH-дозвон, в ней крутится спиннер со статусом **«connecting to …»** (ввод
-  заблокирован, повторный Enter игнорируется). При успехе модалка закрывается и
-  открывается раздел Containers; при ошибке аутентификации она остаётся открытой
-  с понятным сообщением внутри — можно поправить логин/пароль и повторить, не
-  открывая форму заново (исключение — смена ключа хоста: показывается отдельный
-  диалог). Спиннер по образцу `pullform`/`runform`.
+- **Connection status in the credentials modal.** When connecting to a
+  password-authenticated `ssh://` host, the "Connect to …" modal no longer closes
+  immediately: while the SSH dial is in progress, it shows a spinner with the
+  status **"connecting to …"** (input is locked, a repeated Enter is ignored). On
+  success the modal closes and the Containers section opens; on an
+  authentication error it stays open with a clear message inside — you can fix
+  the login/password and retry without reopening the form (the exception is a
+  changed host key: a separate dialog is shown). The spinner follows
+  `pullform`/`runform`.
 
 ## [1.16.0] - 2026-06-30
 
-### Добавлено
+### Added
 
-- **SSH-аутентификация по ключу или паролю с запросом учётных данных при
-  подключении.** В форме добавления/редактирования хоста (`:add`/`:edit`,
-  клавиши `a`/`e`) для `ssh://`-хостов появился выбор способа подключения:
-  **Ключ** (с опциональным полем «Key path» — можно указать кастомный путь к
-  приватному ключу; пусто = ssh-agent / ключи по умолчанию) или **Пароль**
-  (`←/→/пробел` переключают метод). При парольной аутентификации **в конфиг
-  сохраняется только логин** — пароль никогда не пишется на диск. При
-  подключении к такому хосту (`Enter` или `:connect`) открывается модалка
-  **«Connect to …»** с полями логина и пароля: логин подставляется сохранённый,
-  но его можно изменить перед подключением (URL переписывается с новым логином).
-  Пароль живёт только в памяти на время сессии (для авто-реконнекта). Закрывает
-  [#13](https://github.com/kirg0/d9c/issues/13). Новые поля `hosts.Host.SSHAuth`/
-  `SSHKeyPath`, компонент `internal/ui/connform`, режим `ModeConnectAuth`.
+- **SSH authentication by key or password, with credentials prompted on
+  connect.** The host add/edit form (`:add`/`:edit`, keys `a`/`e`) now offers a
+  connection method for `ssh://` hosts: **Key** (with an optional "Key path"
+  field — you can specify a custom private key path; empty = ssh-agent / default
+  keys) or **Password** (`←/→/space` toggle the method). With password
+  authentication **only the login is saved to the config** — the password is
+  never written to disk. Connecting to such a host (`Enter` or `:connect`) opens
+  a **"Connect to …"** modal with login and password fields: the saved login is
+  prefilled but can be changed before connecting (the URL is rewritten with the
+  new login). The password lives only in memory for the session (for
+  auto-reconnect). Closes [#13](https://github.com/kirg0/d9c/issues/13). New
+  fields `hosts.Host.SSHAuth`/`SSHKeyPath`, component `internal/ui/connform`,
+  mode `ModeConnectAuth`.
 
 ## [1.15.0] - 2026-06-29
 
-### Добавлено
+### Added
 
-- **Локализация интерфейса (русский / английский).** Язык переключается командой
-  `:lang` (без аргумента — модалка выбора `Русский`/`English` с живым превью, как у
-  `:theme`; `:lang en` / `:lang ru` — напрямую) и **сохраняется в конфиг** (ключ
-  `lang:` в `d9c-config.yaml`) — переживает перезапуск. По умолчанию интерфейс
-  русский. Новый пакет `internal/i18n` (глобальный текущий язык + хелпер
-  `T(ru, en)`); переведены справка, уведомления, стартовые диалоги, заголовки
-  модалок, подсказки команд и дружелюбные ошибки Docker. Подвал/шапка уже были
-  английскими, поэтому английский режим выходит полностью англоязычным.
+- **UI localization (Russian / English).** The language is switched with the
+  `:lang` command (without an argument — a `Русский`/`English` picker modal with
+  live preview, like `:theme`; `:lang en` / `:lang ru` — directly) and **is saved
+  to the config** (the `lang:` key in `d9c-config.yaml`) — it survives a restart.
+  The interface was Russian by default. New package `internal/i18n` (global
+  current language + a `T(ru, en)` helper); translated: help, notifications,
+  startup dialogs, modal titles, command hints and friendly Docker errors. The
+  footer/header were already in English, so English mode is fully English.
 
 ## [1.13.0] - 2026-06-26
 
-### Добавлено
+### Added
 
-- **Единый конфигурационный файл.** Все настройки приложения — тема, точечные
-  переопределения цветов, горячие клавиши, пороги алертов и **список сохранённых
-  хостов** — теперь хранятся в одном `d9c-config.yaml` (новая секция `hosts:`).
-  Раньше хосты лежали в отдельном `d9c-hosts.json`. Плагины по-прежнему в своём
-  `d9c-plugins.yaml`. Новый пакет `internal/settings` — единственный читатель/
-  писатель файла: запись любой секции (правка хоста, выбор темы) переписывает файл
-  целиком, не затирая остальные секции, а валидация делегируется пакетам
-  `theme`/`keymap`/`alerts` (их чистые `Resolve`).
-- **Тема из пикера сохраняется на диск.** Подтверждение темы в модалке выбора
-  (`Enter`) пишет выбор в `theme:` конфига — он переживает перезапуск. Команда
-  `:theme <name>` по-прежнему меняет тему только на текущую сессию.
-- **Автомиграция хостов.** Существующий `d9c-hosts.json` при первом запуске
-  однократно переносится в `hosts:` нового конфига и переименовывается в
-  `d9c-hosts.json.migrated`. Флаг `-hosts-file` указывает источник миграции.
+- **Unified configuration file.** All application settings — theme, individual
+  color overrides, hotkeys, alert thresholds and **the list of saved hosts** —
+  are now stored in a single `d9c-config.yaml` (new `hosts:` section).
+  Previously hosts lived in a separate `d9c-hosts.json`. Plugins remain in their
+  own `d9c-plugins.yaml`. New package `internal/settings` — the only
+  reader/writer of the file: writing any section (editing a host, choosing a
+  theme) rewrites the whole file without clobbering other sections, and
+  validation is delegated to the `theme`/`keymap`/`alerts` packages (their pure
+  `Resolve`).
+- **The theme from the picker is saved to disk.** Confirming a theme in the
+  picker modal (`Enter`) writes the choice to `theme:` in the config — it
+  survives a restart. The `:theme <name>` command still changes the theme for
+  the current session only.
+- **Automatic host migration.** An existing `d9c-hosts.json` is migrated once on
+  first launch into `hosts:` of the new config and renamed to
+  `d9c-hosts.json.migrated`. The `-hosts-file` flag points to the migration
+  source.
 
 ## [1.12.1] - 2026-06-25
 
-### Исправлено
+### Fixed
 
-- **Выделение строки пропадало при смене темы на лету.** Bubbles-таблица
-  фиксирует стиль выделения один раз при создании, поэтому после `:theme`
-  (или превью в пикере) строка-курсор переставала совпадать с новым
-  ANSI-префиксом и подсветка исчезала в раскрашенных разделах (Hosts/
-  Containers/Compose) — видно было только в стартовой теме. Таблица теперь
-  пере-синхронизирует свои стили при каждой смене темы (`table.RefreshStyles`,
-  вызывается из общего `Model.applyPalette`).
-- **Тема `k9s`: выделение на чёрном фоне.** В палитру добавлены опциональные
-  `SelectBg`/`SelectFg`; для k9s выделенная строка рисуется яркой инверсной
-  полосой (аква-фон + чёрный текст) вместо незаметного сдвига `BgAlt`. Пустые
-  поля = прежнее поведение, остальные темы не затронуты.
+- **Row selection disappeared when switching themes on the fly.** The bubbles
+  table fixes the selection style once at creation, so after `:theme` (or a
+  preview in the picker) the cursor row no longer matched the new ANSI prefix
+  and the highlight vanished in colored sections (Hosts/Containers/Compose) —
+  it was visible only in the startup theme. The table now re-syncs its styles on
+  every theme change (`table.RefreshStyles`, called from the shared
+  `Model.applyPalette`).
+- **`k9s` theme: selection on a black background.** Optional `SelectBg`/
+  `SelectFg` were added to the palette; for k9s the selected row is drawn as a
+  bright inverted bar (aqua background + black text) instead of a barely visible
+  `BgAlt` shift. Empty fields = previous behavior, other themes are unaffected.
 
 ## [1.12.0] - 2026-06-25
 
-### Добавлено
+### Added
 
-- **Встроенная тема `k9s`.** Яркая палитра в духе стокового скина k9s:
-  чёрный фон, аква-акценты, оранжевые заголовки, насыщённые зелёный/жёлтый/
-  красный статусы и dodgerblue-рамки. Доступна в модалке `:theme` и как
+- **Built-in `k9s` theme.** A bright palette in the spirit of the stock k9s skin:
+  black background, aqua accents, orange headers, saturated green/yellow/red
+  statuses and dodgerblue borders. Available in the `:theme` modal and as
   `:theme k9s`.
 
 ## [1.11.0] - 2026-06-25
 
-### Добавлено
+### Added
 
-- **Модалка выбора темы с живым превью.** `:theme` без аргумента открывает
-  список встроенных тем (tokyonight/dracula/nord/gruvbox/solarized/catppuccin)
-  с цветными свотчами; при перемещении курсора тема применяется ко всему
-  интерфейсу вживую (`styles.Apply`), `Enter` закрепляет выбор, `q`/`Esc`
-  откатывает к исходной палитре. `:theme <name>` по-прежнему применяет тему
-  напрямую. Новый режим `ModeThemePicker` (`internal/ui/theme_picker.go`),
-  хелпер `styles.Swatch`.
+- **Theme picker modal with live preview.** `:theme` without an argument opens
+  a list of built-in themes (tokyonight/dracula/nord/gruvbox/solarized/catppuccin)
+  with color swatches; as the cursor moves, the theme is applied to the whole
+  interface live (`styles.Apply`), `Enter` confirms the choice, `q`/`Esc` rolls
+  back to the original palette. `:theme <name>` still applies a theme directly.
+  New mode `ModeThemePicker` (`internal/ui/theme_picker.go`), helper
+  `styles.Swatch`.
 
 ## [1.10.0] - 2026-06-25
 
-### Добавлено
+### Added
 
-- **Выбор драйвера при создании сети/тома.** В модалках `:create`
-  (Networks/Volumes) поле Driver стало селектором: переключение известных
-  драйверов клавишами `←`/`→` (сети — `bridge`/`host`/`overlay`/`macvlan`/
-  `ipvlan`/`none`, тома — `local`), а пункт `custom…` открывает ввод
-  произвольного драйвера плагина. Переиспользуемый компонент
-  `internal/ui/driverfield`.
+- **Driver selection when creating a network/volume.** In the `:create` modals
+  (Networks/Volumes) the Driver field became a selector: known drivers are
+  cycled with `←`/`→` (networks — `bridge`/`host`/`overlay`/`macvlan`/
+  `ipvlan`/`none`, volumes — `local`), and the `custom…` entry opens input for
+  an arbitrary plugin driver. Reusable component `internal/ui/driverfield`.
 
 ## [1.1.2] - 2026-06-18
 
-### Изменено
+### Changed
 
-- **Подготовка к публикации: убраны личные данные.** Диагностические утилиты
-  `cmd/setup`, `cmd/ping`, `cmd/addgroup` больше не содержат захардкоженный
-  адрес домашнего хоста и имена пользователей — хост (и для `addgroup` имя
-  пользователя) теперь передаются аргументами командной строки. Тест-фикстура
-  в `internal/hosts` переведена на нейтральный `deploy@10.0.0.5`.
+- **Publication prep: personal data removed.** The diagnostic utilities
+  `cmd/setup`, `cmd/ping`, `cmd/addgroup` no longer contain a hardcoded home
+  host address and user names — the host (and, for `addgroup`, the user name)
+  are now passed as command-line arguments. The test fixture in
+  `internal/hosts` was switched to a neutral `deploy@10.0.0.5`.
 
 ## [1.1.1] - 2026-06-18
 
-### Исправлено
+### Fixed
 
-- **Логи: автоскролл (follow) теперь переключается.** Клавиша `f` включает/
-  выключает следование за хвостом логов (в разделах Containers и Compose). При
-  включении вид прыгает в конец и держит последнюю строку; индикатор `FOLLOW` в
-  скроллбаре и подсказка `Follow: on/off` в футере.
-- **Консоль: выход по `Ctrl-D`.** Раньше `Ctrl-D` пересылался в сессию как байт
-  `0x04` и полагался на удалённый shell — ненадёжно. Теперь обрабатывается на
-  уровне приложения и закрывает панель (как `Ctrl+\`), как и обещает подсказка.
-- **Files: исправлено наложение символов в подсказке.** Широкий глиф `⌫`
-  заменён на ASCII `bksp/h` в футере и экране помощи.
+- **Logs: auto-scroll (follow) can now be toggled.** The `f` key turns
+  following the log tail on/off (in the Containers and Compose sections). When
+  enabled, the view jumps to the end and keeps the last line in sight; a
+  `FOLLOW` indicator in the scrollbar and a `Follow: on/off` hint in the footer.
+- **Console: exit with `Ctrl-D`.** Previously `Ctrl-D` was forwarded to the
+  session as a `0x04` byte and relied on the remote shell — unreliable. It is
+  now handled at the application level and closes the panel (like `Ctrl+\`), as
+  the hint promises.
+- **Files: fixed overlapping characters in the hint.** The wide glyph `⌫` was
+  replaced with ASCII `bksp/h` in the footer and the help screen.
 
 ## [1.1.0] - 2026-06-17
 
-### Изменено
+### Changed
 
-- **Compose: SSH-only команды скрыты на `tcp://`.** Операции Compose, которым
-  нужен доступ к shell и файловой системе хоста — `create`, `up`, `down`,
-  `pull`, `config`, `edit`, `backup`, `restore` — теперь работают только по
-  SSH. На `tcp://`-соединении они полностью исчезают со всех поверхностей
-  (автодополнение и плейсхолдер командной строки, экран помощи `?`, футер `:`,
-  подсказка `e Edit`, обработчики клавиш и `dispatchComposeCommand`), вместо
-  того чтобы предлагаться и падать с ошибкой в момент запуска.
+- **Compose: SSH-only commands hidden on `tcp://`.** Compose operations that
+  need access to the host shell and filesystem — `create`, `up`, `down`,
+  `pull`, `config`, `edit`, `backup`, `restore` — now work only over SSH. On a
+  `tcp://` connection they disappear entirely from all surfaces (autocomplete
+  and the command-line placeholder, the `?` help screen, the `:` footer, the
+  `e Edit` hint, key handlers and `dispatchComposeCommand`), instead of being
+  offered and failing at launch time.
 
-### Добавлено
+### Added
 
 - `Backend.SupportsHostCompose()` (`ssh://` → `true`, `tcp://` → `false`),
-  проброшен в `ui.Model.composeHostOps` и `cmdline`; обновляется при
+  plumbed into `ui.Model.composeHostOps` and `cmdline`; updated on
   `connect`/`reconnect`.
 
-### Сохранено по `tcp://`
+### Preserved over `tcp://`
 
-- Каталог бэкапов остаётся просматриваемым (view/delete — локальные операции),
-  скрыт только `restore`.
-- Обнаружение проектов, `inspect`, `logs` и жизненный цикл контейнеров
-  (start/stop/restart/pause/unpause/remove) продолжают работать.
+- The backup catalog remains browsable (view/delete are local operations);
+  only `restore` is hidden.
+- Project discovery, `inspect`, `logs` and the container lifecycle
+  (start/stop/restart/pause/unpause/remove) keep working.
 
-## Более ранние версии
+## Earlier versions
 
-История версий `1.0.0`–`1.0.12` доступна в git-тегах и истории коммитов:
-`git log --oneline` / `git tag -l`.
+The history of versions `1.0.0`–`1.0.12` is available in git tags and commit
+history: `git log --oneline` / `git tag -l`.
