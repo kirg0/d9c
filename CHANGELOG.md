@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Public test coverage report.** On every push to `main`, CI publishes the
+  HTML coverage report to <https://kirg0.github.io/d9c/coverage/> (plus
+  `functions.txt` and a shields.io `badge.json` behind the new README coverage
+  badge). `make cover` builds the same report locally (`coverage.html`).
+
 ## [1.23.1] - 2026-09-13
 
 ### Tests

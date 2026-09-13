@@ -2,7 +2,7 @@ BINARY := d9c
 VERSION ?= dev
 LDFLAGS := -ldflags "-X main.version=$(VERSION) -s -w"
 
-.PHONY: build run demo test race fmt fmtcheck vet staticcheck lint check tidy clean tools
+.PHONY: build run demo test race cover fmt fmtcheck vet staticcheck lint check tidy clean tools
 
 build:
 	go build $(LDFLAGS) -o $(BINARY) .
@@ -20,6 +20,13 @@ test:
 # Tests with the race detector enabled.
 race:
 	go test -race ./...
+
+# Coverage profile plus a browsable HTML report (coverage.html) and the total.
+# CI publishes the same report to https://kirg0.github.io/d9c/coverage/.
+cover:
+	go test -covermode=atomic -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
+	go tool cover -func=coverage.out | tail -n 1
 
 # Rewrite files to canonical gofmt form.
 fmt:

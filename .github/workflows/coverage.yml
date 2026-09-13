@@ -1,0 +1,69 @@
+name: Coverage
+
+# Publishes the test coverage report to GitHub Pages on every push to main:
+# the HTML report (go tool cover -html) at https://kirg0.github.io/d9c/coverage/,
+# the per-function listing at .../coverage/functions.txt and a shields.io
+# endpoint badge at .../coverage/badge.json (used by the README badge).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time; never cancel a deploy halfway.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run tests with coverage
+        run: go test -covermode=atomic -coverprofile=coverage.out ./...
+
+      - name: Build report and badge
+        run: |
+          set -euo pipefail
+          mkdir -p site/coverage
+          go tool cover -html=coverage.out -o site/coverage/index.html
+          go tool cover -func=coverage.out > site/coverage/functions.txt
+          total=$(awk '/^total:/ { gsub("%", "", $NF); print $NF }' site/coverage/functions.txt)
+          color=$(awk -v t="$total" 'BEGIN { if (t >= 80) print "brightgreen"; else if (t >= 70) print "yellow"; else print "red" }')
+          printf '{"schemaVersion":1,"label":"coverage","message":"%s%%","color":"%s"}\n' "$total" "$color" > site/coverage/badge.json
+          printf '<!doctype html><meta http-equiv="refresh" content="0; url=coverage/">\n' > site/index.html
+          touch site/.nojekyll
+          {
+            echo "### Test coverage: ${total}%"
+            echo
+            echo "Report: https://kirg0.github.io/d9c/coverage/"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: report
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}coverage/
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v5

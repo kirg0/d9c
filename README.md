@@ -17,6 +17,7 @@ Built on [Bubble Tea](https://github.com/charmbracelet/bubbletea) and the offici
 ![license](https://img.shields.io/badge/license-MIT-blue)
 [![release](https://img.shields.io/github/v/release/kirg0/d9c)](https://github.com/kirg0/d9c/releases/latest)
 [![ci](https://github.com/kirg0/d9c/actions/workflows/ci.yml/badge.svg)](https://github.com/kirg0/d9c/actions/workflows/ci.yml)
+[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fkirg0.github.io%2Fd9c%2Fcoverage%2Fbadge.json)](https://kirg0.github.io/d9c/coverage/)
 [![Go Reference](https://pkg.go.dev/badge/github.com/kirg0/d9c.svg)](https://pkg.go.dev/github.com/kirg0/d9c)
 ![go](https://img.shields.io/github/go-mod/go-version/kirg0/d9c?logo=go&logoColor=white)
 ![platform](https://img.shields.io/badge/platform-linux%20%7C%20macOS%20%7C%20windows-lightgrey)
