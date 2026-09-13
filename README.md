@@ -4,83 +4,85 @@
 
 # d9c
 
-<p align="center"><b>Русский</b> · <a href="README-EN.md">English</a></p>
+<p align="center"><b>English</b> · <a href="README-RU.md">Русский</a></p>
 
-**Терминальный (TUI) менеджер Docker для удалённого хоста** — в духе [`k9s`](https://k9scli.io/)
-и [`lazydocker`](https://github.com/jesseduffield/lazydocker), но сфокусированный на управлении
-Docker **по TCP или SSH**. Один бинарник, без агентов на удалённой стороне: подключаетесь к демону,
-видите контейнеры, образы, сети, тома и Compose-проекты и управляете ими, не выходя из терминала.
+**A terminal (TUI) Docker manager for remote hosts** — in the spirit of [`k9s`](https://k9scli.io/)
+and [`lazydocker`](https://github.com/jesseduffield/lazydocker), but focused on managing
+Docker **over TCP or SSH**. A single binary, no agents on the remote side: connect to the daemon,
+see containers, images, networks, volumes and Compose projects and manage them without leaving the terminal.
 
-Собран на [Bubble Tea](https://github.com/charmbracelet/bubbletea) и официальном
+Built on [Bubble Tea](https://github.com/charmbracelet/bubbletea) and the official
 [Docker SDK](https://pkg.go.dev/github.com/docker/docker).
 
 ![license](https://img.shields.io/badge/license-MIT-blue)
-![go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)
-![version](https://img.shields.io/badge/version-1.7.1-informational)
+[![release](https://img.shields.io/github/v/release/kirg0/d9c)](https://github.com/kirg0/d9c/releases/latest)
+[![ci](https://github.com/kirg0/d9c/actions/workflows/ci.yml/badge.svg)](https://github.com/kirg0/d9c/actions/workflows/ci.yml)
+[![go report](https://goreportcard.com/badge/github.com/kirg0/d9c)](https://goreportcard.com/report/github.com/kirg0/d9c)
+![go](https://img.shields.io/github/go-mod/go-version/kirg0/d9c?logo=go&logoColor=white)
 ![platform](https://img.shields.io/badge/platform-linux%20%7C%20macOS%20%7C%20windows-lightgrey)
 [![donate](https://img.shields.io/badge/donate-dalink.to-ff5e5b)](https://dalink.to/kirg08)
 
 <p align="center">
-  <img src="docs/demo.png" alt="d9c — раздел Containers: колонки STATUS/HEALTH/PORTS/CPU%/MEM, индикатор соединения и подсказки клавиш" width="900">
+  <img src="docs/demo.gif" alt="d9c demo: browsing containers, live CPU/MEM, filter, logs, other sections and help" width="900">
 </p>
 
-> Хотите посмотреть без настройки Docker? Запустите демо на фейковых данных:
+> Want to take a look without setting up Docker? Run the demo on fake data:
 > `go run . -demo`.
 
 ---
 
-## Содержание
+## Table of contents
 
-- [Возможности](#возможности)
-- [Установка](#установка)
-- [Быстрый старт](#быстрый-старт)
-- [Подключение к Docker](#подключение-к-docker)
-- [Разделы и навигация](#разделы-и-навигация)
-- [Фильтр `/`](#фильтр-)
-- [Конфиг, темы и клавиши](#конфиг-темы-и-клавиши)
-- [Файловая система контейнера](#файловая-система-контейнера-f--files)
-- [Автообновление](#автообновление)
-- [Алерты по порогам ресурсов](#алерты-по-порогам-ресурсов)
-- [Плагины](#плагины)
-- [Разработка](#разработка)
-- [Поддержать проект](#поддержать-проект)
-- [Лицензия](#лицензия)
-
----
-
-## Возможности
-
-- **Удалённый Docker по TCP и SSH** — один путь подключения для обоих транспортов, живой
-  `:connect`, сохранённые хосты с CRUD, автореконнект при разрыве (backoff + баннер).
-- **Все основные ресурсы** — Containers / Images / Networks / Volumes / Compose / Hosts.
-- **Управление, а не только просмотр** — start/stop/restart/kill/rm, массовые операции
-  (множественный выбор `Space` — bulk-операции над контейнерами и удаление образов),
-  `run`-мастер, создание сетей/томов, `build`/`tag`/`push`
-  (в т. ч. в приватный реестр), `docker system df` и `prune` с подтверждением.
-- **Compose** — discovery по меткам, `up`/`pull`/`down` со стримингом, `config`, `edit`,
-  `create`, бэкап/восстановление, логи проекта, drill-down в контейнеры (операции с файлами
-  проекта и запуском `docker compose` — только по SSH; см. [Подключение к Docker](#подключение-к-docker)).
-- **Логи и метрики** — `--tail/--since/--until`, поиск, сохранение в файл; живые CPU/MEM/Net/Disk
-  через Stats API.
-- **Встроенный терминал** — интерактивный `exec` в контейнер (vt10x-эмулятор), один путь для
-  TCP и SSH.
-- **Обзор файловой системы контейнера** — навигация и `docker cp` в обе стороны.
-- **Живой журнал событий демона** (`docker events`) отдельной консолью.
-- **Мульти-хост дашборд** — статус и агрегаты (`docker info`) по всем сохранённым хостам.
-- **Алерты по CPU/MEM**, настраиваемые **темы** и **горячие клавиши**, **плагины** (свои команды
-  и клавиши из YAML — как в k9s).
+- [Features](#features)
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [Connecting to Docker](#connecting-to-docker)
+- [Sections and navigation](#sections-and-navigation)
+- [Filter `/`](#filter-)
+- [Config, themes and keys](#config-themes-and-keys)
+- [Container filesystem](#container-filesystem-f--files)
+- [Auto-refresh](#auto-refresh)
+- [Resource threshold alerts](#resource-threshold-alerts)
+- [Plugins](#plugins)
+- [Development](#development)
+- [Support the project](#support-the-project)
+- [License](#license)
 
 ---
 
-## Установка
+## Features
 
-### Готовые бинарники (рекомендуется)
+- **Remote Docker over TCP and SSH** — a single connection path for both transports, live
+  `:connect`, saved hosts with CRUD, auto-reconnect on disconnect (backoff + banner).
+- **All core resources** — Containers / Images / Networks / Volumes / Compose / Hosts.
+- **Management, not just viewing** — start/stop/restart/kill/rm, bulk operations
+  (multi-select with `Space` — bulk operations on containers and image removal),
+  a `run` wizard, network/volume creation, `build`/`tag`/`push`
+  (including to a private registry), `docker system df` and `prune` with confirmation.
+- **Compose** — discovery by labels, `up`/`pull`/`down` with streaming, `config`, `edit`,
+  `create`, backup/restore, project logs, drill-down into containers (operations on project
+  files and running `docker compose` — over SSH only; see [Connecting to Docker](#connecting-to-docker)).
+- **Logs and metrics** — `--tail/--since/--until`, search, save to file; live CPU/MEM/Net/Disk
+  via the Stats API.
+- **Built-in terminal** — interactive `exec` into a container (vt10x emulator), a single path for
+  TCP and SSH.
+- **Container filesystem browser** — navigation and `docker cp` in both directions.
+- **Live daemon event log** (`docker events`) in a dedicated console.
+- **Multi-host dashboard** — status and aggregates (`docker info`) across all saved hosts.
+- **CPU/MEM alerts**, configurable **themes** and **hotkeys**, **plugins** (your own commands
+  and keys from YAML — like in k9s).
 
-Не нужны ни Go, ни компилятор — на удалённом хосте тоже ничего ставить не надо.
-Скачайте архив под свою ОС со страницы
-[**Releases**](https://github.com/kirg0/d9c/releases/latest):
+---
 
-| ОС | Файл |
+## Installation
+
+### Prebuilt binaries (recommended)
+
+No Go and no compiler required — nothing needs to be installed on the remote host either.
+Download the archive for your OS from the
+[**Releases**](https://github.com/kirg0/d9c/releases/latest) page:
+
+| OS | File |
 |----|------|
 | Linux (x86-64) | `d9c_vX.Y.Z_linux_amd64.tar.gz` |
 | Linux (ARM64) | `d9c_vX.Y.Z_linux_arm64.tar.gz` |
@@ -88,32 +90,32 @@ Docker **по TCP или SSH**. Один бинарник, без агентов
 | macOS (Apple Silicon) | `d9c_vX.Y.Z_darwin_arm64.tar.gz` |
 | Windows (x86-64) | `d9c_vX.Y.Z_windows_amd64.zip` |
 
-Внутри архива — один исполняемый файл (`d9c` или `d9c.exe`) плюс `README.md` и `LICENSE`.
+Inside the archive there is a single executable (`d9c` or `d9c.exe`) plus `README.md` and `LICENSE`.
 
 **Linux / macOS:**
 
 ```sh
-# распаковать и поставить в PATH (пример для Linux amd64)
+# unpack and put it on PATH (example for Linux amd64)
 tar -xzf d9c_vX.Y.Z_linux_amd64.tar.gz
 sudo install d9c_vX.Y.Z_linux_amd64/d9c /usr/local/bin/d9c
 
-d9c -version          # проверить
+d9c -version          # check
 ```
 
-> macOS может заблокировать неподписанный бинарник при первом запуске
-> («cannot be opened because the developer cannot be verified»). Снимите карантин:
+> macOS may block an unsigned binary on first launch
+> ("cannot be opened because the developer cannot be verified"). Remove the quarantine:
 > `xattr -d com.apple.quarantine ./d9c`.
 
 **Windows (PowerShell):**
 
 ```powershell
-# распакуйте zip и запускайте d9c.exe из этой папки,
-# либо положите его в каталог из %PATH%
+# unpack the zip and run d9c.exe from that folder,
+# or put it in a directory that is on %PATH%
 Expand-Archive d9c_vX.Y.Z_windows_amd64.zip
 .\d9c_vX.Y.Z_windows_amd64\d9c.exe -version
 ```
 
-**Проверка контрольной суммы (необязательно).** К каждому релизу приложен
+**Checksum verification (optional).** Each release ships a
 `checksums.txt` (SHA-256):
 
 ```sh
@@ -125,604 +127,581 @@ sha256sum -c checksums.txt 2>/dev/null | grep d9c_vX.Y.Z_linux_amd64.tar.gz
 (Get-FileHash .\d9c_vX.Y.Z_windows_amd64.zip -Algorithm SHA256).Hash
 ```
 
-### Сборка из исходников
+### `go install`
 
-Нужен [Go 1.25+](https://go.dev/dl/):
+With [Go 1.25+](https://go.dev/dl/) installed:
+
+```sh
+go install github.com/kirg0/d9c@latest   # binary lands in $(go env GOPATH)/bin
+```
+
+### Building from source
+
+Requires [Go 1.25+](https://go.dev/dl/):
 
 ```sh
 git clone https://github.com/kirg0/d9c.git
 cd d9c
-make build          # бинарник ./d9c (или d9c.exe на Windows)
+make build          # binary ./d9c (or d9c.exe on Windows)
 ```
 
-или напрямую через `go`:
+or directly via `go`:
 
 ```sh
 go build -o d9c .
 ```
 
-Версию можно зашить в бинарник при сборке (релизные сборки делают это автоматически):
+The version can be baked into the binary at build time (release builds do this automatically):
 
 ```sh
-go build -ldflags "-X d9c/internal/version.Version=1.2.3" -o d9c .
+go build -ldflags "-X github.com/kirg0/d9c/internal/version.Version=1.2.3" -o d9c .
 ```
 
-Приложение следует [SemVer](https://semver.org); текущая версия показана в шапке (`d9c vX.Y.Z`)
-и печатается флагом `-version`.
+The application follows [SemVer](https://semver.org); the current version is shown in the header (`d9c vX.Y.Z`)
+and printed by the `-version` flag.
 
 ---
 
-## Быстрый старт
+## Quick start
 
 ```sh
-go run . -demo                 # демо-данные, без Docker
-go run . -H tcp://host:2375    # удалённый демон по TCP
-go run . -H ssh://user@host    # удалённый демон по SSH-туннелю
-go run . -version              # вывести версию и выйти
+go run . -demo                 # demo data, no Docker
+go run . -H tcp://host:2375    # remote daemon over TCP
+go run . -H ssh://user@host    # remote daemon over an SSH tunnel
+go run . -version              # print the version and exit
 ```
 
-> Примеры выше — для запуска из исходников. Если вы поставили готовый бинарник,
-> используйте `d9c` вместо `go run .` (например, `d9c -demo`, `d9c -H ssh://user@host`).
+> The examples above are for running from source. If you installed a prebuilt binary,
+> use `d9c` instead of `go run .` (e.g. `d9c -demo`, `d9c -H ssh://user@host`).
 
-Если хост не указан, d9c открывается на разделе **Hosts**, где можно выбрать сохранённый хост
-или добавить новый — подключение произойдёт по `Enter` / `:connect`.
+If no host is specified, d9c opens on the **Hosts** section, where you can pick a saved host
+or add a new one — the connection happens via `Enter` / `:connect`.
 
 ---
 
-## Подключение к Docker
+## Connecting to Docker
 
-| Транспорт | Пример | Примечание |
+| Transport | Example | Note |
 | --- | --- | --- |
-| TCP | `-H tcp://host:2375` | демон должен слушать TCP (`-H tcp://0.0.0.0:2375` на стороне сервера) |
-| SSH | `-H ssh://user@host` | туннель по SSH к локальному сокету демона; ключи из агента/`~/.ssh` |
-| Unix | `-H unix:///var/run/docker.sock` | локальный сокет демона (Linux/macOS) |
-| npipe | `-H npipe:////./pipe/docker_engine` | именованный канал Windows (Docker Desktop / Podman machine) |
-| nerdctl (локально) | `-H nerdctl://` | containerd через локальный `nerdctl` (см. [containerd](#containerd)) |
-| nerdctl (SSH) | `-H nerdctl+ssh://user@host` | containerd через `nerdctl` на удалённом хосте по SSH |
-| CRI (локально) | `-H crio://` | CRI-O / любой CRI-рантайм через локальный `crictl` (см. [CRI-O](#cri-o--generic-cri)) |
-| CRI (SSH) | `-H crio+ssh://user@host` | CRI-рантайм через `crictl` на удалённом хосте по SSH |
+| TCP | `-H tcp://host:2375` | the daemon must listen on TCP (`-H tcp://0.0.0.0:2375` on the server side) |
+| SSH | `-H ssh://user@host` | an SSH tunnel to the local daemon socket; keys from the agent/`~/.ssh` |
+| nerdctl (local) | `-H nerdctl://` | containerd via a local `nerdctl` (see [containerd](#containerd)) |
+| nerdctl (SSH) | `-H nerdctl+ssh://user@host` | containerd via `nerdctl` on a remote host over SSH |
+| CRI (local) | `-H crio://` | CRI-O / any CRI runtime via a local `crictl` (see [CRI-O](#cri-o--generic-cri)) |
+| CRI (SSH) | `-H crio+ssh://user@host` | a CRI runtime via `crictl` on a remote host over SSH |
 
-> **TCP против SSH — что доступно.** Почти всё (контейнеры, образы, сети, тома, exec,
-> обзор ФС контейнера, события, дашборд) работает по обоим транспортам через Docker Engine API.
-> Но операции Compose, которым нужен доступ к **файловой системе хоста** или запуск самого
-> `docker compose` как процесса, идут мимо API — только через SSH. Поэтому **при подключении по
-> TCP следующие команды Compose недоступны** (они не показываются ни в подсказках, ни в `?`):
-> `create`, `up`, `down`, `pull`, `config`, `edit`, `backup`, `restore` (и клавиша `e` — правка
-> файла). По TCP остаются discovery проектов, просмотр/инспекция/логи, локальный каталог
-> `backups` (только просмотр и удаление архивов — восстановление требует SSH) и управление
-> контейнерами проекта: `start` / `stop` / `restart` / `pause` / `unpause` / `remove`. Нужен
-> полный набор Compose — подключайтесь через `-H ssh://...`.
-
-### Podman
-
-Podman предоставляет Docker-совместимый REST API, поэтому d9c подключается к нему тем же
-бэкендом, что и к Docker — отдельный флаг не нужен. Включите сервис сокета и укажите его в `-H`:
-
-```
-# rootless (от обычного пользователя)
-podman system service --time=0 unix:///run/user/$(id -u)/podman/podman.sock &
-go run . -H ssh://user@host          # туннель к podman.sock на хосте
-go run . -H unix:///run/user/1000/podman/podman.sock   # локальный сокет
-
-# rootful (системный сокет)
-sudo podman system service --time=0 unix:///run/podman/podman.sock &
-go run . -H ssh://root@host
-
-# Windows (Podman machine) — именованный канал
-d9c -H npipe:////./pipe/podman-machine-default
-```
-
-> На Windows `podman machine` поднимает API на именованном канале — подключайтесь по
-> `npipe://`. Проверено на Podman 5.8: движок определяется как **podman**, чип появляется
-> в шапке, разделы Containers/Images/… работают штатно.
-
-Когда d9c определяет, что на той стороне Podman (по ответу `/version`), в шапке рядом с хостом
-появляется метка **podman**. Операции Compose по SSH автоматически используют `podman compose`
-вместо `docker compose`. Учтите особенности rootless: сокет лежит в `/run/user/<uid>/…`,
-а доступ к нему есть только у владельца — подключайтесь под тем же пользователем (`ssh://user@host`,
-а не `root`), иначе сокет будет не виден.
+> **TCP vs SSH — what's available.** Almost everything (containers, images, networks, volumes, exec,
+> container FS browser, events, dashboard) works over both transports via the Docker Engine API.
+> But Compose operations that need access to the **host filesystem** or run `docker compose`
+> itself as a process go around the API — SSH only. So **when connected over TCP the following
+> Compose commands are unavailable** (they don't appear in the hints or in `?`):
+> `create`, `up`, `down`, `pull`, `config`, `edit`, `backup`, `restore` (and the `e` key —
+> edit the file). Over TCP you still get project discovery, view/inspect/logs, the local `backups`
+> directory (view and delete archives only — restore requires SSH) and project container
+> management: `start` / `stop` / `restart` / `pause` / `unpause` / `remove`. Need the
+> full Compose set — connect via `-H ssh://...`.
 
 ### containerd
 
-У containerd **нет** Docker-совместимого API, поэтому трюк с Podman тут не работает. Вместо
-нативного gRPC-клиента (тяжёлый, без логов/сетей/томов/compose) d9c управляет containerd через
-[`nerdctl`](https://github.com/containerd/nerdctl) — Docker-совместимый CLI-фронтенд. Нужен
-установленный `nerdctl` на той машине, где живёт containerd
-([инструкция по установке](https://github.com/containerd/nerdctl#install) — бинарники из
-releases + CNI-плагины; rootless-режим — [docs/rootless.md](https://github.com/containerd/nerdctl/blob/main/docs/rootless.md)):
+containerd has **no** Docker-compatible REST API, so d9c cannot talk to it the way it talks to
+Docker or Podman. Instead of a native gRPC client (heavy, and lacking logs/networks/volumes/
+compose) d9c drives containerd through [`nerdctl`](https://github.com/containerd/nerdctl) —
+the Docker-compatible CLI frontend. `nerdctl` must be installed on the machine where containerd
+lives ([installation guide](https://github.com/containerd/nerdctl#install) — binaries from
+releases + CNI plugins; rootless mode — [docs/rootless.md](https://github.com/containerd/nerdctl/blob/main/docs/rootless.md)):
 
 ```
-# containerd на этой же машине
+# containerd on this machine
 d9c -H nerdctl://
 
-# containerd на удалённом хосте (nerdctl запускается там по SSH)
+# containerd on a remote host (nerdctl is executed there over SSH)
 d9c -H nerdctl+ssh://user@host
 ```
 
-Когда подключение идёт через nerdctl, в шапке появляется метка **containerd**, а рядом — активный
-**namespace** (`containerd:default`). Работают все разделы: Containers (list/start/stop/restart/
-kill/rm/inspect/logs/stats/run), exec (по SSH-транспорту), Images (pull/rmi/tag/push/build/history),
-Networks, Volumes, Compose (discovery по тем же меткам + `nerdctl compose up/down/pull`), events,
-`system df`/`prune`.
+When connected through nerdctl, the header shows a **containerd** chip together with the active
+**namespace** (`containerd:default`). All sections work: Containers (list/start/stop/restart/
+kill/rm/inspect/logs/stats/run), exec (over the SSH transport), Images (pull/rmi/tag/push/build/
+history), Networks, Volumes, Compose (discovery by the same labels + reconstructed
+`up`/`down`/`pull`), events, `system df`/`prune`.
 
-**Namespaces.** containerd раскладывает объекты по namespace (`default`, `k8s.io` для Kubernetes и
-т. д.). Команда `:namespace <имя>` переключает namespace, а `:namespace` без аргумента открывает
-список для выбора. Все команды автоматически скоупятся по активному namespace. Незнакомое имя
-принимается без ошибки — containerd создаст namespace лениво при первой операции записи.
+**Namespaces.** containerd shards its objects by namespace (`default`, `k8s.io` for Kubernetes,
+etc.). The `:namespace <name>` command switches the namespace; `:namespace` with no argument
+opens a picker. Every command is automatically scoped to the active namespace. An unknown name
+is accepted without an error — containerd creates the namespace lazily on the first write.
 
-#### Тонкости nerdctl-бэкенда
+#### nerdctl backend fine print
 
-- **Локально и по SSH ограничения зеркальные.** Копирование файлов в/из контейнера (`cp`)
-  работает только при локальном nerdctl (`nerdctl://`): по SSH файлы оказались бы на удалённом
-  хосте, а не на машине с d9c. Интерактивные `exec` / `run -it` — наоборот, только по SSH
-  (`nerdctl+ssh://`): мост локального PTY во встроенный терминал не реализован. Остальные
-  операции работают на обоих транспортах.
-- **Compose — без compose-файла.** nerdctl не проставляет метки `working_dir`/`config_files`
-  и не имеет `compose ls`, поэтому путь к compose-файлу обнаруженного проекта восстановить
-  неоткуда. Команды `up`/`pull`/`down` реконструируются из меток `com.docker.compose.project`
-  (они есть и на контейнерах, и на сетях): `up` = запуск контейнеров проекта (**не** рекреация
-  из файла), `pull` = образы всех сервисов, `down` = удаление контейнеров и сетей проекта
-  (именованные тома сохраняются — как у `docker compose down` по умолчанию). `config` / `edit`
-  (клавиша `e`) / `backup` / `restore` недоступны — им нужен сам compose-файл.
-- **`system df` эмулируется.** У nerdctl 2.x нет подкоманды `system df`; отчёт собирается из
-  списков объектов: образы с суммарным размером, контейнеры (всего/запущено), тома. Размеры
-  томов не считаются: `volume ls --size` обходит каждый том и на реальных хостах может быть
-  очень медленным.
-- **Stats — one-shot.** CPU%/MEM в Containers берутся из `nerdctl stats --no-stream`; nerdctl
-  сам отдаёт готовый CPU%, дельта между тиками (как в Docker API) не нужна.
-- **Фильтр `network:`.** В JSON-выводе `nerdctl ps` нет поля Networks — сети контейнера
-  извлекаются из служебной метки `nerdctl/networks=["…"]`.
-- **События приходят редко.** containerd-хост без активности почти не шлёт событий (нет
-  healthcheck'ов и фоновой активности типичного docker-демона) — до первого события viewer
-  показывает «ожидание событий…», а если поток завершился (процесс `nerdctl events` умер,
-  разрыв SSH), в ленте появляется строка `[error] поток событий завершился — нажмите r`.
-- **PATH и iptables по SSH.** У неинтерактивной SSH-сессии в PATH нет `/usr/sbin`, а nerdctl
-  дёргает `iptables` при публикации портов (`run -p …`) — без него запуск падает с `failed to
-  load networking flags`. d9c сам добавляет `/usr/local/sbin:/usr/sbin:/sbin` в PATH для всех
-  nerdctl-команд по SSH.
-- **`nerdctl+ssh://` — полноценный SSH-хост.** В разделе Hosts для него доступны те же способы
-  аутентификации, что и для `ssh://`: ключ (свой путь или ssh-agent/`~/.ssh`) либо пароль с
-  модалкой логина/пароля при подключении.
-- **Дашборд Hosts** заполняется из `nerdctl info --format json` (имя хоста, CPU, память) и
-  `nerdctl version` (версия containerd из `Server.Components`); счётчики контейнеров/образов
-  считаются по спискам.
-- **Дружелюбные ошибки.** logrus-обёртка nerdctl (`time="…" level=fatal msg="…"`) срезается со
-  всех ошибок — в интерфейсе остаётся суть («no such image: …»).
-- **Браузер ФС контейнера** работает через запуск `ls -1Ap` внутри контейнера (у containerd
-  нет API чтения каталогов) — в образе должен быть `ls`.
-- **Rootless поддерживается** — бэкенд проверен живым прогоном на Debian 13 с containerd
-  v2.3.2 и rootless nerdctl 2.3.4.
+- **Local and SSH limitations mirror each other.** Copying files into/out of a container
+  (`cp`) works only with a local nerdctl (`nerdctl://`): over SSH the files would land on the
+  remote host, not on the machine running d9c. Interactive `exec` / `run -it` is the opposite —
+  SSH only (`nerdctl+ssh://`): bridging a local PTY into the built-in terminal is not
+  implemented. Everything else works on both transports.
+- **Compose without a compose file.** nerdctl does not stamp the `working_dir`/`config_files`
+  labels and has no `compose ls`, so the path of a discovered project's compose file cannot be
+  recovered. The `up`/`pull`/`down` commands are reconstructed from the
+  `com.docker.compose.project` labels (present on both containers and networks): `up` = start
+  the project's containers (**not** a recreate from the file), `pull` = pull every service's
+  image, `down` = remove the project's containers and networks (named volumes are kept — same
+  as `docker compose down` by default). `config` / `edit` (the `e` key) / `backup` / `restore`
+  are unavailable — they need the compose file itself.
+- **`system df` is emulated.** nerdctl 2.x has no `system df` subcommand; the report is
+  assembled from the object lists: images with their summed size, containers (total/running),
+  volumes. Volume sizes are not computed: `volume ls --size` walks every volume and can be very
+  slow on real hosts.
+- **Stats are one-shot.** CPU%/MEM in Containers come from `nerdctl stats --no-stream`;
+  nerdctl reports a ready-made CPU%, so no cross-tick delta bookkeeping (as with the Docker
+  API) is needed.
+- **The `network:` filter.** The JSON output of `nerdctl ps` has no Networks field — the
+  container's networks are extracted from nerdctl's own `nerdctl/networks=["…"]` label.
+- **Events are rare.** An idle containerd host emits almost no events (none of the
+  healthchecks and background chatter of a typical docker daemon) — until the first event the
+  viewer shows a "waiting for events…" hint, and if the stream ends (the `nerdctl events`
+  process died, SSH dropped) the feed gets an `[error] event stream ended — press r` line.
+- **PATH and iptables over SSH.** A non-interactive SSH session has no `/usr/sbin` in PATH,
+  while nerdctl invokes `iptables` when publishing ports (`run -p …`) — without it the run
+  fails with `failed to load networking flags`. d9c prepends `/usr/local/sbin:/usr/sbin:/sbin`
+  to PATH for every nerdctl command over SSH.
+- **`nerdctl+ssh://` is a first-class SSH host.** The Hosts section offers it the same
+  authentication options as `ssh://`: a key (custom path or ssh-agent/`~/.ssh`) or a password
+  with the login/password modal on connect.
+- **The Hosts dashboard** is filled from `nerdctl info --format json` (host name, CPUs,
+  memory) and `nerdctl version` (the containerd version from `Server.Components`); the
+  container/image counters are computed from the lists.
+- **Friendly errors.** nerdctl's logrus wrapper (`time="…" level=fatal msg="…"`) is stripped
+  from every error — the UI shows just the substance ("no such image: …").
+- **The container FS browser** works by running `ls -1Ap` inside the container (containerd
+  exposes no readdir API) — the image must contain `ls`.
+- **Rootless is supported** — the backend was live-tested on Debian 13 with containerd v2.3.2
+  and rootless nerdctl 2.3.4.
 
 ### CRI-O / generic CRI
 
-Для рантаймов, говорящих на **CRI** (Container Runtime Interface Kubernetes) — CRI-O,
-CRI-плагин containerd, cri-dockerd — d9c работает через
-[`crictl`](https://github.com/kubernetes-sigs/cri-tools), официальный CRI-клиент. Нужен
-установленный `crictl` на машине с рантаймом:
+For runtimes speaking **CRI** (the Kubernetes Container Runtime Interface) — CRI-O,
+containerd's CRI plugin, cri-dockerd — d9c works through
+[`crictl`](https://github.com/kubernetes-sigs/cri-tools), the official CRI client. `crictl`
+must be installed on the machine where the runtime lives:
 
 ```
-# CRI-рантайм на этой же машине (crictl сам найдёт сокет или возьмёт /etc/crictl.yaml)
+# CRI runtime on this machine (crictl finds the socket itself or reads /etc/crictl.yaml)
 d9c -H crio://
 
-# явный путь к сокету
+# explicit socket path
 d9c -H crio:///var/run/crio/crio.sock
 d9c -H cri:///run/containerd/containerd.sock
 
-# рантайм на удалённом хосте (crictl запускается там по SSH)
+# runtime on a remote host (crictl is executed there over SSH)
 d9c -H crio+ssh://user@host
 d9c -H cri+ssh://user@host/run/crio/crio.sock
 ```
 
-`crio://` и `cri://` — синонимы (бэкенд общий); `crio+ssh://` — полноценный SSH-хост с той же
-аутентификацией ключом/паролем, что и `ssh://`. В шапке появляется метка **cri-o** (или **cri**
-для другого рантайма — по `RuntimeName` из `crictl version`).
+`crio://` and `cri://` are synonyms (one shared backend); `crio+ssh://` is a first-class SSH
+host with the same key/password authentication as `ssh://`. The header shows a **cri-o** chip
+(or **cri** for another runtime — from the `RuntimeName` of `crictl version`).
 
-**Что работает.** Containers — списки (имя показывается как `pod/container`: pod — единица
-группировки в CRI), inspect, start/stop/rm, kill (маппится на CRI `stop` с таймаутом 0 —
-других сигналов в CRI нет), логи (`-f/--tail/--since`), метрики CPU/MEM (CPU% считается по
-дельте кумулятивного счётчика между тиками), интерактивный exec (по SSH-транспорту, как у
-nerdctl), обзор ФС (`ls` внутри контейнера); Images — список/inspect/`rmi`/`pull`/`prune`;
-events (нужен cri-tools ≥ 1.26); `system df` эмулируется из списков; дашборд Hosts получает
-счётчики и версию рантайма.
+**What works.** Containers — listings (names render as `pod/container`: the pod is CRI's
+grouping unit), inspect, start/stop/rm, kill (maps to CRI `stop` with a zero timeout — CRI has
+no other signals), logs (`-f/--tail/--since`), CPU/MEM metrics (CPU% is derived as the delta of
+the cumulative counter between refresh ticks), interactive exec (over the SSH transport, like
+nerdctl), the container FS browser (`ls` inside the container); Images — list/inspect/`rmi`/
+`pull`/`prune`; events (requires cri-tools ≥ 1.26); `system df` is emulated from the lists;
+the Hosts dashboard gets the counters and the runtime version.
 
-**Чего в CRI нет по определению** — деградация мягкая: Networks/Volumes/Compose показывают
-пустые списки (сетями заведует CNI, томами и compose — оркестратор), а build/tag/push/`run`/
-`cp` отвечают понятной ошибкой «CRI управляет только pod'ами, контейнерами и образами».
-Создание контейнеров — задача kubelet/оркестратора, а не TUI. Учтите также, что некоторые
-рантаймы отказываются стартовать exited-контейнер (`restart` может вернуть ошибку рантайма) —
-в Kubernetes контейнеры пересоздаёт kubelet.
+**What CRI has no notion of** — soft degradation: Networks/Volumes/Compose show empty lists
+(networking belongs to CNI, volumes and compose to the orchestrator), while build/tag/push/
+`run`/`cp` answer with a clear "CRI manages only pods, containers and images" error. Creating
+containers is the kubelet/orchestrator's job, not a TUI's. Also note that some runtimes refuse
+to start an exited container (`restart` may return the runtime's error) — in Kubernetes the
+kubelet recreates containers instead.
 
-#### Настройка хоста CRI-O
+#### Setting up a CRI-O host
 
-Проверено живым прогоном на Debian 13 + CRI-O 1.33. Чтобы d9c работал полноценно:
+Verified with a live run against Debian 13 + CRI-O 1.33. For d9c to work fully:
 
-- **`crictl`** — пакет `cri-tools` есть не во всех репозиториях (например, в openSUSE OBS
-  `isv:/cri-o` его нет) — тогда возьмите бинарник из
-  [releases cri-tools](https://github.com/kubernetes-sigs/cri-tools/releases). Эндпоинт
-  пропишите в `/etc/crictl.yaml`, иначе crictl будет перебирать сокеты с предупреждениями:
+- **`crictl`** — the `cri-tools` package is missing from some repositories (e.g. openSUSE OBS
+  `isv:/cri-o`) — grab the binary from
+  [cri-tools releases](https://github.com/kubernetes-sigs/cri-tools/releases) instead. Set the
+  endpoint in `/etc/crictl.yaml`, otherwise crictl probes sockets with warnings:
 
   ```yaml
   runtime-endpoint: unix:///var/run/crio/crio.sock
   image-endpoint: unix:///var/run/crio/crio.sock
   ```
 
-- **Доступ к сокету.** `/var/run/crio/crio.sock` принадлежит root — подключайтесь
-  `crio+ssh://root@host` (или дайте пользователю права на сокет).
-- **События (`:events`).** CRI-O отдаёт поток событий только при `enable_pod_events = true`
-  (drop-in в `/etc/crio/crio.conf.d/`), иначе стрим закрывается сразу после открытия и
-  viewer сообщает о завершении потока.
-- **Идемпотентный stop.** `crictl stop` несуществующего контейнера завершается успехом
-  (особенность CRI-O) — stop по устаревшей строке списка не покажет ошибку.
-- **Standalone-стенд без Kubernetes.** Пакетный CNI-конфиг CRI-O поставляется отключённым
-  (`/etc/cni/net.d/10-crio-bridge.conflist.disabled` — переименуйте, убрав `.disabled`), а
-  старые CNI-плагины (например, 1.1.1 из Debian) не проходят bridge-CHECK
-  («Interface veth… Mac doesn't match») — поставьте плагины ≥ 1.5 из
-  [containernetworking/plugins](https://github.com/containernetworking/plugins/releases) в
-  `/opt/cni/bin`. Это нужно для создания pod'ов (`crictl runp`); сам d9c pod'ы не создаёт,
-  но без CNI на стенде нечем наполнить списки.
+- **Socket access.** `/var/run/crio/crio.sock` is owned by root — connect as
+  `crio+ssh://root@host` (or grant your user access to the socket).
+- **Events (`:events`).** CRI-O only serves the event stream with `enable_pod_events = true`
+  (a drop-in under `/etc/crio/crio.conf.d/`); without it the stream closes right after opening
+  and the viewer reports a finished stream.
+- **Idempotent stop.** `crictl stop` of a nonexistent container succeeds (a CRI-O trait) —
+  stopping a stale list row won't surface an error.
+- **Standalone rigs without Kubernetes.** CRI-O's packaged CNI config ships disabled
+  (`/etc/cni/net.d/10-crio-bridge.conflist.disabled` — rename it, dropping `.disabled`), and
+  old CNI plugins (e.g. 1.1.1 from Debian) fail the bridge CHECK
+  ("Interface veth… Mac doesn't match") — install plugins ≥ 1.5 from
+  [containernetworking/plugins](https://github.com/containernetworking/plugins/releases) into
+  `/opt/cni/bin`. This matters for creating pods (`crictl runp`); d9c itself never creates
+  pods, but without CNI a test rig has nothing to fill the lists with.
 
-Раздел **Hosts** — это и список сохранённых хостов, и мульти-хост дашборд: на каждый хост строка
-со статусом (● up/down) и агрегатом из `docker info` (контейнеры/запущено/образы/версия демона).
-Данные собираются по одному соединению на хост, обновляются раз в ~10 секунд. `Enter` — подключиться
-к выбранному хосту. Управление прямо из раздела: `a` — добавить, `e` — редактировать, `d` — удалить
-(с подтверждением); те же действия доступны командами `:add` / `:edit` / `:rm`. Команды
-`:dashboard` / `:dash` — алиасы для `:hosts`. Список хостов хранится в общем
-`d9c-config.yaml` (секция `hosts:`, см. [Конфиг, темы и клавиши](#конфиг-темы-и-клавиши)).
+The **Hosts** section is both the list of saved hosts and a multi-host dashboard: each host gets a row
+with status (● up/down) and an aggregate from `docker info` (containers/running/images/daemon version).
+Data is collected over a single connection per host, refreshed roughly every 10 seconds. `Enter` — connect
+to the selected host. Management right from the section: `a` — add, `e` — edit, `d` — delete
+(with confirmation); the same actions are available via the `:add` / `:edit` / `:rm` commands. The
+`:dashboard` / `:dash` commands are aliases for `:hosts`. The host list is stored in the shared
+`d9c-config.yaml` (the `hosts:` section, see [Config, themes and keys](#config-themes-and-keys)).
 
-Для `ssh://`-хостов форма добавления/редактирования предлагает выбрать способ
-аутентификации (`←/→/пробел` переключают):
+For `ssh://` hosts the add/edit form lets you choose the authentication method
+(`←/→/space` toggle):
 
-- **Ключ** — поле «Key path» позволяет указать кастомный путь к приватному ключу;
-  пусто = ssh-agent и ключи `~/.ssh` по умолчанию.
-- **Пароль** — в конфиг сохраняется **только логин**, пароль на диск не пишется.
-  При подключении (`Enter` / `:connect`) открывается модалка с полями логина и
-  пароля: логин подставляется сохранённый, но его можно изменить перед
-  подключением. Пароль хранится только в памяти на время сессии.
-
----
-
-## Разделы и навигация
-
-Разделы: **Containers / Images / Networks / Volumes / Compose / Hosts**.
-
-- Навигация — стрелками / `j` / `k`, `PgUp/PgDn`, `g`/`G`.
-- Фильтр — `/`, командная строка — `:`, выход — `q`.
-- Подсказки клавиш — в нижней строке, полная справка по текущему разделу — по клавише `?`.
+- **Key** — the "Key path" field takes a custom private-key path; empty falls back
+  to ssh-agent and the default `~/.ssh` keys.
+- **Password** — only the login is saved to the config; the password is never
+  written to disk. On connect (`Enter` / `:connect`) a modal prompts for the login
+  and password: the saved login is pre-filled but editable before connecting. The
+  password lives in memory only for the session.
 
 ---
 
-## Фильтр `/`
+## Sections and navigation
 
-Простой текст — подстрока без учёта регистра (несколько слов — логическое И).
-Доступны и структурированные термины (для Containers — самые полные):
+Sections: **Containers / Images / Networks / Volumes / Compose / Hosts**.
 
-| Терм | Что делает |
+- Navigation — arrow keys / `j` / `k`, `PgUp/PgDn`, `g`/`G`.
+- Filter — `/`, command line — `:`, quit — `q`.
+- Key hints are in the bottom line; full help for the current section is on the `?` key.
+
+---
+
+## Filter `/`
+
+Plain text is a case-insensitive substring (multiple words are logical AND).
+Structured terms are also available (for Containers they are the richest):
+
+| Term | What it does |
 | --- | --- |
-| `nginx` | подстрока в имени/образе/статусе |
-| `re:^web-\d+` | регулярное выражение (без регистра) |
-| `status:running` | по статусу/состоянию (`running`, `exited`, `healthy`…) |
-| `label:env` / `label:env=prod` | по метке контейнера (ключ или ключ=значение) |
-| `network:frontend` (`net:`) | по подключённой сети |
+| `nginx` | substring in name/image/status |
+| `re:^web-\d+` | regular expression (case-insensitive) |
+| `status:running` | by status/state (`running`, `exited`, `healthy`…) |
+| `label:env` / `label:env=prod` | by container label (key or key=value) |
+| `network:frontend` (`net:`) | by attached network |
 
-Термины комбинируются через пробел (И): `status:running label:env=prod net:bridge`.
-Ошибка в регулярном выражении подсвечивается прямо в строке фильтра.
+Terms combine with a space (AND): `status:running label:env=prod net:bridge`.
+A regex error is highlighted right in the filter line.
 
 ---
 
-## Конфиг, темы и клавиши
+## Config, themes and keys
 
-**Все настройки приложения** — тема, переопределения цветов, горячие клавиши, пороги алертов
-и **список сохранённых хостов** — лежат в одном YAML-файле. По умолчанию d9c ищет
-**`d9c-config.yaml` рядом с исполняемым файлом**; другой путь — флагом:
+**All application settings** — theme, color overrides, hotkeys, alert thresholds
+and the **list of saved hosts** — live in a single YAML file. By default d9c looks for
+**`d9c-config.yaml` next to the executable**; a different path can be set with a flag:
 
 ```sh
 d9c -config /path/to/d9c-config.yaml
 ```
 
-Плагины — единственное исключение: они в отдельном `d9c-plugins.yaml`. Если конфига нет —
-это не ошибка, берётся встроенная тема `tokyonight` и пустой список хостов. Файл читается
-при запуске, а изменения, сделанные из интерфейса (правка хостов, выбор темы в пикере),
-сразу пишутся обратно — остальные секции при этом сохраняются. Старый отдельный
-`d9c-hosts.json` при первом запуске **автоматически переносится** в `hosts:` нового конфига
-(файл переименовывается в `d9c-hosts.json.migrated`).
+Plugins are the only exception: they live in a separate `d9c-plugins.yaml`. A missing config
+is not an error — the built-in `tokyonight` theme and an empty host list are used. The file is read
+at startup, and changes made from the interface (editing hosts, picking a theme in the picker)
+are written back immediately — the other sections are preserved. An old standalone
+`d9c-hosts.json` is **automatically migrated** into the new config's `hosts:` on first run
+(the file is renamed to `d9c-hosts.json.migrated`).
 
 ```yaml
-lang: ru                  # язык интерфейса: ru (по умолчанию) или en
-theme: dracula            # встроенная палитра (по умолчанию tokyonight)
-colors:                   # необязательные точечные переопределения цветов
+lang: ru                  # UI language: ru (default) or en
+theme: dracula            # built-in palette (tokyonight by default)
+colors:                   # optional pointwise color overrides
   primary: "#ff79c6"
   danger: "#ff5555"
-hosts:                    # сохранённые хосты (раздел Hosts; обычно правятся из UI)
+hosts:                    # saved hosts (Hosts section; usually edited from the UI)
   - name: prod
     host: ssh://user@prod.example.com
-    ssh_auth: key          # key | password (пусто = key через ssh-agent/~/.ssh)
-    ssh_key_path: ~/.ssh/prod_ed25519   # необязательно; для ssh_auth: key
+    ssh_auth: key          # key | password (empty = key via ssh-agent/~/.ssh)
+    ssh_key_path: ~/.ssh/prod_ed25519   # optional; for ssh_auth: key
   - name: staging
     host: ssh://deploy@staging.example.com
-    ssh_auth: password     # запрос пароля при подключении; пароль НЕ хранится
+    ssh_auth: password     # prompts for the password on connect; never stored
   - name: local
     host: tcp://localhost:2375
 ```
 
-Встроенные темы: `tokyonight`, `dracula`, `nord`, `gruvbox`, `solarized`,
-`catppuccin`, `k9s` (яркая, в духе скина k9s). Тему можно переключить и **на лету,
-без конфига** — командой `:theme <name>` (например `:theme nord`); `:theme` без
-аргумента открывает модалку выбора со списком тем и живым превью (стрелки —
-предпросмотр, Enter — применить, q/Esc — отмена). Выбор темы через пикер (Enter)
-**сохраняется в конфиг** (`theme:`) — переживает перезапуск; `:theme <name>` меняет тему
-только на текущую сессию. В `colors` можно переопределить любой из базовых цветов поверх
-выбранной темы:
+Built-in themes: `tokyonight`, `dracula`, `nord`, `gruvbox`, `solarized`,
+`catppuccin`, `k9s` (bright, in the spirit of the k9s skin). The theme can also be switched
+**on the fly, without a config** — via the `:theme <name>` command (e.g. `:theme nord`); `:theme`
+without an argument opens a picker modal with a list of themes and live preview (arrows —
+preview, Enter — apply, q/Esc — cancel). Picking a theme through the picker (Enter)
+is **saved to the config** (`theme:`) — it survives a restart; `:theme <name>` changes the theme
+for the current session only. In `colors` you can override any of the base colors on top of the
+selected theme:
 
-**Язык интерфейса** переключается так же: команда `:lang` без аргумента открывает
-модалку выбора (`Русский` / `English`, стрелки — превью, Enter — применить, q/Esc —
-отмена), а `:lang en` / `:lang ru` меняют язык напрямую. Выбор **сохраняется в конфиг**
-(`lang:`) и переживает перезапуск. По умолчанию интерфейс русский.
+**The UI language** is switched the same way: the `:lang` command with no argument opens a
+picker modal (`Русский` / `English`, arrows — preview, Enter — apply, q/Esc — cancel), while
+`:lang en` / `:lang ru` change the language directly. The choice is **saved to the config**
+(`lang:`) and survives a restart. The interface is Russian by default.
 
-| Ключ | Назначение |
+| Key | Purpose |
 | --- | --- |
-| `primary` | акценты, активные клавиши, индикаторы |
-| `secondary` | заголовки таблиц, метки |
-| `success` | running / healthy / «● up» |
-| `warning` | переходные состояния (paused, реконнект) |
-| `danger` | ошибки, stopped, unhealthy |
-| `muted` | приглушённый текст, разделители |
-| `bg` / `bgalt` | фон и приподнятые поверхности (выделение, бары, модалки) |
-| `fg` | основной текст |
-| `border` | рамки и линии |
+| `primary` | accents, active keys, indicators |
+| `secondary` | table headers, labels |
+| `success` | running / healthy / "● up" |
+| `warning` | transitional states (paused, reconnect) |
+| `danger` | errors, stopped, unhealthy |
+| `muted` | dimmed text, separators |
+| `bg` / `bgalt` | background and raised surfaces (selection, bars, modals) |
+| `fg` | primary text |
+| `border` | frames and lines |
 
-Значение цвета — hex (`#rgb` или `#rrggbb`) либо индекс ANSI-палитры `0`–`255`.
-Неизвестная тема, неизвестный ключ цвета или некорректное значение — ошибка при
-старте (`loading config: …`).
+A color value is hex (`#rgb` or `#rrggbb`) or an ANSI palette index `0`–`255`.
+An unknown theme, an unknown color key or an invalid value is an error at
+startup (`loading config: …`).
 
-### Клавиши
+### Keys
 
-Действия normal-режима можно переназначить в секции `keys:` того же
-`d9c-config.yaml`. Указываются только те действия, которые нужно изменить —
-остальные остаются на значениях по умолчанию:
+Normal-mode actions can be remapped in the `keys:` section of the same
+`d9c-config.yaml`. Only the actions you want to change need to be listed —
+the rest stay at their defaults:
 
 ```yaml
 keys:
-  filter: f        # фильтр вместо "/"
-  logs: g          # логи вместо "l"
-  select: space    # отметка для массовой операции (алиас "space" = пробел)
+  filter: f        # filter instead of "/"
+  logs: g          # logs instead of "l"
+  select: space    # mark for a bulk operation (the alias "space" = the spacebar)
 ```
 
-| Действие | По умолчанию | Что делает |
+| Action | Default | What it does |
 | --- | --- | --- |
-| `inspect` | `i` | подробности выбранного ресурса |
-| `logs` | `l` | логи контейнера / compose-проекта |
-| `edit` | `e` | редактировать compose-файл |
-| `exec` | `x` | shell в контейнере (встроенный терминал) |
-| `filter` | `/` | фильтр по строкам |
-| `command` | `:` | командная строка |
-| `toggle-all` | `a` | все / только running |
-| `stats` | `s` | метрики CPU/MEM |
-| `select` | `space` | отметить для массовой операции |
-| `copy` | `y` | меню копирования |
-| `refresh` | `r` | обновить вручную |
-| `pause` | `p` | пауза/возобновление автообновления |
-| `help` | `?` | справка |
+| `inspect` | `i` | details of the selected resource |
+| `logs` | `l` | container / compose-project logs |
+| `edit` | `e` | edit the compose file |
+| `exec` | `x` | shell in a container (built-in terminal) |
+| `filter` | `/` | filter by rows |
+| `command` | `:` | command line |
+| `toggle-all` | `a` | all / running only |
+| `stats` | `s` | CPU/MEM metrics |
+| `select` | `space` | mark for a bulk operation |
+| `copy` | `y` | copy menu |
+| `refresh` | `r` | refresh manually |
+| `pause` | `p` | pause/resume auto-refresh |
+| `help` | `?` | help |
 
-Значение — имя клавиши в нотации bubbletea (`f`, `ctrl+d`, `f5`, `space` и т. п.).
-Навигация (`↑/↓`, `j/k`, `PgUp/PgDn`), `Enter` и клавиши выхода (`q`, `esc`,
-`Ctrl+C`) фиксированы и не переназначаются. Неизвестное действие, пустая клавиша,
-зарезервированная клавиша или одна клавиша на два действия — ошибка при старте
-(`loading keybindings: …`). Справка `?` показывает уже актуальные (переназначенные)
-клавиши.
+A value is a key name in Bubble Tea notation (`f`, `ctrl+d`, `f5`, `space`, etc.).
+Navigation (`↑/↓`, `j/k`, `PgUp/PgDn`), `Enter` and the quit keys (`q`, `esc`,
+`Ctrl+C`) are fixed and cannot be remapped. An unknown action, an empty key, a
+reserved key or one key bound to two actions is an error at startup
+(`loading keybindings: …`). The `?` help shows the actual (remapped) keys.
 
 ---
 
-## Файловая система контейнера (`f` / `:files`)
+## Container filesystem (`f` / `:files`)
 
-В разделе **Containers** клавиша `f` (или команда `:files [path]`) открывает обзор
-файловой системы выбранного запущенного контейнера. Листинг строится через `ls`
-внутри контейнера, поэтому в минимальных образах без `ls` (scratch/distroless)
-обзор недоступен (об этом сообщается понятной ошибкой).
+In the **Containers** section the `f` key (or the `:files [path]` command) opens a browser of
+the selected running container's filesystem. The listing is built via `ls`
+inside the container, so in minimal images without `ls` (scratch/distroless) the
+browser is unavailable (this is reported with a clear error).
 
-| Клавиша | Действие |
+| Key | Action |
 | --- | --- |
-| `enter` / `l` | войти в каталог |
-| `⌫` / `h` / `-` | подняться на уровень вверх |
-| `d` | скачать выбранный файл/каталог в рабочий каталог d9c (`docker cp` из контейнера) |
-| `↑/↓` `j/k`, `g`/`G`, `PgUp/PgDn` | навигация по списку |
-| `q` / `esc` | закрыть обзор |
+| `enter` / `l` | enter a directory |
+| `⌫` / `h` / `-` | go up one level |
+| `d` | download the selected file/directory into d9c's working directory (`docker cp` out of the container) |
+| `↑/↓` `j/k`, `g`/`G`, `PgUp/PgDn` | navigate the list |
+| `q` / `esc` | close the browser |
 
-Загрузка В контейнер — командой `:cp <local-path> <container-dir>` (целевой путь
-должен быть существующим каталогом внутри контейнера). Вызов `:cp` **без
-аргументов** открывает модальный мастер: встроенный пикер локальной файловой
-системы (навигация по машине, где запущен d9c) плюс поле каталога назначения в
-контейнере — `Tab` переключает фокус, `enter`/`l` входит в каталог, `⌫`/`h`
-поднимается вверх, `enter` в поле назначения запускает загрузку. Скачивание распаковывает
-tar-поток демона на диск с защитой от выхода за пределы каталога назначения;
-символьные ссылки и спецфайлы при этом пропускаются.
-
----
-
-## Автообновление
-
-Списки обновляются по таймеру. Стартовый интервал задаётся флагом `-interval`
-(например `-interval 5s`, по умолчанию `3s`); на лету его меняет команда
-`:interval <dur>` (`:interval 10s`, диапазон `1s`–`1h`), а `:interval` без
-аргумента показывает текущее значение. Клавиша `p` (или `:interval pause` /
-`:interval resume`) ставит автообновление на паузу и снимает с неё — индикатор
-статуса сервера при этом продолжает работать, а ручное обновление по `r` доступно
-всегда. Состояние видно в шапке: `↻3s` — активный интервал, `⏸ paused` — пауза.
+Uploading INTO a container is done with the `:cp <local-path> <container-dir>` command (the target path
+must be an existing directory inside the container). Calling `:cp` **without
+arguments** opens a modal wizard: a built-in picker for the local filesystem
+(navigating the machine where d9c runs) plus a destination directory field in the
+container — `Tab` switches focus, `enter`/`l` enters a directory, `⌫`/`h`
+goes up, `enter` in the destination field starts the upload. Downloading unpacks
+the daemon's tar stream to disk with protection against escaping the destination
+directory; symlinks and special files are skipped.
 
 ---
 
-## Алерты по порогам ресурсов
+## Auto-refresh
 
-Контейнеры, чья нагрузка превышает заданный порог, подсвечиваются маркером `⚠`
-рядом с именем (в обоих режимах таблицы Containers), а в шапке появляется счётчик
-`⚠ N` — число «горящих» контейнеров. Пороги опираются на живые метрики Stats API
-(те же CPU%/MEM%, что в режиме `s`); остановленные и ещё не опрошенные контейнеры
-не учитываются.
+Lists are refreshed on a timer. The initial interval is set by the `-interval` flag
+(e.g. `-interval 5s`, `3s` by default); the `:interval <dur>` command changes it on the fly
+(`:interval 10s`, range `1s`–`1h`), and `:interval` without an
+argument shows the current value. The `p` key (or `:interval pause` /
+`:interval resume`) pauses and resumes auto-refresh — the server status
+indicator keeps working meanwhile, and manual refresh via `r` is always available.
+The state is shown in the header: `↻3s` — the active interval, `⏸ paused` — paused.
 
-Стартовые пороги задаются секцией `alerts:` в `d9c-config.yaml` (необязательная;
-`0` или отсутствие = метрика выключена):
+---
+
+## Resource threshold alerts
+
+Containers whose load exceeds a given threshold are highlighted with a `⚠` marker
+next to the name (in both Containers table modes), and a `⚠ N` counter appears in the
+header — the number of "hot" containers. The thresholds rely on the live Stats API metrics
+(the same CPU%/MEM% as in `s` mode); stopped and not-yet-polled containers
+are not counted.
+
+The initial thresholds are set by the `alerts:` section in `d9c-config.yaml` (optional;
+`0` or absence = the metric is off):
 
 ```yaml
 alerts:
-  cpu: 80     # подсветить контейнер при CPU% ≥ 80 (может превышать 100 на многоядерных)
-  mem: 90     # подсветить при MEM% ≥ 90
+  cpu: 80     # highlight a container at CPU% ≥ 80 (may exceed 100 on multi-core)
+  mem: 90     # highlight at MEM% ≥ 90
 ```
 
-На лету пороги меняет команда `:alert`:
+The thresholds are changed on the fly with the `:alert` command:
 
-| Команда | Действие |
+| Command | Action |
 | --- | --- |
-| `:alert cpu <%>` | порог по CPU% (например `:alert cpu 80`) |
-| `:alert mem <%>` | порог по MEM% |
-| `:alert cpu off` / `:alert mem off` | выключить отдельную метрику |
-| `:alert off` | выключить алерты полностью |
-| `:alert` | показать текущие пороги |
+| `:alert cpu <%>` | CPU% threshold (e.g. `:alert cpu 80`) |
+| `:alert mem <%>` | MEM% threshold |
+| `:alert cpu off` / `:alert mem off` | turn off an individual metric |
+| `:alert off` | turn alerts off entirely |
+| `:alert` | show the current thresholds |
 
 ---
 
-## Плагины
+## Plugins
 
-Плагины — это **пользовательские команды и горячие клавиши**, описанные в YAML-файле
-(как в k9s). Каждый плагин запускает **локальную** команду (на той машине, где работает
-d9c) с подстановкой данных выбранной строки. Так можно встроить `dive`, `lazydocker`,
-`ctop`, собственные скрипты, `docker`-команды и т. п. — не меняя код приложения.
+Plugins are **custom commands and hotkeys** described in a YAML file
+(like in k9s). Each plugin runs a **local** command (on the machine where
+d9c runs) with substitution of the selected row's data. This lets you wire in `dive`, `lazydocker`,
+`ctop`, your own scripts, `docker` commands and so on — without changing the application code.
 
-### Где лежит файл
+### Where the file lives
 
-По умолчанию d9c ищет файл **`d9c-plugins.yaml` рядом с исполняемым файлом**.
-Другой путь можно указать флагом:
+By default d9c looks for the file **`d9c-plugins.yaml` next to the executable**.
+A different path can be set with a flag:
 
 ```sh
 d9c -plugins-file /path/to/plugins.yaml
 ```
 
-Если файла нет — это не ошибка, просто плагинов не будет. Файл читается **один раз при
-запуске**: после правки перезапустите d9c.
+A missing file is not an error, there will just be no plugins. The file is read **once at
+startup**: after editing it, restart d9c.
 
-### Формат файла
+### File format
 
-Корень — ключ `plugins` со списком объектов:
+The root is the `plugins` key with a list of objects:
 
 ```yaml
 plugins:
-  - name: dive                 # обязательно — имя команды (вызов :dive)
-    key: ctrl+d                # необязательно — горячая клавиша
-    scope: images              # в каком разделе доступен (по умолчанию "*")
-    description: Слои образа   # необязательно — для документации
-    command: dive              # обязательно — исполняемый файл (без аргументов)
-    args: ["${ID}"]            # необязательно — аргументы (каждый отдельной строкой)
-    background: false          # необязательно — режим запуска (по умолчанию false)
+  - name: dive                 # required — the command name (invoked as :dive)
+    key: ctrl+d                # optional — a hotkey
+    scope: images              # in which section it's available (default "*")
+    description: Image layers  # optional — for documentation
+    command: dive              # required — the executable (without arguments)
+    args: ["${ID}"]            # optional — arguments (each on its own line)
+    background: false          # optional — launch mode (default false)
 ```
 
-#### Поля
+#### Fields
 
-| Поле          | Обяз. | Описание |
+| Field         | Req. | Description |
 |---------------|:----:|----------|
-| `name`        |  да  | Имя команды. Запускается как `:name`. |
-| `command`     |  да  | Имя/путь исполняемого файла. **Запускается напрямую, без shell.** |
-| `args`        | нет  | Список аргументов. Каждый — отдельный элемент списка (не одна строка). |
-| `scope`       | нет  | Раздел, где плагин активен. По умолчанию `*` (везде). |
-| `key`         | нет  | Горячая клавиша (формат Bubble Tea: `ctrl+d`, `f5`, `alt+x`…). |
-| `description` | нет  | Краткое описание (документирующее). |
-| `background`  | нет  | `false` — интерактивно (захват терминала); `true` — фоном с выводом в консоль. |
+| `name`        | yes  | The command name. Invoked as `:name`. |
+| `command`     | yes  | The executable name/path. **Run directly, without a shell.** |
+| `args`        | no   | The argument list. Each one is a separate list item (not a single string). |
+| `scope`       | no   | The section where the plugin is active. Default `*` (everywhere). |
+| `key`         | no   | A hotkey (Bubble Tea format: `ctrl+d`, `f5`, `alt+x`…). |
+| `description` | no   | A short description (documentation). |
+| `background`  | no   | `false` — interactive (takes over the terminal); `true` — in the background with output to a console. |
 
-#### Допустимые значения `scope`
+#### Allowed `scope` values
 
-`containers`, `images`, `networks`, `volumes`, `compose`, `hosts`, или `*` (любой раздел).
-Регистр не важен. Плагин со `scope: containers` доступен только в разделе контейнеров;
-`scope: "*"` — во всех.
+`containers`, `images`, `networks`, `volumes`, `compose`, `hosts`, or `*` (any section).
+Case-insensitive. A plugin with `scope: containers` is only available in the containers section;
+`scope: "*"` — in all of them.
 
-### Подстановка `${ПЕРЕМЕННЫХ}`
+### `${VARIABLE}` substitution
 
-Перед запуском в `command` и в каждом элементе `args` подставляются значения из
-**выделенной строки**. Неизвестные плейсхолдеры остаются как есть (чтобы опечатка была
-заметна).
+Before launch, the values from the **selected row** are substituted into `command` and into each
+`args` item. Unknown placeholders are left as is (so a typo is visible).
 
-Доступны всегда:
+Always available:
 
-| Переменная | Значение |
+| Variable | Value |
 |------------|----------|
-| `${HOST}`  | Адрес текущего Docker-хоста (`tcp://…` или `ssh://…`). |
-| `${ID}`    | Идентификатор выделенной строки. Для контейнеров/образов/сетей — ID; для томов/проектов/хостов — имя (оно же ключ строки). |
+| `${HOST}`  | The address of the current Docker host (`tcp://…` or `ssh://…`). |
+| `${ID}`    | The identifier of the selected row. For containers/images/networks — the ID; for volumes/projects/hosts — the name (which is also the row key). |
 
-В зависимости от раздела добавляются:
+Depending on the section, the following are added:
 
-| Раздел (`scope`) | Дополнительно |
+| Section (`scope`) | Additionally |
 |------------------|---------------|
 | `containers`     | `${NAME}` `${IMAGE}` `${STATUS}` `${STATE}` `${PORTS}` |
-| `images`         | `${NAME}` `${IMAGE}` `${TAGS}` (все три = теги образа) |
+| `images`         | `${NAME}` `${IMAGE}` `${TAGS}` (all three = the image tags) |
 | `networks`       | `${NAME}` `${DRIVER}` |
 | `volumes`        | `${NAME}` `${DRIVER}` |
-| `compose`        | `${NAME}` `${PATH}` (рабочий каталог) `${STATUS}` |
-| `hosts`          | `${NAME}` `${HOST}` (URL выбранного хоста) |
+| `compose`        | `${NAME}` `${PATH}` (the working directory) `${STATUS}` |
+| `hosts`          | `${NAME}` `${HOST}` (the URL of the selected host) |
 
-> Удалённый демон — это `${HOST}`. Поскольку команда выполняется локально, для действий
-> над удалённым демоном вызывайте локальный клиент с этим адресом, например
-> `docker -H ${HOST} …` или `docker -H ${HOST} exec -it ${ID} sh`.
+> The remote daemon is `${HOST}`. Since the command runs locally, for actions
+> against the remote daemon call the local client with this address, e.g.
+> `docker -H ${HOST} …` or `docker -H ${HOST} exec -it ${ID} sh`.
 
-### Как вызвать плагин
+### How to invoke a plugin
 
-- **Командой:** `:` → ввести `name` → Enter. Имена плагинов текущего раздела появляются
-  в автодополнении.
-- **Клавишей:** если задан `key` — нажать её в подходящем разделе. Привязка показывается
-  в подсказках внизу экрана.
+- **By command:** `:` → type `name` → Enter. The plugin names for the current section appear
+  in autocompletion.
+- **By key:** if `key` is set — press it in the appropriate section. The binding is shown
+  in the hints at the bottom of the screen.
 
-**Встроенные команды и клавиши всегда имеют приоритет.** Если назвать плагин как штатную
-команду (`stop`, `rm`, `logs`…) или повесить его на занятую клавишу (`i`, `l`, `x`, `s`,
-`a`, `/`, `:`…), сработает встроенное действие. Поэтому для клавиш предпочитайте
-`ctrl+<буква>` или функциональные клавиши (`f2`…`f12`), а имена выбирайте отличными от
-встроенных.
+**Built-in commands and keys always take priority.** If you name a plugin like a built-in
+command (`stop`, `rm`, `logs`…) or bind it to a taken key (`i`, `l`, `x`, `s`,
+`a`, `/`, `:`…), the built-in action fires. So for keys prefer
+`ctrl+<letter>` or function keys (`f2`…`f12`), and pick names different from the
+built-in ones.
 
-### Режимы запуска
+### Launch modes
 
-**Интерактивный (`background: false`, по умолчанию).** d9c **отдаёт терминал**
-запущенной программе (как при `exec`/shell), а после её завершения возвращает интерфейс.
-Подходит для интерактивных программ: оболочка в контейнере, `dive`, `lazydocker`, `vim`,
-`htop`. Ненулевой код возврата покажется ошибкой в нижней строке.
+**Interactive (`background: false`, default).** d9c **hands over the terminal**
+to the launched program (like `exec`/shell), and returns the interface after it exits.
+Suitable for interactive programs: a shell in a container, `dive`, `lazydocker`, `vim`,
+`htop`. A non-zero exit code is shown as an error in the bottom line.
 
-**Фоновый (`background: true`).** Команда запускается без захвата терминала, а её
-stdout/stderr **построчно стримятся в консоль операции** (как прогресс `compose up`).
-Подходит для одноразовых команд, печатающих текст (`docker system df`, отчёты, скрипты).
-Закрыть консоль — `q`/`esc`.
+**Background (`background: true`).** The command runs without taking over the terminal, and its
+stdout/stderr are **streamed line by line into the operation console** (like `compose up` progress).
+Suitable for one-off commands that print text (`docker system df`, reports, scripts).
+Close the console with `q`/`esc`.
 
-### Важные ограничения
+### Important limitations
 
-- **Без shell.** `command` запускается напрямую, поэтому конвейеры (`|`), перенаправления
-  (`>`), подстановки (`$(…)`), wildcard (`*`) и переменные окружения **не** раскрываются.
-  Чтобы их использовать, явно вызовите оболочку:
+- **No shell.** `command` runs directly, so pipelines (`|`), redirections
+  (`>`), substitutions (`$(…)`), wildcards (`*`) and environment variables are **not** expanded.
+  To use them, call a shell explicitly:
   - Linux/macOS: `command: sh`, `args: ["-c", "docker -H ${HOST} logs ${ID} | tail -n 100"]`
   - Windows: `command: cmd`, `args: ["/c", "…"]`
-- **Команда выполняется локально**, на машине с d9c. Нужные бинарники (`docker`, `dive`,
-  `lazydocker`…) должны быть установлены и доступны в `PATH`.
-- **Кроссплатформенность.** Пути к оболочке и утилитам различаются на Windows и Linux —
-  учитывайте, где запускается d9c.
-- Файл читается при старте; после изменений нужен перезапуск.
+- **The command runs locally**, on the machine with d9c. The needed binaries (`docker`, `dive`,
+  `lazydocker`…) must be installed and available on `PATH`.
+- **Cross-platform.** The paths to the shell and utilities differ on Windows and Linux —
+  keep in mind where d9c runs.
+- The file is read at startup; after changes a restart is needed.
 
-### Полный пример `d9c-plugins.yaml`
+### Full `d9c-plugins.yaml` example
 
 ```yaml
 plugins:
-  # Интерактивная оболочка в выбранном контейнере (через удалённый демон).
+  # An interactive shell in the selected container (via the remote daemon).
   - name: sh
     key: ctrl+s
     scope: containers
-    description: Shell внутри контейнера
+    description: Shell inside the container
     command: docker
     args: ["-H", "${HOST}", "exec", "-it", "${ID}", "sh"]
 
-  # Исследовать слои образа с помощью dive.
+  # Explore image layers with dive.
   - name: dive
     key: ctrl+d
     scope: images
-    description: Анализ слоёв образа
+    description: Image layer analysis
     command: dive
     args: ["${TAGS}"]
 
-  # Полноценный lazydocker, подключённый к тому же хосту.
+  # Full lazydocker, connected to the same host.
   - name: lazy
     scope: "*"
     command: lazydocker
 
-  # Использование диска демоном — вывод в консоль операции.
+  # The daemon's disk usage — output to the operation console.
   - name: df
     scope: "*"
     background: true
@@ -730,7 +709,7 @@ plugins:
     command: docker
     args: ["-H", "${HOST}", "system", "df"]
 
-  # Последние 200 строк логов через shell-конвейер (фоном).
+  # The last 200 log lines through a shell pipeline (in the background).
   - name: tail
     scope: containers
     background: true
@@ -738,58 +717,58 @@ plugins:
     args: ["-c", "docker -H ${HOST} logs --tail 200 ${ID}"]
 ```
 
-### Диагностика
+### Troubleshooting
 
-- **Плагин не вызывается по `:name`** — проверьте `scope` (совпадает ли с текущим
-  разделом или `*`) и что имя не совпадает со встроенной командой.
-- **Клавиша не срабатывает** — вероятно, она занята встроенным действием; смените на
+- **The plugin isn't invoked by `:name`** — check the `scope` (does it match the current
+  section or `*`) and that the name doesn't collide with a built-in command.
+- **The key doesn't fire** — it's probably taken by a built-in action; change it to
   `ctrl+<…>`/`fN`.
-- **`executable file not found`** — нужного бинарника нет в `PATH` на машине с d9c.
-- **Конвейер/`>`/`*` «не работают»** — это ожидаемо: оберните команду в `sh -c "…"` /
+- **`executable file not found`** — the needed binary isn't on `PATH` on the machine with d9c.
+- **A pipeline/`>`/`*` "doesn't work"** — that's expected: wrap the command in `sh -c "…"` /
   `cmd /c "…"`.
-- **Ошибка при старте `loading plugins: …`** — невалидный YAML или плагин без `name`/
-  `command` либо с неизвестным `scope`. Исправьте файл и перезапустите.
+- **A `loading plugins: …` error at startup** — invalid YAML, or a plugin without `name`/
+  `command`, or with an unknown `scope`. Fix the file and restart.
 
 ---
 
-## Разработка
+## Development
 
-Полный набор проверок перед коммитом (quality gate):
+The full set of checks before a commit (quality gate):
 
 ```sh
 make check      # = fmtcheck + vet + golangci-lint + test
 ```
 
-или вручную:
+or manually:
 
 ```sh
-gofmt -l .               # должно быть пусто
+gofmt -l .               # should be empty
 go vet ./...
-golangci-lint run ./...  # конфиг в .golangci.yml; установка: make tools
+golangci-lint run ./...  # config in .golangci.yml; install: make tools
 go test ./...
-go test -race ./...      # для конкурентного кода
+go test -race ./...      # for concurrent code
 ```
 
-Полезные цели Makefile: `make build`, `make run ARGS="-H tcp://host:2375"`, `make demo`,
-`make test`, `make race`, `make lint`, `make tools` (установка `golangci-lint`/`staticcheck`).
+Useful Makefile targets: `make build`, `make run ARGS="-H tcp://host:2375"`, `make demo`,
+`make test`, `make race`, `make lint`, `make tools` (installs `golangci-lint`/`staticcheck`).
 
-Архитектурно все операции Docker спрятаны за интерфейсом `docker.Backend`, поэтому демо-режим
-(`-demo`) и headless-тесты используют `FakeBackend` и не требуют реального демона. UI построен
-по модели Elm (Bubble Tea): `Update` не блокирует event loop, длинные операции идут через `tea.Cmd`.
+Architecturally all Docker operations are hidden behind the `docker.Backend` interface, so the demo mode
+(`-demo`) and headless tests use `FakeBackend` and don't require a real daemon. The UI is built
+on the Elm model (Bubble Tea): `Update` doesn't block the event loop, long operations go through `tea.Cmd`.
 
 ---
 
-## Поддержать проект
+## Support the project
 
-d9c развивается в свободное время. Если инструмент оказался полезен, поддержать
-разработку можно донатом — это помогает находить время на новые фичи:
+d9c is developed in spare time. If the tool turned out useful, you can support
+its development with a donation — it helps to find time for new features:
 
 ➡️ **[dalink.to/kirg08](https://dalink.to/kirg08)**
 
-Звезда репозиторию ⭐ тоже мотивирует. Спасибо!
+A repository star ⭐ is motivating too. Thank you!
 
 ---
 
-## Лицензия
+## License
 
 [MIT](LICENSE) © kirg0
