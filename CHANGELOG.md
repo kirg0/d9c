@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.23.1] - 2026-09-13
+
+### Tests
+
+- **Test coverage 73.8% → 80.3%** (`go test -cover ./...`; 89.1% excluding
+  the diagnostic `cmd/*` utilities). `internal/docker` 71.3% → 87.4%: an
+  in-process SSH server (`golang.org/x/crypto/ssh`) exercises compose over SSH
+  (up/pull/down/config, creating/reading/writing the compose file,
+  backup/restore with sudo fallbacks), `sshStream`/`sshPipe`/`sshInteractive`,
+  `sshRunner` and the full `ssh://` backend via `docker system dial-stdio`
+  proxied into a mock daemon; plus the CRI backend methods and
+  `ListPath`/`docker cp` against the mock daemon with exec hijacking.
+  `internal/ui` 83.6% → 85.9% (modal form keys), `internal/ui/shell`
+  79.0% → 85.0%, root package 1.4% → 67.6% (startup error paths, legacy host
+  migration).
+
 ## [1.23.0] - 2026-09-13
 
 ### Changed
