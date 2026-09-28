@@ -1,6 +1,6 @@
 // Package statgraph keeps a bounded history of numeric samples and renders it
-// as a compact block-character chart (a sparkline when one row tall). It is
-// used by the containers stats view to plot CPU/MEM over the last N refreshes.
+// as a compact Braille area chart. It is used by the containers stats view to
+// plot CPU/MEM over the last N refreshes.
 package statgraph
 
 import (
@@ -8,8 +8,19 @@ import (
 	"strings"
 )
 
-// blocks are the eighth-height bar glyphs, from 1/8 to a full cell.
-var blocks = []rune("▁▂▃▄▅▆▇█")
+// Braille cells pack a 2×4 dot matrix: dotsX columns by dotsY rows.
+const (
+	dotsX       = 2
+	dotsY       = 4
+	brailleBase = 0x2800 // U+2800, the empty Braille pattern
+)
+
+// brailleDot holds the pattern bit of each dot, indexed [column][row] with row
+// 0 at the bottom of the cell (dots 7,3,2,1 on the left, 8,6,5,4 on the right).
+var brailleDot = [dotsX][dotsY]rune{
+	{0x40, 0x04, 0x02, 0x01},
+	{0x80, 0x20, 0x10, 0x08},
+}
 
 // Ring is a fixed-capacity ring buffer of samples: once full, Push overwrites
 // the oldest one. The zero value has no capacity and ignores pushes; use
@@ -92,14 +103,17 @@ func Min(vs []float64) float64 {
 	return lo
 }
 
-// Render draws values as a bar chart height rows tall and width cells wide and
-// returns the rows top to bottom, each exactly width runes. Only the newest
+// Render draws values as a filled area chart of Braille dots, height rows
+// tall and width cells wide, and returns the rows top to bottom, each exactly
+// width runes. Every cell is 2×4 dots: one sample per cell sits on its right
+// dot column, and the left one holds the midpoint to the previous sample, so
+// the outline climbs and falls in slopes instead of steps. Only the newest
 // width samples are drawn, right-aligned, so the chart scrolls left as samples
-// arrive; unused leading columns are blank. Bars scale linearly from lo (the
-// baseline) to hi (full height): values at or below lo, NaN and infinities sit
-// on the baseline, values above hi are clipped. A baseline sample still shows
-// the lowest glyph on the bottom row, so idle periods remain visible against
-// the blank padding; when hi <= lo every sample is drawn at the baseline.
+// arrive; unused leading columns are blank. Heights scale linearly from lo
+// (the baseline) to hi (full height): values at or below lo, NaN and
+// infinities sit on the baseline, values above hi are clipped. Every drawn
+// column lights at least its bottom dot, so idle periods remain visible
+// against the blank padding; when hi <= lo every sample sits on the baseline.
 // Returns nil when width or height < 1.
 func Render(values []float64, width, height int, lo, hi float64) []string {
 	if width < 1 || height < 1 {
@@ -108,34 +122,51 @@ func Render(values []float64, width, height int, lo, hi float64) []string {
 	if len(values) > width {
 		values = values[len(values)-width:]
 	}
-	pad := width - len(values)
-	steps := height * len(blocks) // total eighths in a column
+	dotsH := height * dotsY
 
-	levels := make([]int, len(values))
+	// Fractional heights (in dots) of the samples.
+	heights := make([]float64, len(values))
 	for i, v := range values {
 		if !(hi > lo) || math.IsNaN(v) || math.IsInf(v, 0) || v <= lo {
 			continue
 		}
-		levels[i] = min(int(math.Round((v-lo)/(hi-lo)*float64(steps))), steps)
+		heights[i] = min((v-lo)/(hi-lo), 1) * float64(dotsH)
+	}
+
+	// Lit dots per dot column. Sample i lands on the right column of its cell,
+	// the left column interpolates between it and sample i-1; the first
+	// sample's left column is padding. -1 marks an empty (padding) column.
+	pad := width - len(values)
+	levels := make([]int, width*dotsX)
+	for x := range levels {
+		levels[x] = -1
+	}
+	level := func(h float64) int { return max(int(math.Round(h)), 1) }
+	for i, h := range heights {
+		x := (pad + i) * dotsX
+		if i > 0 {
+			levels[x] = level((heights[i-1] + h) / 2)
+		}
+		levels[x+1] = level(h)
 	}
 
 	rows := make([]string, height)
 	for r := range height {
-		// r = 0 is the top row; floor is the number of eighths below this row.
-		floor := (height - 1 - r) * len(blocks)
+		// r = 0 is the top row; floor is the number of dots below this row.
+		floor := (height - 1 - r) * dotsY
 		var sb strings.Builder
-		sb.WriteString(strings.Repeat(" ", pad))
-		for _, lv := range levels {
-			fill := lv - floor
-			switch {
-			case fill >= len(blocks):
-				sb.WriteRune(blocks[len(blocks)-1])
-			case fill > 0:
-				sb.WriteRune(blocks[fill-1])
-			case floor == 0:
-				sb.WriteRune(blocks[0]) // baseline for a present, ~zero sample
-			default:
+		for c := range width {
+			var cell rune
+			for dx := range dotsX {
+				fill := min(levels[c*dotsX+dx]-floor, dotsY)
+				for dy := 0; dy < fill; dy++ {
+					cell |= brailleDot[dx][dy]
+				}
+			}
+			if cell == 0 {
 				sb.WriteByte(' ')
+			} else {
+				sb.WriteRune(brailleBase + cell)
 			}
 		}
 		rows[r] = sb.String()

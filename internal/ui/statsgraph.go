@@ -57,15 +57,16 @@ func recordStatsHistory(hist map[string]*statsHistory, fresh map[string]docker.C
 	return out
 }
 
-// statsGraphRows picks the height of each chart for a body of h lines: a
-// 3-row bar chart on tall windows, a 1-row sparkline on medium ones, none (0)
-// when the table would be left too little room.
+// statsGraphRows picks the height of each chart for a body of h lines: 3 rows
+// on tall windows, 2 on medium ones (a Braille row holds only 4 dot levels, so
+// a single row is too coarse), none (0) when the table would be left too
+// little room.
 func statsGraphRows(h int) int {
 	switch {
 	case h >= 30:
 		return 3
 	case h >= 16:
-		return 1
+		return 2
 	}
 	return 0
 }

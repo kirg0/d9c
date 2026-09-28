@@ -103,7 +103,18 @@ func TestMin(t *testing.T) {
 	}
 }
 
+// br builds a string of Braille cells from their dot-pattern bits.
+func br(bits ...rune) string {
+	out := make([]rune, len(bits))
+	for i, b := range bits {
+		out[i] = brailleBase + b
+	}
+	return string(out)
+}
+
 func TestRender(t *testing.T) {
+	// Bits: left column bottom→top 0x40,0x04,0x02,0x01; right 0x80,0x20,0x10,0x08.
+	const rightFull, bothFull = 0xB8, 0xFF
 	tests := []struct {
 		name   string
 		values []float64
@@ -115,26 +126,30 @@ func TestRender(t *testing.T) {
 		{name: "zero width", values: []float64{1}, width: 0, height: 1, want: nil},
 		{name: "zero height", values: []float64{1}, width: 3, height: 0, want: nil},
 		{name: "empty is blank", width: 4, height: 1, want: []string{"    "}},
-		{name: "sparkline eighths", values: []float64{0, 1, 2, 3, 4, 5, 6, 7, 8}, width: 9, height: 1, hi: 8,
-			want: []string{"▁▁▂▃▄▅▆▇█"}},
-		{name: "right-aligned with padding", values: []float64{8, 4}, width: 5, height: 1, hi: 8,
-			want: []string{"   █▄"}},
+		{name: "single sample on right column", values: []float64{8}, width: 1, height: 1, hi: 8,
+			want: []string{br(rightFull)}},
+		{name: "right-aligned with padding", values: []float64{8}, width: 3, height: 1, hi: 8,
+			want: []string{"  " + br(rightFull)}},
+		{name: "rise interpolates midpoint", values: []float64{0, 8}, width: 2, height: 1, hi: 8,
+			want: []string{br(0x80, 0x44|rightFull)}},
+		{name: "peak slopes both ways", values: []float64{0, 8, 0}, width: 3, height: 1, hi: 8,
+			want: []string{br(0x80, 0x44|rightFull, 0x44|0x80)}},
 		{name: "keeps newest samples", values: []float64{8, 8, 0, 4}, width: 2, height: 1, hi: 8,
-			want: []string{"▁▄"}},
-		{name: "range above baseline", values: []float64{40, 44, 48}, width: 3, height: 1, lo: 40, hi: 48,
-			want: []string{"▁▄█"}},
+			want: []string{br(0x80, 0x40|0xA0)}},
+		{name: "clamps above hi", values: []float64{100}, width: 1, height: 1, hi: 8,
+			want: []string{br(rightFull)}},
+		{name: "range above baseline", values: []float64{40, 48}, width: 2, height: 1, lo: 40, hi: 48,
+			want: []string{br(0x80, 0x44|rightFull)}},
 		{name: "empty range draws baseline", values: []float64{5, 5}, width: 2, height: 1, lo: 5, hi: 5,
-			want: []string{"▁▁"}},
+			want: []string{br(0x80, 0xC0)}},
 		{name: "NaN range draws baseline", values: []float64{5}, width: 1, height: 1, hi: math.NaN(),
-			want: []string{"▁"}},
-		{name: "clamps above scale", values: []float64{100}, width: 1, height: 1, hi: 8,
-			want: []string{"█"}},
-		{name: "all zero shows baseline", values: []float64{0, 0}, width: 2, height: 2, hi: 1,
-			want: []string{"  ", "▁▁"}},
-		{name: "bad values as zero", values: []float64{math.NaN(), math.Inf(1), -3, 8}, width: 4, height: 1, hi: 8,
-			want: []string{"▁▁▁█"}},
-		{name: "multi-row", values: []float64{16, 12, 8, 4, 1}, width: 5, height: 2, hi: 16,
-			want: []string{"█▄   ", "███▄▁"}},
+			want: []string{br(0x80)}},
+		{name: "bad values as baseline", values: []float64{math.NaN(), math.Inf(1), -3, 8}, width: 4, height: 1, hi: 8,
+			want: []string{br(0x80, 0xC0, 0xC0, 0x44|rightFull)}},
+		{name: "multi-row", values: []float64{8, 4}, width: 2, height: 2, hi: 8,
+			want: []string{br(rightFull, 0x44), br(rightFull, bothFull)}},
+		{name: "empty upper cell is blank", values: []float64{0}, width: 1, height: 2, hi: 8,
+			want: []string{" ", br(0x80)}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

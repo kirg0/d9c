@@ -6,6 +6,15 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.26.1] - 2026-09-28
+
+### Changed
+
+- **Smoother stats graphs.** The CPU/MEM charts in the stats view (`s`) are now drawn with
+  Braille dots (2×4 per cell) as a filled area, and neighbouring samples are joined by linear
+  interpolation — the outline rises and falls in slopes instead of blocky steps. Medium-height
+  windows get 2-row charts instead of a one-line sparkline (and the memory `min` label).
+
 ## [1.26.0] - 2026-09-28
 
 ### Added
