@@ -36,6 +36,9 @@ func (m *Model) dispatchCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 		return func() tea.Msg { return switchResourceMsg{ViewCompose} }, nil
 	case "events":
 		return openEvents(m.backend), nil
+	case "portforward", "pf":
+		// Tunnel list, available from any view (tunnels outlive view switches).
+		return func() tea.Msg { return openPortForwardsMsg{} }, nil
 	case "system":
 		// System-wide ops, available from any view: `system df` / `system prune`.
 		if len(cmd.Args) == 0 {

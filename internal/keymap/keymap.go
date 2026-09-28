@@ -40,30 +40,33 @@ const (
 	Refresh   Action = "refresh"
 	Pause     Action = "pause"
 	Help      Action = "help"
+	// PortForward opens the port-forward form (containers / compose views).
+	PortForward Action = "port-forward"
 )
 
 // actionOrder lists every action in a stable order (config validation, docs).
 var actionOrder = []Action{
 	Inspect, Logs, Edit, Exec, Filter, Command,
-	ToggleAll, Stats, Select, Copy, Refresh, Pause, Help,
+	ToggleAll, Stats, Select, Copy, Refresh, Pause, Help, PortForward,
 }
 
 // defaults holds the built-in key for every action. Space is stored as the
 // bubbletea key string " " (the config accepts the alias "space").
 var defaults = map[Action]string{
-	Inspect:   "i",
-	Logs:      "l",
-	Edit:      "e",
-	Exec:      "x",
-	Filter:    "/",
-	Command:   ":",
-	ToggleAll: "a",
-	Stats:     "s",
-	Select:    " ",
-	Copy:      "y",
-	Refresh:   "r",
-	Pause:     "p",
-	Help:      "?",
+	Inspect:     "i",
+	Logs:        "l",
+	Edit:        "e",
+	Exec:        "x",
+	Filter:      "/",
+	Command:     ":",
+	ToggleAll:   "a",
+	Stats:       "s",
+	Select:      " ",
+	Copy:        "y",
+	Refresh:     "r",
+	Pause:       "p",
+	Help:        "?",
+	PortForward: "F",
 }
 
 // reserved keys carry a fixed meaning the user can't take over for an action:

@@ -105,6 +105,7 @@ func viewCmds() []cmdDef {
 		{"hosts", i18n.T("(= dashboard: STATUS + агрегат docker info)", "(= dashboard: STATUS + docker info summary)")},
 		{"compose", ""},
 		{"events", "(live daemon events)"},
+		{"portforward", i18n.T("(список туннелей; алиас pf)", "(tunnel list; alias pf)")},
 		{"system", i18n.T("df | prune (полная очистка с подтверждением)", "df | prune (full cleanup with confirmation)")},
 		{"theme", i18n.T("[name] (сменить тему; без имени — выбор из списка с превью)", "[name] (switch theme; no name — pick from a list with preview)")},
 		{"lang", i18n.T("[ru|en] (язык интерфейса; без аргумента — выбор)", "[ru|en] (UI language; no arg — pick from a list)")},

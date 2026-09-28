@@ -71,6 +71,7 @@ func (m Model) buildHelpContent() string {
 		{":compose :co", i18n.T("Compose-проекты", "Compose projects")},
 		{":hosts :h", i18n.T("Сохранённые хосты", "Saved hosts")},
 		{":events", i18n.T("Живой журнал событий Docker", "Live Docker events feed")},
+		{":portforward :pf", i18n.T("Список туннелей port-forward (стоп/старт/удаление)", "Port-forward tunnel list (stop/start/delete)")},
 		{":system df", i18n.T("Дисковая статистика демона", "Daemon disk usage")},
 		{":system prune", i18n.T("Полная очистка (с подтверждением)", "Full cleanup (with confirmation)")},
 		{":theme [name]", i18n.T("Сменить тему; без имени — выбор из списка с превью", "Switch theme; no name — pick from a list with preview")},
@@ -114,6 +115,7 @@ func (m Model) resourceKeyRows() []helpRow {
 			{"f", i18n.T("Обзор файловой системы (enter/l — войти, bksp/h — вверх, d — скачать)", "Browse the filesystem (enter/l — open, bksp/h — up, d — download)")},
 			{":cp [<local> <ctr-dir>]", i18n.T("Загрузить файл/каталог в контейнер (без аргументов — модалка с выбором файла)", "Upload a file/dir into the container (no args — modal file picker)")},
 			{k.Display(keymap.Stats), i18n.T("Метрики CPU/MEM (stats)", "CPU/MEM metrics (stats)")},
+			{k.Display(keymap.PortForward), i18n.T("Port-forward порта контейнера на localhost (через SSH; :pf — список)", "Port-forward a container port to localhost (over SSH; :pf — list)")},
 			{"⇧N ⇧S ⇧C ⇧M", i18n.T("Сортировка: имя/статус/CPU/MEM (повтор — реверс)", "Sort: name/status/CPU/MEM (repeat — reverse)")},
 			{k.Display(keymap.ToggleAll), i18n.T("Все / только running", "All / running only")},
 			{k.Display(keymap.Select), i18n.T("Отметить для массовой операции", "Select for a bulk operation")},
@@ -123,6 +125,7 @@ func (m Model) resourceKeyRows() []helpRow {
 			{"enter", i18n.T("Открыть контейнеры проекта", "Open the project's containers")},
 			{k.Display(keymap.Inspect), i18n.T("Подробности (inspect)", "Details (inspect)")},
 			{k.Display(keymap.Logs), i18n.T("Логи проекта", "Project logs")},
+			{k.Display(keymap.PortForward), i18n.T("Port-forward порта контейнера проекта на localhost", "Port-forward a project container's port to localhost")},
 		}
 		// Editing the compose file needs host filesystem access (SSH only).
 		if m.composeHostOps {

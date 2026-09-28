@@ -42,6 +42,7 @@ Built on [Bubble Tea](https://github.com/charmbracelet/bubbletea) and the offici
 - [Filter `/`](#filter-)
 - [Config, themes and keys](#config-themes-and-keys)
 - [Container filesystem](#container-filesystem-f--files)
+- [Port-forward](#port-forward-f--portforward)
 - [Auto-refresh](#auto-refresh)
 - [Resource threshold alerts](#resource-threshold-alerts)
 - [Plugins](#plugins)
@@ -68,6 +69,8 @@ Built on [Bubble Tea](https://github.com/charmbracelet/bubbletea) and the offici
 - **Built-in terminal** — interactive `exec` into a container (vt10x emulator), a single path for
   TCP and SSH.
 - **Container filesystem browser** — navigation and `docker cp` in both directions.
+- **Port-forward over SSH** — a container (or compose service) port on `localhost:<port>`
+  through the already open SSH connection; tunnels survive view switches and auto-reconnect.
 - **Live daemon event log** (`docker events`) in a dedicated console.
 - **Multi-host dashboard** — status and aggregates (`docker info`) across all saved hosts.
 - **CPU/MEM alerts**, configurable **themes** and **hotkeys**, **plugins** (your own commands
@@ -484,6 +487,7 @@ keys:
 | `refresh` | `r` | refresh manually |
 | `pause` | `p` | pause/resume auto-refresh |
 | `help` | `?` | help |
+| `port-forward` | `F` | forward a container port to localhost |
 
 A value is a key name in Bubble Tea notation (`f`, `ctrl+d`, `f5`, `space`, etc.).
 Navigation (`↑/↓`, `j/k`, `PgUp/PgDn`), `Enter` and the quit keys (`q`, `esc`,
@@ -516,6 +520,40 @@ container — `Tab` switches focus, `enter`/`l` enters a directory, `⌫`/`h`
 goes up, `enter` in the destination field starts the upload. Downloading unpacks
 the daemon's tar stream to disk with protection against escaping the destination
 directory; symlinks and special files are skipped.
+
+---
+
+## Port-forward (`F` / `:portforward`)
+
+`F` in **Containers** (or in **Compose** — then the form lets you pick one of the project's
+running containers with `←/→`) opens a form: the container port (pre-filled from the
+container's ports) and the local port (empty = any free one). d9c listens on
+`127.0.0.1:<local>` and forwards every connection to the container:
+
+- **`ssh://` hosts** — through the already open SSH connection (`direct-tcpip`, like
+  `ssh -L`): a published port is dialed on the host's loopback, an unpublished one on the
+  container IP (`127.0.0.1` for `network_mode: host`). Nothing extra has to be open on the
+  server besides SSH.
+- **`tcp://` hosts** — straight to the port the container **publishes** on the daemon
+  host; an unpublished port is rejected with a hint to use `ssh://`.
+- CRI-O / containerd (nerdctl) backends don't support port-forward yet.
+
+The target is re-resolved on every connection, so a restarted container (new IP) is still
+reached. An active tunnel is marked in the PORTS column (`⇄:8080`) and counted in the header
+(`⇄ 1`). A busy local port is reported in the form with a hint.
+
+`:portforward` (`:pf`) lists all tunnels from any section:
+
+| Key | Action |
+| --- | --- |
+| `s` / `space` | stop / start (a restart re-binds the same local port) |
+| `d` | delete the tunnel |
+| `y` | copy the local address |
+| `q` / `esc` | close the list |
+
+Tunnels live independently of the current section and survive auto-reconnect (while the
+connection is down a tunnel is shown as `failing` with the error, then recovers). Switching
+to another host (`:connect`) or quitting d9c closes all tunnels.
 
 ---
 
