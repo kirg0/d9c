@@ -155,10 +155,30 @@ func (b *dockerBackend) inspectPortInfo(containerID string, containerPort int) (
 	return info, nil
 }
 
-// resolveForward returns the address to dial for containerPort.
+// connLostError reports that a tunnel could not reach the daemon because the
+// connection to the host is down. Its message is short and readable (it is
+// shown on the failing tunnel in the :pf list); the raw transport error stays
+// reachable through Unwrap.
+type connLostError struct{ cause error }
+
+func (e *connLostError) Error() string {
+	return i18n.T(
+		"соединение с хостом потеряно — туннель восстановится после переподключения",
+		"connection to the host lost — the tunnel resumes after reconnect")
+}
+
+func (e *connLostError) Unwrap() error { return e.cause }
+
+// resolveForward returns the address to dial for containerPort. A daemon that
+// cannot be reached at all (dropped SSH/TCP connection) yields connLostError
+// instead of the raw transport error; daemon-side failures (no such container)
+// pass through unchanged.
 func (b *dockerBackend) resolveForward(containerID string, containerPort int) (string, error) {
 	info, err := b.inspectPortInfo(containerID, containerPort)
 	if err != nil {
+		if IsConnectionError(err) {
+			return "", &connLostError{cause: err}
+		}
 		return "", err
 	}
 	return pickForwardAddr(info, containerPort, b.sshClient != nil, daemonHostname(b.cli.DaemonHost()))

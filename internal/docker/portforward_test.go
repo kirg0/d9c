@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -9,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/kirg0/d9c/internal/config"
 
 	"github.com/docker/go-connections/nat"
 )
@@ -251,5 +254,43 @@ func TestDockerBackendForwardOverSSH(t *testing.T) {
 	b2.sshClient = b.sshClient
 	if _, err := b2.DialPort("fwd", closed); err == nil || !strings.Contains(err.Error(), "listens") {
 		t.Errorf("refused SSH dial should carry the hint, got %v", err)
+	}
+}
+
+// TestForwardConnectionLost checks an unreachable daemon is reported with the
+// readable "connection lost" message (the raw cause kept for errors.Is/As),
+// while daemon-side errors pass through untouched.
+func TestForwardConnectionLost(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dead := ln.Addr().String()
+	_ = ln.Close()
+	b, err := New(&config.Config{Host: "tcp://" + dead})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer b.Close()
+	fw := b.(PortForwarder)
+
+	_, err = fw.DialPort("web", 80)
+	if err == nil || err.Error() != "connection to the host lost — the tunnel resumes after reconnect" {
+		t.Fatalf("DialPort err = %v, want the connection-lost message", err)
+	}
+	var lost *connLostError
+	if !errors.As(err, &lost) || errors.Unwrap(err) == nil {
+		t.Error("the raw transport error should stay wrapped")
+	}
+	if _, err := fw.PortTarget("web", 80); !errors.As(err, &lost) {
+		t.Errorf("PortTarget err = %v, want connLostError", err)
+	}
+
+	// A daemon answering "no such container" is not a lost connection.
+	mb := newMockBackend(t, func(w http.ResponseWriter, _ *http.Request) {
+		jsonErr(w, http.StatusNotFound, "No such container: web")
+	})
+	if _, err := mb.DialPort("web", 80); err == nil || errors.As(err, &lost) {
+		t.Errorf("daemon-side error should pass through, got %v", err)
 	}
 }
