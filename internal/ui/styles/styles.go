@@ -149,6 +149,17 @@ var (
 	// NAME marker); applied after table layout.
 	Alert lipgloss.Style
 
+	// ── stats-view CPU/MEM graphs ────────────────────────────────────────────
+	// GraphTitle is the panel's title rule; GraphLabel the metric name (CPU/MEM);
+	// GraphValue the current figure; GraphPeak the "max" figure; GraphCPU and
+	// GraphMem color the bars of each chart.
+	GraphTitle lipgloss.Style
+	GraphLabel lipgloss.Style
+	GraphValue lipgloss.Style
+	GraphPeak  lipgloss.Style
+	GraphCPU   lipgloss.Style
+	GraphMem   lipgloss.Style
+
 	// ── k9s-style footer bar ─────────────────────────────────────────────────
 	FooterKey   lipgloss.Style
 	FooterDesc  lipgloss.Style
@@ -435,6 +446,27 @@ func Apply(p Palette) {
 	Alert = lipgloss.NewStyle().
 		Foreground(colorDanger).
 		Bold(true)
+
+	// ── stats-view CPU/MEM graphs ────────────────────────────────────────────
+
+	GraphTitle = lipgloss.NewStyle().
+		Foreground(colorBorder)
+
+	GraphLabel = lipgloss.NewStyle().
+		Foreground(colorSecondary).
+		Bold(true)
+
+	GraphValue = lipgloss.NewStyle().
+		Foreground(colorFg)
+
+	GraphPeak = lipgloss.NewStyle().
+		Foreground(colorMuted)
+
+	GraphCPU = lipgloss.NewStyle().
+		Foreground(colorPrimary)
+
+	GraphMem = lipgloss.NewStyle().
+		Foreground(colorSuccess)
 
 	// ── k9s-style footer bar ─────────────────────────────────────────────────
 

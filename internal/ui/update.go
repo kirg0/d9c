@@ -140,6 +140,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Merge instead of replace: a container whose sample missed this batch
 		// keeps its last known figures instead of blinking off.
 		m.stats = mergeStats(m.stats, msg.stats, m.containers)
+		m.statsHist = recordStatsHistory(m.statsHist, msg.stats, m.containers, statsHistoryLen)
 		if m.resource == ViewContainers {
 			m.refreshTableRows()
 		}
@@ -306,6 +307,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cfg.Host = msg.host
 		// Forget the old host's samples and let the new host fetch immediately.
 		m.stats = nil
+		m.statsHist = nil
 		m.statsInFlight = false
 		// Invalidate pings still in flight against the old backend.
 		m.pingSeq++
@@ -1228,7 +1230,7 @@ func (m Model) handleAction(action keymap.Action) (tea.Model, tea.Cmd) {
 		// Toggle the `docker stats`-style column layout for containers.
 		if m.resource == ViewContainers {
 			m.statsView = !m.statsView
-			m.applyColumns(m.width)
+			m.relayout() // columns + room for the CPU/MEM graph panel
 			m.refreshTableRows()
 			return m, nil
 		}
@@ -1660,7 +1662,7 @@ func (m *Model) relayout() {
 	case ModeCpForm:
 		m.cpForm.SetSize(w, h)
 	default:
-		m.table.SetSize(w, tableHeight)
+		m.table.SetSize(w, tableHeight-m.statsPanelHeight())
 		m.applyColumns(w)
 	}
 	m.logs.SetSize(w, h)

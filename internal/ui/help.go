@@ -159,7 +159,7 @@ func (m Model) allResourceKeyRows() []helpRow {
 			{k.Display(keymap.Exec), i18n.T("Shell в контейнере (встроенный терминал; exit/Ctrl-D — выход, Ctrl+\\ — отсоединить)", "Shell in the container (embedded terminal; exit/Ctrl-D — quit, Ctrl+\\ — detach)")},
 			{"f", i18n.T("Обзор файловой системы (enter/l — войти, bksp/h — вверх, d — скачать)", "Browse the filesystem (enter/l — open, bksp/h — up, d — download)")},
 			{":cp [<local> <ctr-dir>]", i18n.T("Загрузить файл/каталог в контейнер (без аргументов — модалка с выбором файла)", "Upload a file/dir into the container (no args — modal file picker)")},
-			{k.Display(keymap.Stats), i18n.T("Метрики CPU/MEM (stats)", "CPU/MEM metrics (stats)")},
+			{k.Display(keymap.Stats), i18n.T("Метрики CPU/MEM + графики (stats)", "CPU/MEM metrics + graphs (stats)")},
 			{k.Display(keymap.PortForward), i18n.T("Port-forward порта контейнера на localhost (через SSH; :pf — список)", "Port-forward a container port to localhost (over SSH; :pf — list)")},
 			{"⇧N ⇧S ⇧C ⇧M", i18n.T("Сортировка: имя/статус/CPU/MEM (повтор — реверс)", "Sort: name/status/CPU/MEM (repeat — reverse)")},
 			{k.Display(keymap.ToggleAll), i18n.T("Все / только running", "All / running only")},

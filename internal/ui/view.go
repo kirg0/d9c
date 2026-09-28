@@ -718,6 +718,9 @@ func (m Model) viewBackupOverlay() string {
 
 func (m Model) viewNormal() string {
 	body := m.table.View()
+	if m.statsPanelHeight() > 0 {
+		body = lipgloss.JoinVertical(lipgloss.Left, body, m.viewStatsPanel())
+	}
 	switch m.mode {
 	case ModeFilter:
 		return lipgloss.JoinVertical(lipgloss.Left, body, m.filter.View(m.width))

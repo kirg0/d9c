@@ -24,9 +24,19 @@ func TestViewFitsWindowHeight(t *testing.T) {
 	}{
 		{"containers on start", func(m Model) Model { return m }},
 		{"containers stats layout", func(m Model) Model {
-			m.statsView = true
-			m.applyColumns(m.width)
-			return m
+			// The real toggle path: it also makes room for the graph panel.
+			nm, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+			return nm.(Model)
+		}},
+		{"containers stats layout + cmdline", func(m Model) Model {
+			nm, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+			nm, _ = nm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(":")})
+			return nm.(Model)
+		}},
+		{"containers stats layout, medium window", func(m Model) Model {
+			nm, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+			nm, _ = nm.Update(tea.WindowSizeMsg{Width: w, Height: 20})
+			return nm.(Model)
 		}},
 		{"images", func(m Model) Model { m.resource = ViewImages; m.relayout(); return m }},
 		{"networks", func(m Model) Model { m.resource = ViewNetworks; m.relayout(); return m }},
@@ -40,8 +50,8 @@ func TestViewFitsWindowHeight(t *testing.T) {
 			nm, _ := m.Update(tea.WindowSizeMsg{Width: w, Height: h})
 			m = tt.setup(nm.(Model))
 
-			if got := strings.Count(m.View(), "\n") + 1; got != h {
-				t.Errorf("View() has %d lines, want %d (window height)", got, h)
+			if got := strings.Count(m.View(), "\n") + 1; got != m.height {
+				t.Errorf("View() has %d lines, want %d (window height)", got, m.height)
 			}
 		})
 	}

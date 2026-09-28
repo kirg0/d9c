@@ -6,6 +6,19 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.26.0] - 2026-09-28
+
+### Added
+
+- **CPU/MEM graphs in the stats view.** Pressing `s` in Containers now also shows a graph
+  panel under the table for the container under the cursor: the CPU and memory history over
+  the last 120 samples (a rolling buffer per container, one sample per refresh) with the
+  current value, the peak and — for memory — the minimum. CPU bars stand on 0%, memory is
+  scaled over its min…max range so growth stays visible. The chart width follows the window;
+  tall windows get 3-row charts, medium ones a one-line sparkline, small ones hide the panel.
+  Colors come from the theme. In `-demo` mode the sample CPU/MEM figures now fluctuate so the
+  graphs have something to show.
+
 ## [1.25.0] - 2026-09-28
 
 ### Added
