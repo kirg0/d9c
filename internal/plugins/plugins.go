@@ -21,6 +21,11 @@
 //	    background: true          # stream output to the console instead of a TTY
 //	    command: docker
 //	    args: ["-H", "${HOST}", "system", "df"]
+//	  - name: restart-all
+//	    scope: containers
+//	    mutating: true            # changes the host: disabled in read-only mode
+//	    command: docker
+//	    args: ["-H", "${HOST}", "restart", "${ID}"]
 package plugins
 
 import (
@@ -43,6 +48,9 @@ type Plugin struct {
 	// Background runs the command detached, streaming its output to the operation
 	// console; the default (false) hands the terminal over for an interactive TTY.
 	Background bool `yaml:"background"`
+	// Mutating marks a plugin that changes state on the Docker host; read-only
+	// mode refuses to run it (and hides its key hint).
+	Mutating bool `yaml:"mutating"`
 }
 
 // Set is an immutable collection of loaded plugins. All methods are nil-safe so

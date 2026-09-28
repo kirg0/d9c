@@ -48,7 +48,7 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.RefreshInterval != DefaultRefreshInterval {
 		t.Errorf("RefreshInterval = %v, want %v", cfg.RefreshInterval, DefaultRefreshInterval)
 	}
-	if cfg.ShowAll || cfg.Demo || cfg.ShowVersion {
+	if cfg.ShowAll || cfg.Demo || cfg.ShowVersion || cfg.ReadOnly {
 		t.Error("bool flags should default to false")
 	}
 	if cfg.TLSCACert != "" || cfg.SSHKeyFile != "" || cfg.SSHPassword != "" {
@@ -63,7 +63,7 @@ func TestLoad_Flags(t *testing.T) {
 		"-ssh-key", "id_ed25519", "-ssh-password", "pw",
 		"-a", "-demo", "-version",
 		"-hosts-file", "hosts.json", "-plugins-file", "plugins.yml", "-config", "d9c.yml",
-		"-interval", "5s",
+		"-interval", "5s", "-read-only",
 	)
 	if cfg.Host != "tcp://box:2375" {
 		t.Errorf("Host = %q", cfg.Host)
@@ -74,7 +74,7 @@ func TestLoad_Flags(t *testing.T) {
 	if cfg.SSHKeyFile != "id_ed25519" || cfg.SSHPassword != "pw" {
 		t.Errorf("SSH = %q/%q", cfg.SSHKeyFile, cfg.SSHPassword)
 	}
-	if !cfg.ShowAll || !cfg.Demo || !cfg.ShowVersion {
+	if !cfg.ShowAll || !cfg.Demo || !cfg.ShowVersion || !cfg.ReadOnly {
 		t.Error("bool flags should be set")
 	}
 	if cfg.HostsFile != "hosts.json" || cfg.PluginsFile != "plugins.yml" || cfg.ConfigFile != "d9c.yml" {

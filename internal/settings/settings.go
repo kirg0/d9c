@@ -35,7 +35,10 @@ type File struct {
 	Colors map[string]string `yaml:"colors,omitempty"`
 	Keys   map[string]string `yaml:"keys,omitempty"`
 	Alerts *AlertsSection    `yaml:"alerts,omitempty"`
-	Hosts  []hosts.Host      `yaml:"hosts,omitempty"`
+	// ReadOnly forbids every mutating action on every host (see also the
+	// per-host read_only flag and the -read-only command-line flag).
+	ReadOnly bool         `yaml:"readOnly,omitempty"`
+	Hosts    []hosts.Host `yaml:"hosts,omitempty"`
 }
 
 // AlertsSection mirrors the "alerts:" block (CPU/MEM thresholds, percent).
@@ -149,6 +152,10 @@ func (s *Store) Hosts() *hosts.Store {
 func (s *Store) SetHosts(list []hosts.Host) {
 	s.File.Hosts = list
 }
+
+// ReadOnly reports whether the config enables read-only mode globally. It is
+// nil-safe so callers without a loaded config (tests) get false.
+func (s *Store) ReadOnly() bool { return s != nil && s.File.ReadOnly }
 
 // HasHosts reports whether the config already carries saved hosts.
 func (s *Store) HasHosts() bool { return len(s.File.Hosts) > 0 }

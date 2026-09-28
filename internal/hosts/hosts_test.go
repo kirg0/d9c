@@ -209,3 +209,46 @@ func TestPersistCallback(t *testing.T) {
 		t.Errorf("zero-value Save: %v", err)
 	}
 }
+
+func TestReadOnlyFor(t *testing.T) {
+	s := NewStore([]Host{
+		{Name: "prod", Host: "ssh://root@prod", ReadOnly: true},
+		{Name: "dev", Host: "tcp://dev:2375"},
+	}, nil)
+	tests := []struct {
+		url  string
+		want bool
+	}{
+		{"ssh://root@prod", true},
+		{"tcp://dev:2375", false},
+		{"tcp://adhoc:2375", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		if got := s.ReadOnlyFor(tt.url); got != tt.want {
+			t.Errorf("ReadOnlyFor(%q) = %v, want %v", tt.url, got, tt.want)
+		}
+	}
+	var nilStore *Store
+	if nilStore.ReadOnlyFor("ssh://root@prod") {
+		t.Error("nil store must not report read-only")
+	}
+}
+
+// ReadOnly lives only in the config file (the host form doesn't expose it), so
+// an edit from the UI must keep it rather than silently clearing it.
+func TestEditHostKeepsReadOnly(t *testing.T) {
+	s := NewStore([]Host{{Name: "prod", Host: "ssh://root@prod", ReadOnly: true}}, nil)
+	if err := s.EditHost("prod", Host{Name: "prod2", Host: "ssh://admin@prod"}); err != nil {
+		t.Fatal(err)
+	}
+	if h, _ := s.Find("prod2"); !h.ReadOnly {
+		t.Error("EditHost dropped read_only")
+	}
+	if err := s.Edit("prod2", "prod3", "ssh://root@prod"); err != nil {
+		t.Fatal(err)
+	}
+	if h, _ := s.Find("prod3"); !h.ReadOnly {
+		t.Error("Edit dropped read_only")
+	}
+}

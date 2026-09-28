@@ -20,6 +20,11 @@ import (
 // of update.go; handleCommand (update.go) is the entry point.
 
 func (m *Model) dispatchCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
+	// ── read-only mode: refuse commands that mutate the Docker host ───────────
+	if err := m.guardCommand(cmd); err != nil {
+		return nil, err
+	}
+
 	// ── view switching (always valid) ──────────────────────────────────────────
 	switch cmd.Name {
 	case "containers", "c":

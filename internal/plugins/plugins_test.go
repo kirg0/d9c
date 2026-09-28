@@ -131,3 +131,24 @@ func TestNilSetSafe(t *testing.T) {
 		t.Error("nil set ByKey should report not found")
 	}
 }
+
+func TestLoadMutatingFlag(t *testing.T) {
+	path := writeYAML(t, `
+plugins:
+  - name: bounce
+    scope: containers
+    mutating: true
+    command: docker
+  - name: top
+    scope: containers
+    command: docker
+`)
+	s, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	all := s.All()
+	if len(all) != 2 || !all[0].Mutating || all[1].Mutating {
+		t.Errorf("mutating flags = %+v, want bounce=true top=false", all)
+	}
+}

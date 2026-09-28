@@ -29,6 +29,13 @@ func (m Model) buildHelpContent() string {
 		b.WriteString("\n")
 	}
 
+	if m.readOnly() {
+		b.WriteString(styles.HelpMuted.Render(i18n.T(
+			"Режим только для чтения (RO): действия, изменяющие хост, отключены и скрыты",
+			"Read-only mode (RO): actions that change the host are disabled and hidden")))
+		b.WriteString("\n\n")
+	}
+
 	k := m.keys
 	section(i18n.T("Навигация", "Navigation"), []helpRow{
 		{"↑/↓  j/k", i18n.T("Перемещение по списку", "Move through the list")},
@@ -55,7 +62,7 @@ func (m Model) buildHelpContent() string {
 		section(m.resource.String()+i18n.T(" — клавиши", " — keys"), rows)
 	}
 
-	if cmds := cmdline.CommandsFor(m.pluginScope(), m.composeHostOps); len(cmds) > 0 {
+	if cmds := cmdline.CommandsFor(m.pluginScope(), m.composeHostOps, m.readOnly()); len(cmds) > 0 {
 		rows := make([]helpRow, 0, len(cmds))
 		for _, c := range cmds {
 			rows = append(rows, helpRow{":" + c.Name, c.Hint})
@@ -63,7 +70,7 @@ func (m Model) buildHelpContent() string {
 		section(i18n.T("Команды ( : )", "Commands ( : )"), rows)
 	}
 
-	section(i18n.T("Разделы ( : )", "Sections ( : )"), []helpRow{
+	sections := []helpRow{
 		{":containers :c", i18n.T("Контейнеры", "Containers")},
 		{":images :img", i18n.T("Образы", "Images")},
 		{":networks :net", i18n.T("Сети", "Networks")},
@@ -78,9 +85,13 @@ func (m Model) buildHelpContent() string {
 		{":lang [ru|en]", i18n.T("Сменить язык; без аргумента — выбор из списка", "Switch language; no arg — pick from a list")},
 		{":interval <dur>", i18n.T("Интервал автообновления (pause/resume)", "Auto-refresh interval (pause/resume)")},
 		{":alert cpu|mem <%>", i18n.T("Порог CPU/MEM для подсветки строк; off — выключить", "CPU/MEM threshold to highlight rows; off — disable")},
-	})
+	}
+	if m.readOnly() {
+		sections = dropHelpRows(sections, ":system prune")
+	}
+	section(i18n.T("Разделы ( : )", "Sections ( : )"), sections)
 
-	if plugs := m.plugins.ForScope(m.pluginScope()); len(plugs) > 0 {
+	if plugs := m.visiblePlugins(); len(plugs) > 0 {
 		rows := make([]helpRow, 0, len(plugs))
 		for _, p := range plugs {
 			key := ":" + p.Name
@@ -105,6 +116,40 @@ func (m Model) buildHelpContent() string {
 // resourceKeyRows returns the view-specific key bindings for the help screen,
 // using the (possibly remapped) keys from the active keymap.
 func (m Model) resourceKeyRows() []helpRow {
+	rows := m.allResourceKeyRows()
+	if !m.readOnly() {
+		return rows
+	}
+	k := m.keys
+	switch m.resource {
+	case ViewContainers:
+		return dropHelpRows(rows, k.Display(keymap.Exec), ":cp [<local> <ctr-dir>]")
+	case ViewCompose:
+		return dropHelpRows(rows, k.Display(keymap.Edit))
+	case ViewImages:
+		return dropHelpRows(rows, ":build [dir] [tag]", ":tag <new-ref>", ":push", "r", ":rm [-f]")
+	}
+	return rows
+}
+
+// dropHelpRows returns rows without the ones whose key is listed (used to hide
+// mutating actions from help in read-only mode).
+func dropHelpRows(rows []helpRow, keys ...string) []helpRow {
+	drop := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		drop[k] = true
+	}
+	out := make([]helpRow, 0, len(rows))
+	for _, r := range rows {
+		if !drop[r.key] {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// allResourceKeyRows lists every view-specific key binding, mutating or not.
+func (m Model) allResourceKeyRows() []helpRow {
 	k := m.keys
 	switch m.resource {
 	case ViewContainers:

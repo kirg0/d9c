@@ -15,6 +15,7 @@ import (
 func Run(cfg *config.Config, backend docker.Backend, store *hosts.Store, set *settings.Store, pluginSet *plugins.Set, keys keymap.Map, alertThresholds alerts.Thresholds, connectErr error, startInHosts bool) error {
 	m := NewModel(cfg, backend, store, connectErr, startInHosts)
 	m.SetSettings(set)
+	m.SetReadOnly(set.ReadOnly())
 	m.SetPlugins(pluginSet)
 	m.SetKeymap(keys)
 	m.SetAlerts(alertThresholds)

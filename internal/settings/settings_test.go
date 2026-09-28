@@ -233,3 +233,39 @@ func mustTheme(t *testing.T, name string) styles.Palette {
 	}
 	return p
 }
+
+func TestReadOnlyParsing(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "d9c-config.yaml")
+	content := "readOnly: true\nhosts:\n  - name: prod\n    host: ssh://root@prod\n    read_only: true\n  - name: dev\n    host: tcp://dev:2375\n"
+	if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !s.ReadOnly() {
+		t.Error("readOnly: true not parsed")
+	}
+	hs := s.Hosts()
+	if !hs.ReadOnlyFor("ssh://root@prod") || hs.ReadOnlyFor("tcp://dev:2375") {
+		t.Error("per-host read_only not parsed")
+	}
+
+	// Saving (e.g. after a theme change) must keep both flags.
+	if err := s.SetTheme("dracula"); err != nil {
+		t.Fatal(err)
+	}
+	again, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !again.ReadOnly() || !again.Hosts().ReadOnlyFor("ssh://root@prod") {
+		t.Error("read-only flags lost on save")
+	}
+
+	var nilStore *Store
+	if nilStore.ReadOnly() {
+		t.Error("nil store must not be read-only")
+	}
+}

@@ -137,6 +137,10 @@ var (
 	// next to the host in the header.
 	HeaderRuntime lipgloss.Style
 
+	// HeaderReadOnly is the "RO" chip shown in the header while read-only mode
+	// forbids mutating actions.
+	HeaderReadOnly lipgloss.Style
+
 	// HeaderAlert is the chip shown in the header when one or more containers
 	// breach a configured resource-usage threshold (the ⚠ count).
 	HeaderAlert lipgloss.Style
@@ -413,6 +417,12 @@ func Apply(p Palette) {
 
 	HeaderRuntime = lipgloss.NewStyle().
 		Background(colorSecondary).
+		Foreground(colorBg).
+		Bold(true).
+		Padding(0, 1)
+
+	HeaderReadOnly = lipgloss.NewStyle().
+		Background(colorWarning).
 		Foreground(colorBg).
 		Bold(true).
 		Padding(0, 1)

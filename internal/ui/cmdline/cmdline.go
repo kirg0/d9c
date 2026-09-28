@@ -92,6 +92,50 @@ var composeHostOnly = map[string]bool{
 // shell (SSH). The dispatcher uses it to reject such commands early on tcp://.
 func IsComposeHostOp(name string) bool { return composeHostOnly[name] }
 
+// mutatingCmds lists, per resource view, the built-in commands that change state
+// on the Docker host. Read-only mode refuses them and hides them from
+// autocomplete/help. The hosts view has none: its commands only edit the local
+// list of saved hosts.
+var mutatingCmds = map[string]map[string]bool{
+	"containers": {
+		"cp": true, "exec": true, "kill": true, "restart": true,
+		"rm": true, "run": true, "start": true, "stop": true,
+	},
+	"images": {
+		"build": true, "exec": true, "tag": true, "push": true,
+		"pull": true, "prune": true, "rm": true, "run": true,
+	},
+	"networks": {"create": true, "rm": true},
+	"volumes":  {"create": true, "prune": true, "rm": true},
+	"compose": {
+		"create": true, "up": true, "down": true, "pull": true, "edit": true,
+		"restore": true, "start": true, "stop": true, "restart": true,
+		"pause": true, "unpause": true, "remove": true, "rm": true,
+	},
+}
+
+// IsMutating reports whether the built-in command name (with its args) changes
+// state on the Docker host when run in the given resource view. The global
+// `system prune` counts in every view; `system df` does not. Plugins are
+// classified by their own "mutating" flag, not here.
+func IsMutating(resource, name string, args []string) bool {
+	if name == "system" {
+		return len(args) > 0 && args[0] == "prune"
+	}
+	return mutatingCmds[resource][name]
+}
+
+// readOnlyFilter drops the mutating commands of a resource view.
+func readOnlyFilter(resource string, cmds []cmdDef) []cmdDef {
+	out := make([]cmdDef, 0, len(cmds))
+	for _, c := range cmds {
+		if !mutatingCmds[resource][c.name] {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
 // viewCmds returns the always-available commands: view switching, the global
 // events feed and system-wide operations. It is a function (not a package var)
 // so the localized hints reflect the active language at call time, after
@@ -130,6 +174,9 @@ type Model struct {
 	// tcp:// connection) the SSH-only compose commands are hidden from
 	// autocomplete and the placeholder.
 	hostCompose bool
+	// readOnly hides the commands that mutate the Docker host from autocomplete
+	// and the placeholder (read-only mode). IsBuiltin still reports them.
+	readOnly bool
 }
 
 func New() Model {
@@ -155,6 +202,13 @@ func (m *Model) SetHostCompose(v bool) {
 	m.updatePlaceholder()
 }
 
+// SetReadOnly toggles read-only mode: the mutating commands of every view are
+// dropped from autocomplete and the placeholder.
+func (m *Model) SetReadOnly(v bool) {
+	m.readOnly = v
+	m.updatePlaceholder()
+}
+
 // SetPluginCommands registers the user-defined plugin names available in the
 // current view so they appear in autocomplete.
 func (m *Model) SetPluginCommands(names []string) {
@@ -176,6 +230,16 @@ func (m Model) IsBuiltin(name string) bool {
 }
 
 func (m *Model) updatePlaceholder() {
+	if m.readOnly {
+		// Read-only: list only the commands that remain available in this view.
+		names := make([]string, 0, 8)
+		for _, c := range readOnlyFilter(m.resource, resourceCmds(m.resource, m.hostCompose)) {
+			names = append(names, c.name)
+		}
+		names = append(names, "events")
+		m.input.Placeholder = strings.Join(names, "  ") + "…"
+		return
+	}
 	switch m.resource {
 	case "images":
 		m.input.Placeholder = "run  exec  build <dir> [tag]  tag <new-ref>  push  history  pull  rm [-f]  prune…"
@@ -296,9 +360,13 @@ type CmdHelp struct {
 
 // CommandsFor returns the built-in commands specific to the given resource view
 // (excluding the global view-switch commands), for documentation/help. For
-// compose, hostCompose=false hides the SSH-only commands (tcp:// connection).
-func CommandsFor(resource string, hostCompose bool) []CmdHelp {
+// compose, hostCompose=false hides the SSH-only commands (tcp:// connection);
+// readOnly hides the commands that mutate the Docker host.
+func CommandsFor(resource string, hostCompose, readOnly bool) []CmdHelp {
 	specific := resourceCmds(resource, hostCompose)
+	if readOnly {
+		specific = readOnlyFilter(resource, specific)
+	}
 	out := make([]CmdHelp, 0, len(specific))
 	for _, c := range specific {
 		out = append(out, CmdHelp{Name: c.name, Hint: c.hint})
@@ -306,9 +374,14 @@ func CommandsFor(resource string, hostCompose bool) []CmdHelp {
 	return out
 }
 
-// commands returns the full autocomplete set: built-ins plus user plugins.
+// commands returns the full autocomplete set: built-ins plus user plugins. In
+// read-only mode the mutating built-ins are left out (the caller already passes
+// only the non-mutating plugins).
 func (m Model) commands() []cmdDef {
 	builtins := m.builtinCommands()
+	if m.readOnly {
+		builtins = readOnlyFilter(m.resource, builtins)
+	}
 	if len(m.pluginCmds) == 0 {
 		return builtins
 	}

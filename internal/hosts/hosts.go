@@ -36,6 +36,10 @@ type Host struct {
 	// SSHKeyPath is the private-key path used when SSHAuth is key-based; empty
 	// falls back to ssh-agent and the default ~/.ssh keys.
 	SSHKeyPath string `json:"ssh_key_path,omitempty" yaml:"ssh_key_path,omitempty"`
+	// ReadOnly forbids mutating actions while connected to this host. It is set
+	// only in the config file (the host form doesn't expose it), so edits made
+	// from the UI keep the stored value.
+	ReadOnly bool `json:"read_only,omitempty" yaml:"read_only,omitempty"`
 }
 
 // Store holds the saved hosts and a callback that persists them. The zero value
@@ -167,8 +171,23 @@ func (s *Store) EditHost(name string, h Host) error {
 			return fmt.Errorf("host %q already exists", h.Name)
 		}
 	}
+	h.ReadOnly = s.Hosts[idx].ReadOnly
 	s.Hosts[idx] = h
 	return nil
+}
+
+// ReadOnlyFor reports whether the saved host with the given URL is marked
+// read_only. An unknown URL (e.g. an ad-hoc -H host) is not read-only.
+func (s *Store) ReadOnlyFor(hostURL string) bool {
+	if s == nil || hostURL == "" {
+		return false
+	}
+	for _, h := range s.Hosts {
+		if h.Host == hostURL && h.ReadOnly {
+			return true
+		}
+	}
+	return false
 }
 
 // sshSchemes are the host-URL prefixes reached over SSH: a plain Docker ssh://

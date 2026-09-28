@@ -6,6 +6,20 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.25.0] - 2026-09-28
+
+### Added
+
+- **Read-only mode.** The `-read-only` flag, `readOnly: true` in `d9c-config.yaml` or
+  `read_only: true` on a saved host (applies while connected to it) forbid every action that
+  changes the Docker host: start/stop/restart/kill/rm, prune (incl. `:system prune`), run,
+  exec, cp, compose up/down/pull/edit/restore and lifecycle, image build/tag/push/pull,
+  network/volume creation and plugins marked `mutating: true`. A single check runs before
+  command/key dispatch and shows `read-only mode: <action> is disabled` in the footer; the
+  header shows an `RO` badge, and mutating actions disappear from the footer hints, help and
+  command autocomplete. Viewing, logs, stats, events, the file browser, port-forward and local
+  settings (hosts, theme, language, alerts, compose backups) keep working.
+
 ## [1.24.1] - 2026-09-28
 
 ### Fixed
