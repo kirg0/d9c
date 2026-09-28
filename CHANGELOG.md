@@ -6,6 +6,16 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.24.1] - 2026-09-28
+
+### Fixed
+
+- **Port-forward: readable error while the connection is down.** A tunnel that
+  cannot reach the host (dropped SSH/TCP connection) now shows "connection to
+  the host lost — the tunnel resumes after reconnect" in the `:pf` list instead
+  of the raw `inspect container: error during connect: … use of closed network
+  connection` text. Daemon-side errors (no such container) are unchanged.
+
 ## [1.24.0] - 2026-09-28
 
 ### Added
