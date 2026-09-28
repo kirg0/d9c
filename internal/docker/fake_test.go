@@ -630,3 +630,37 @@ func TestFakeMisc(t *testing.T) {
 	for range ch {
 	} // channel must be closed after stop
 }
+
+// TestFakeContainerStats_Jitter checks StatsJitter varies CPU/MEM between calls
+// while keeping them non-negative and MemPerc consistent with usage/limit, and
+// that the default (off) keeps the stable figures tests rely on.
+func TestFakeContainerStats_Jitter(t *testing.T) {
+	const id = "9ae942fd8fbc"
+	stable := NewFakeBackend()
+	a, _ := stable.ContainerStats([]string{id})
+	b, _ := stable.ContainerStats([]string{id})
+	if a[id] != b[id] || a[id].CPUPerc != 2.5 {
+		t.Fatalf("jitter off: samples changed: %+v vs %+v", a[id], b[id])
+	}
+
+	f := NewFakeBackend()
+	f.StatsJitter = true
+	seen := map[float64]bool{}
+	for range 10 {
+		s, err := f.ContainerStats([]string{id})
+		if err != nil {
+			t.Fatal(err)
+		}
+		st := s[id]
+		if st.CPUPerc < 0 {
+			t.Errorf("negative CPU %v", st.CPUPerc)
+		}
+		if want := float64(st.MemUsage) / float64(st.MemLimit) * 100; st.MemPerc != want {
+			t.Errorf("MemPerc = %v, want %v", st.MemPerc, want)
+		}
+		seen[st.CPUPerc] = true
+	}
+	if len(seen) < 5 {
+		t.Errorf("jitter produced only %d distinct CPU values", len(seen))
+	}
+}

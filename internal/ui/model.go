@@ -467,6 +467,10 @@ type Model struct {
 	// ticks don't pile up overlapping batches on hosts with many containers.
 	statsInFlight bool
 
+	// statsHist is the rolling CPU/MEM history per container ID, plotted by
+	// the graph panel under the stats view.
+	statsHist map[string]*statsHistory
+
 	// statsView toggles the containers table between the default columns and the
 	// `docker stats`-style layout (CPU/MEM/MEM%/NET I/O/BLOCK I/O).
 	statsView bool

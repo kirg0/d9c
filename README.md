@@ -44,6 +44,7 @@ Built on [Bubble Tea](https://github.com/charmbracelet/bubbletea) and the offici
 - [Container filesystem](#container-filesystem-f--files)
 - [Port-forward](#port-forward-f--portforward)
 - [Auto-refresh](#auto-refresh)
+- [Stats view and graphs](#stats-view-and-graphs-s)
 - [Resource threshold alerts](#resource-threshold-alerts)
 - [Read-only mode](#read-only-mode)
 - [Plugins](#plugins)
@@ -66,7 +67,7 @@ Built on [Bubble Tea](https://github.com/charmbracelet/bubbletea) and the offici
   `create`, backup/restore, project logs, drill-down into containers (operations on project
   files and running `docker compose` — over SSH only; see [Connecting to Docker](#connecting-to-docker)).
 - **Logs and metrics** — `--tail/--since/--until`, search, save to file; live CPU/MEM/Net/Disk
-  via the Stats API.
+  via the Stats API, with CPU/MEM history graphs for the selected container in the stats view (`s`).
 - **Built-in terminal** — interactive `exec` into a container (vt10x emulator), a single path for
   TCP and SSH.
 - **Container filesystem browser** — navigation and `docker cp` in both directions.
@@ -484,7 +485,7 @@ keys:
 | `filter` | `/` | filter by rows |
 | `command` | `:` | command line |
 | `toggle-all` | `a` | all / running only |
-| `stats` | `s` | CPU/MEM metrics |
+| `stats` | `s` | CPU/MEM metrics + history graphs |
 | `select` | `space` | mark for a bulk operation |
 | `copy` | `y` | copy menu |
 | `refresh` | `r` | refresh manually |
@@ -571,6 +572,22 @@ indicator keeps working meanwhile, and manual refresh via `r` is always availabl
 The state is shown in the header: `↻3s` — the active interval, `⏸ paused` — paused.
 
 ---
+
+## Stats view and graphs (`s`)
+
+In Containers, `s` switches the table to the `docker stats` layout (CPU % / MEM / MEM % /
+NET I/O / BLOCK I/O) and opens a graph panel under it for the container under the cursor:
+the CPU and MEM history over the last 120 samples (one per auto-refresh — 6 minutes at the
+default 3s). The graphs are drawn from the moment d9c starts polling, so history accumulates
+while the app runs; the panel shows the current value, the peak (`max`) and, for memory,
+the minimum of the window.
+
+- CPU bars stand on 0%; memory is scaled over its min…max range, so growth and leaks
+  stand out even when usage barely moves.
+- The chart width follows the window width; on tall windows (≥ 32 lines) each chart is
+  3 rows high, on medium ones a one-line sparkline, and on very small windows the panel
+  is hidden and the table keeps the whole screen.
+- Colors come from the active theme.
 
 ## Resource threshold alerts
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -40,6 +41,13 @@ type FakeBackend struct {
 	// value (RuntimeUnknown) is treated as Docker. Set RuntimePodman to exercise
 	// the Podman-specific paths without a live host.
 	RuntimeKind Runtime
+
+	// StatsJitter makes ContainerStats vary CPU/MEM smoothly from call to call
+	// (the -demo mode enables it so the stats graphs have something to plot).
+	// Off by default: tests rely on the stable figures.
+	StatsJitter bool
+	statsCalls  int
+	statsMu     sync.Mutex
 }
 
 // NewFakeBackend returns a FakeBackend pre-populated with representative data.
@@ -158,13 +166,37 @@ func (f *FakeBackend) ContainerStats(ids []string) (map[string]ContainerStats, e
 		"9ae942fd8fbc": {ID: "9ae942fd8fbc", CPUPerc: 2.5, MemUsage: 48 * 1024 * 1024, MemLimit: 512 * 1024 * 1024, MemPerc: 9.4, NetRx: 1024 * 1024, NetTx: 512 * 1024, BlockRead: 8 * 1024 * 1024, BlockWrite: 2 * 1024 * 1024},
 		"d2c94e258dcb": {ID: "d2c94e258dcb", CPUPerc: 0.1, MemUsage: 6 * 1024 * 1024, MemLimit: 512 * 1024 * 1024, MemPerc: 1.2, NetRx: 2048, NetTx: 1024, BlockRead: 512 * 1024, BlockWrite: 0},
 	}
+	var tick int
+	if f.StatsJitter {
+		f.statsMu.Lock()
+		f.statsCalls++
+		tick = f.statsCalls
+		f.statsMu.Unlock()
+	}
 	out := make(map[string]ContainerStats, len(ids))
 	for _, id := range ids {
 		if s, ok := samples[id]; ok {
+			if f.StatsJitter {
+				s = jitterStats(s, tick)
+			}
 			out[id] = s
 		}
 	}
 	return out, nil
+}
+
+// jitterStats deterministically wobbles a sample's CPU/MEM around its base
+// figures: tick is the call number, so consecutive batches draw a smooth wave.
+func jitterStats(s ContainerStats, tick int) ContainerStats {
+	t := float64(tick)
+	cpu := s.CPUPerc * (1 + 0.8*math.Sin(t/2.5) + 0.3*math.Sin(t*1.7))
+	s.CPUPerc = math.Max(cpu, 0)
+	mem := float64(s.MemUsage) * (1 + 0.2*math.Sin(t/6))
+	s.MemUsage = uint64(math.Max(mem, 0))
+	if s.MemLimit > 0 {
+		s.MemPerc = float64(s.MemUsage) / float64(s.MemLimit) * 100
+	}
+	return s
 }
 
 // RunContainer mimics `docker run -d`: the image must exist among the demo

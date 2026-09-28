@@ -79,7 +79,9 @@ func run() error {
 	var startInHosts bool
 	switch {
 	case cfg.Demo:
-		backend = docker.NewFakeBackend()
+		fb := docker.NewFakeBackend()
+		fb.StatsJitter = true // live-looking CPU/MEM graphs in the stats view
+		backend = fb
 
 	case !hostConfigured(cfg.Host):
 		// No host specified: don't connect at all. Open the hosts view so the
