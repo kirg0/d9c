@@ -582,10 +582,12 @@ default 3s). The graphs are drawn from the moment d9c starts polling, so history
 while the app runs; the panel shows the current value, the peak (`max`) and, for memory,
 the minimum of the window.
 
-- CPU bars stand on 0%; memory is scaled over its min…max range, so growth and leaks
+- The charts are drawn with Braille dots (2×4 per character cell) and neighbouring samples
+  are joined by interpolation, so the outline rises and falls smoothly instead of in steps.
+- CPU starts at 0%; memory is scaled over its min…max range, so growth and leaks
   stand out even when usage barely moves.
 - The chart width follows the window width; on tall windows (≥ 32 lines) each chart is
-  3 rows high, on medium ones a one-line sparkline, and on very small windows the panel
+  3 rows high, on medium ones (≥ 18 lines) 2 rows, and on very small windows the panel
   is hidden and the table keeps the whole screen.
 - Colors come from the active theme.
 

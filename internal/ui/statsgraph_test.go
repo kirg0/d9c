@@ -58,7 +58,7 @@ func TestStatsGraphRows(t *testing.T) {
 	tests := []struct {
 		h, want int
 	}{
-		{10, 0}, {15, 0}, {16, 1}, {29, 1}, {30, 3}, {60, 3},
+		{10, 0}, {15, 0}, {16, 2}, {29, 2}, {30, 3}, {60, 3},
 	}
 	for _, tt := range tests {
 		if got := statsGraphRows(tt.h); got != tt.want {
@@ -79,7 +79,7 @@ func TestStatsPanelHeight(t *testing.T) {
 		{"default layout", ViewContainers, false, 120, 40, 0},
 		{"other resource", ViewImages, true, 120, 40, 0},
 		{"tall window", ViewContainers, true, 120, 40, 7},
-		{"medium window", ViewContainers, true, 120, 20, 3},
+		{"medium window", ViewContainers, true, 120, 20, 5},
 		{"short window", ViewContainers, true, 120, 12, 0},
 		{"narrow window", ViewContainers, true, 30, 40, 0},
 	}
@@ -108,8 +108,10 @@ func TestRenderStatsPanel(t *testing.T) {
 		lines  int
 		expect []string
 	}{
-		{name: "sparkline", cname: "web", hist: h["a"], width: 80, rows: 1, lines: 3,
+		{name: "single row", cname: "web", hist: h["a"], width: 80, rows: 1, lines: 3,
 			expect: []string{"web · CPU/MEM · 2/120 samples", "CPU", "2.0%", "max 4.0%", "MEM", "32.0 MB", "max 48.0 MB"}},
+		{name: "two rows show min", cname: "web", hist: h["a"], width: 80, rows: 2, lines: 5,
+			expect: []string{"max 48.0 MB", "min 32.0 MB"}},
 		{name: "tall chart", cname: "web", hist: h["a"], width: 80, rows: 3, lines: 7,
 			expect: []string{"CPU/MEM", "max 4.0%", "max 48.0 MB", "min 32.0 MB"}},
 		{name: "no samples yet", cname: "db", hist: nil, width: 60, rows: 1, lines: 3,
