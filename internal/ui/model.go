@@ -492,6 +492,10 @@ type Model struct {
 	// as the theme picked live via the theme picker. May be nil in tests.
 	settings *settings.Store
 
+	// roGlobal is session-wide read-only mode (-read-only flag or "readOnly:" in
+	// the config). A saved host can also be read_only; see readOnly().
+	roGlobal bool
+
 	// When set, the containers view is scoped to this compose project.
 	composeFilter string
 
@@ -703,7 +707,9 @@ func NewModel(cfg *config.Config, backend docker.Backend, store *hosts.Store, co
 		serverUp:        connectErr == nil && !startInHosts,
 		summaries:       map[string]docker.HostSummary{},
 		refreshInterval: clampInterval(interval),
+		roGlobal:        cfg.ReadOnly,
 	}
+	m.syncReadOnly()
 	// Saved-host summaries dial real TCP/SSH connections; demo mode (which also
 	// backs the headless TUI tests) stubs them out so it stays network-free.
 	if cfg.Demo {

@@ -72,14 +72,14 @@ func TestComposeCommandsHiddenOverTCP(t *testing.T) {
 	hidden := []string{"create", "up", "down", "pull", "config", "edit", "backup", "restore"}
 	kept := []string{"start", "stop", "restart", "pause", "unpause", "remove", "backups"}
 
-	ssh := CommandsFor("compose", true)
+	ssh := CommandsFor("compose", true, false)
 	for _, name := range append(append([]string{}, hidden...), kept...) {
 		if !containsCmd(ssh, name) {
 			t.Errorf("ssh compose help should list %q", name)
 		}
 	}
 
-	tcp := CommandsFor("compose", false)
+	tcp := CommandsFor("compose", false, false)
 	for _, name := range hidden {
 		if containsCmd(tcp, name) {
 			t.Errorf("tcp compose help must NOT list SSH-only command %q", name)
@@ -304,5 +304,108 @@ func TestEventsIsGlobalBuiltin(t *testing.T) {
 		if !m.IsBuiltin("events") {
 			t.Errorf("events should be builtin in %q view", res)
 		}
+	}
+}
+
+func TestIsMutating(t *testing.T) {
+	tests := []struct {
+		resource, name string
+		args           []string
+		want           bool
+	}{
+		{"containers", "stop", nil, true},
+		{"containers", "kill", []string{"SIGTERM"}, true},
+		{"containers", "rm", []string{"-f"}, true},
+		{"containers", "exec", nil, true},
+		{"containers", "cp", nil, true},
+		{"containers", "run", nil, true},
+		{"containers", "logs", nil, false},
+		{"containers", "files", nil, false},
+		{"images", "build", nil, true},
+		{"images", "push", nil, true},
+		{"images", "pull", nil, true},
+		{"images", "tag", nil, true},
+		{"images", "history", nil, false},
+		{"networks", "create", nil, true},
+		{"networks", "rm", nil, true},
+		{"volumes", "prune", nil, true},
+		{"compose", "up", nil, true},
+		{"compose", "down", nil, true},
+		{"compose", "edit", nil, true},
+		{"compose", "restore", nil, true},
+		{"compose", "remove", nil, true},
+		{"compose", "config", nil, false},
+		{"compose", "backup", nil, false},
+		{"compose", "backups", nil, false},
+		{"hosts", "rm", nil, false},
+		{"hosts", "add", nil, false},
+		{"hosts", "connect", nil, false},
+		{"hosts", "system", []string{"prune"}, true},
+		{"containers", "system", []string{"df"}, false},
+		{"containers", "system", nil, false},
+		{"containers", "theme", nil, false},
+		{"containers", "unknown", nil, false},
+	}
+	for _, tt := range tests {
+		if got := IsMutating(tt.resource, tt.name, tt.args); got != tt.want {
+			t.Errorf("IsMutating(%q, %q, %v) = %v, want %v", tt.resource, tt.name, tt.args, got, tt.want)
+		}
+	}
+}
+
+// Every command listed as mutating must exist in its view's command set, so the
+// classification can't silently drift from the real commands.
+func TestMutatingCmdsAreKnown(t *testing.T) {
+	for resource, names := range mutatingCmds {
+		all := CommandsFor(resource, true, false)
+		for name := range names {
+			if name == "rm" && resource == "compose" {
+				continue // alias of remove, dispatched but not listed
+			}
+			if !containsCmd(all, name) {
+				t.Errorf("%s: mutating command %q is not in the command set", resource, name)
+			}
+		}
+	}
+}
+
+func TestCommandsForReadOnly(t *testing.T) {
+	ro := CommandsFor("containers", true, true)
+	for _, name := range []string{"stop", "rm", "exec", "cp", "run", "kill"} {
+		if containsCmd(ro, name) {
+			t.Errorf("read-only help must not list %q", name)
+		}
+	}
+	for _, name := range []string{"logs", "files"} {
+		if !containsCmd(ro, name) {
+			t.Errorf("read-only help should still list %q", name)
+		}
+	}
+	if hosts := CommandsFor("hosts", true, true); !containsCmd(hosts, "rm") {
+		t.Error("hosts commands are local and must stay listed in read-only mode")
+	}
+}
+
+func TestSetReadOnlyFiltersAutocompleteAndPlaceholder(t *testing.T) {
+	m := New()
+	m.SetReadOnly(true)
+	m.input.SetValue("sto")
+	if g := m.ghost(); g.completion != "" {
+		t.Errorf("read-only should not autocomplete 'stop', got %+v", g)
+	}
+	m.input.SetValue("lo")
+	if g := m.ghost(); g.completion != "gs" {
+		t.Errorf("read-only should still complete 'lo' -> 'logs', got %+v", g)
+	}
+	if !m.IsBuiltin("stop") {
+		t.Error("hidden mutating command must still be reported as builtin")
+	}
+	if ph := m.input.Placeholder; strings.Contains(ph, "stop") || !strings.Contains(ph, "logs") {
+		t.Errorf("read-only placeholder = %q, want logs without stop", ph)
+	}
+	m.SetReadOnly(false)
+	m.input.SetValue("sto")
+	if g := m.ghost(); g.completion != "p" {
+		t.Errorf("leaving read-only should restore 'stop' completion, got %+v", g)
 	}
 }

@@ -45,11 +45,31 @@ func (m *Model) SetAlerts(t alerts.Thresholds) {
 // refreshPluginCmds pushes the plugin names available in the current view into
 // the command line for autocomplete.
 func (m *Model) refreshPluginCmds() {
+	// Runs on every view/host change, so it also refreshes the read-only state
+	// of the command line (a saved host may be read_only).
+	m.syncReadOnly()
 	var names []string
-	for _, p := range m.plugins.ForScope(m.pluginScope()) {
+	for _, p := range m.visiblePlugins() {
 		names = append(names, p.Name)
 	}
 	m.cmdline.SetPluginCommands(names)
+}
+
+// visiblePlugins returns the plugins in scope for the current view, minus the
+// mutating ones while read-only mode is on (they can't run, so they're hidden
+// from autocomplete, the footer and help).
+func (m Model) visiblePlugins() []plugins.Plugin {
+	all := m.plugins.ForScope(m.pluginScope())
+	if !m.readOnly() {
+		return all
+	}
+	out := make([]plugins.Plugin, 0, len(all))
+	for _, p := range all {
+		if !p.Mutating {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // pluginScope maps the active resource view to a plugin scope string.
@@ -66,7 +86,7 @@ func (m Model) pluginForKey(key string) (plugins.Plugin, bool) {
 // the footer can advertise them.
 func (m Model) scopedPluginsWithKeys() []plugins.Plugin {
 	var out []plugins.Plugin
-	for _, p := range m.plugins.ForScope(m.pluginScope()) {
+	for _, p := range m.visiblePlugins() {
 		if p.Key != "" {
 			out = append(out, p)
 		}
@@ -131,6 +151,10 @@ func (m Model) pluginVars() map[string]string {
 // pluginCmd runs a plugin: interactive plugins take over the terminal via
 // tea.Exec, background plugins stream their output into the operation console.
 func (m Model) pluginCmd(p plugins.Plugin) tea.Cmd {
+	if p.Mutating && m.readOnly() {
+		err := errReadOnly(p.Name)
+		return func() tea.Msg { return errMsg{err} }
+	}
 	name, args := plugins.Substitute(p, m.pluginVars())
 	if p.Background {
 		title := "plugin: " + p.Name

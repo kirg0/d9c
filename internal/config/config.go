@@ -26,6 +26,9 @@ type Config struct {
 	PluginsFile     string
 	ConfigFile      string
 	RefreshInterval time.Duration
+	// ReadOnly forbids every mutating action (stop/rm/prune/run/exec/…) for the
+	// whole session, regardless of the config file and per-host settings.
+	ReadOnly bool
 }
 
 func Load() *Config {
@@ -44,6 +47,7 @@ func Load() *Config {
 	flag.StringVar(&cfg.PluginsFile, "plugins-file", "", "Path to the plugins file (default: next to the binary)")
 	flag.StringVar(&cfg.ConfigFile, "config", "", "Path to the unified config file (theme/colors/keys/alerts/hosts; default: next to the binary)")
 	flag.DurationVar(&cfg.RefreshInterval, "interval", DefaultRefreshInterval, "Auto-refresh interval (e.g. 1s, 5s); toggle pause at runtime with 'p'")
+	flag.BoolVar(&cfg.ReadOnly, "read-only", false, "Read-only mode: forbid every mutating action (stop/kill/rm/prune/run/exec/cp/compose/build/push/create)")
 	flag.Parse()
 
 	return cfg

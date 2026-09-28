@@ -216,8 +216,15 @@ func (m Model) viewHeader() string {
 		}
 		right = styles.HeaderRuntime.Render(" "+label+" ") + right
 	}
+	// Read-only mode: a prominent chip so the user always knows mutating actions
+	// are disabled (kept visible even while reconnecting).
+	roChip := ""
+	if m.readOnly() {
+		roChip = styles.HeaderReadOnly.Render("RO") + " "
+	}
+	right = roChip + right
 	if m.reconnecting {
-		right = styles.HeaderStatusRetry.Render(" ● ") +
+		right = roChip + styles.HeaderStatusRetry.Render(" ● ") +
 			styles.HeaderReconnect.Render(fmt.Sprintf(" ⟳ reconnecting… (attempt %d) ", m.reconnectAttempt))
 	}
 
@@ -283,16 +290,19 @@ func (m Model) viewFooter() string {
 		sb.WriteString(keyHint("enter", "Apply"))
 		sb.WriteString(keyHint("esc", "Cancel"))
 	case ModeCommand:
-		switch m.resource {
-		case ViewImages:
+		switch {
+		case m.readOnly() && m.resource != ViewHosts:
+			// Read-only: list only the commands still available in this view.
+			sb.WriteString(styles.FooterDesc.Render("  " + m.readOnlyCommandList() + "  "))
+		case m.resource == ViewImages:
 			sb.WriteString(styles.FooterDesc.Render("  run · exec · build <dir> [tag] · tag <new-ref> · push · history · pull · rm [-f] · prune  "))
-		case ViewNetworks:
+		case m.resource == ViewNetworks:
 			sb.WriteString(styles.FooterDesc.Render("  create · rm  "))
-		case ViewVolumes:
+		case m.resource == ViewVolumes:
 			sb.WriteString(styles.FooterDesc.Render("  create · rm · prune  "))
-		case ViewHosts:
+		case m.resource == ViewHosts:
 			sb.WriteString(styles.FooterDesc.Render("  connect · add <name> <url> · edit <name> <url> · rm  "))
-		case ViewCompose:
+		case m.resource == ViewCompose:
 			if m.composeHostOps {
 				sb.WriteString(styles.FooterDesc.Render("  create <dir> · up · down · pull · config · edit · backup · backups · restore [file] · start · stop · restart · pause · unpause · remove  "))
 			} else {
@@ -333,7 +343,7 @@ func (m Model) viewFooter() string {
 		} else {
 			sb.WriteString(keyHint("↑↓", "Select"))
 			// Restore is SSH-only; over tcp:// the catalog is view/delete only.
-			if m.composeHostOps {
+			if m.composeHostOps && !m.readOnly() {
 				sb.WriteString(keyHint("enter", "Restore"))
 			}
 			sb.WriteString(keyHint("d", "Delete"))
@@ -418,7 +428,9 @@ func (m Model) viewFooter() string {
 		// apply to the selection: navigate, remove (with confirmation), clear, quit.
 		if m.resource == ViewImages && len(m.selected) > 0 {
 			sb.WriteString(keyHint("↑↓", "Navigate"))
-			sb.WriteString(keyHint("r", "Remove"))
+			if !m.readOnly() {
+				sb.WriteString(keyHint("r", "Remove"))
+			}
 			sb.WriteString(keyHint("esc", "Clear"))
 			sb.WriteString(keyHint("q", "Quit"))
 			break
@@ -435,7 +447,7 @@ func (m Model) viewFooter() string {
 			sb.WriteString(keyHint("i", "Inspect"))
 			sb.WriteString(keyHint("l", "Logs"))
 			sb.WriteString(keyHint("F", "Forward"))
-			if m.composeHostOps {
+			if m.composeHostOps && !m.readOnly() {
 				sb.WriteString(keyHint("e", "Edit"))
 			}
 		default:
@@ -443,7 +455,9 @@ func (m Model) viewFooter() string {
 		}
 		if m.resource == ViewContainers {
 			sb.WriteString(keyHint("l", "Logs"))
-			sb.WriteString(keyHint("x", "Shell"))
+			if !m.readOnly() {
+				sb.WriteString(keyHint("x", "Shell"))
+			}
 			sb.WriteString(keyHint("f", "Files"))
 			sb.WriteString(keyHint("F", "Forward"))
 			sb.WriteString(keyHint("a", "All"))

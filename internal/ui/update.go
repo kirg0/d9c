@@ -1094,6 +1094,15 @@ func (m Model) handleNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// Read-only mode: refuse keys that would mutate the Docker host before any
+	// of them is dispatched (plugin keys are checked by pluginCmd).
+	if m.readOnly() {
+		if op, ok := mutatingKeyOp(m.resource, key, m.keys, len(m.selected) > 0); ok {
+			m.err = errReadOnly(op).Error()
+			return m, nil
+		}
+	}
+
 	// In the Images view with a pending bulk selection, `r` removes the marked
 	// images after a confirmation. Resolved before the keymap so it overrides the
 	// global Refresh binding while a selection is active.
@@ -1550,6 +1559,11 @@ func (m Model) handleBackupPicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !m.composeHostOps {
 			m.backupConfirmDelete = ""
 			m.err = "restore requires an SSH connection (use -H ssh://...)"
+			return m, nil
+		}
+		if m.readOnly() {
+			m.backupConfirmDelete = ""
+			m.err = errReadOnly("restore").Error()
 			return m, nil
 		}
 		if m.backupCursor < len(m.backupItems) {

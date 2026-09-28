@@ -45,6 +45,7 @@ Built on [Bubble Tea](https://github.com/charmbracelet/bubbletea) and the offici
 - [Port-forward](#port-forward-f--portforward)
 - [Auto-refresh](#auto-refresh)
 - [Resource threshold alerts](#resource-threshold-alerts)
+- [Read-only mode](#read-only-mode)
 - [Plugins](#plugins)
 - [Development](#development)
 - [Support the project](#support-the-project)
@@ -75,6 +76,8 @@ Built on [Bubble Tea](https://github.com/charmbracelet/bubbletea) and the offici
 - **Multi-host dashboard** — status and aggregates (`docker info`) across all saved hosts.
 - **CPU/MEM alerts**, configurable **themes** and **hotkeys**, **plugins** (your own commands
   and keys from YAML — like in k9s).
+- **Read-only mode** — `-read-only`, `readOnly:` in the config or `read_only` per host: view
+  everything, change nothing (`RO` badge in the header).
 
 ---
 
@@ -596,6 +599,37 @@ The thresholds are changed on the fly with the `:alert` command:
 | `:alert off` | turn alerts off entirely |
 | `:alert` | show the current thresholds |
 
+## Read-only mode
+
+Read-only mode protects a host from accidental changes: d9c still shows everything (lists,
+details, logs, stats, events, file browser, port-forward), but every action that changes state
+on the Docker host is refused — start/stop/restart/kill/rm, `prune` (including `:system prune`),
+`run`, `exec` (`x`), `cp`, compose `up`/`down`/`pull`/`edit`/`restore`/lifecycle, image
+`build`/`tag`/`push`/`pull`, network/volume creation and plugins marked `mutating: true`.
+An attempt shows `read-only mode: <action> is disabled` in the footer, the header carries an
+`RO` badge, and the hints/help/autocomplete entries of mutating actions are hidden.
+
+It is enabled in one of three ways:
+
+```sh
+d9c -read-only -H ssh://user@prod.example.com   # for the whole session
+```
+
+```yaml
+readOnly: true            # d9c-config.yaml: every host, every session
+hosts:
+  - name: prod
+    host: ssh://user@prod.example.com
+    read_only: true       # only while connected to this host
+```
+
+The per-host flag follows the connection: `:connect` to a `read_only` host turns the mode on,
+connecting to another host turns it off again. The global mode (flag or `readOnly:`) cannot be
+switched off at runtime. `read_only` is set in the config file only — editing the host from the
+UI keeps it. Local operations are not affected: managing saved hosts, themes, language, alert
+thresholds, compose backups (`:backup`, deleting local backup files) and downloading files from
+containers.
+
 ---
 
 ## Plugins
@@ -630,6 +664,7 @@ plugins:
     command: dive              # required — the executable (without arguments)
     args: ["${ID}"]            # optional — arguments (each on its own line)
     background: false          # optional — launch mode (default false)
+    mutating: false            # optional — changes the host (disabled in read-only mode)
 ```
 
 #### Fields
@@ -643,6 +678,7 @@ plugins:
 | `key`         | no   | A hotkey (Bubble Tea format: `ctrl+d`, `f5`, `alt+x`…). |
 | `description` | no   | A short description (documentation). |
 | `background`  | no   | `false` — interactive (takes over the terminal); `true` — in the background with output to a console. |
+| `mutating`    | no   | `true` — the plugin changes the Docker host: it is refused and hidden in [read-only mode](#read-only-mode). |
 
 #### Allowed `scope` values
 
