@@ -18,6 +18,7 @@ import (
 	"github.com/kirg0/d9c/internal/i18n"
 	"github.com/kirg0/d9c/internal/keymap"
 	"github.com/kirg0/d9c/internal/plugins"
+	"github.com/kirg0/d9c/internal/portfwd"
 	"github.com/kirg0/d9c/internal/settings"
 	"github.com/kirg0/d9c/internal/ui/buildform"
 	"github.com/kirg0/d9c/internal/ui/cmdline"
@@ -34,6 +35,7 @@ import (
 	"github.com/kirg0/d9c/internal/ui/hostform"
 	"github.com/kirg0/d9c/internal/ui/logs"
 	"github.com/kirg0/d9c/internal/ui/netform"
+	"github.com/kirg0/d9c/internal/ui/pfform"
 	"github.com/kirg0/d9c/internal/ui/pullform"
 	"github.com/kirg0/d9c/internal/ui/pushform"
 	"github.com/kirg0/d9c/internal/ui/runform"
@@ -105,6 +107,8 @@ const (
 	ModeConnectAuth          // SSH login/password prompt before connecting (password-auth hosts)
 	ModeNamespacePicker      // containerd namespace selector modal (`:namespace` with no args)
 	ModeConnecting           // connection-progress window for hosts without a credential prompt
+	ModePortForwardForm      // port-forward modal form ('F' in containers/compose)
+	ModePortForwards         // tunnel list overlay (`:portforward`)
 )
 
 // copyItem is one selectable entry in the copy overlay.
@@ -412,6 +416,22 @@ type fsCopiedMsg struct {
 	err  error
 }
 
+// openPortForwardFormMsg requests the port-forward form for the given targets
+// (one container, or every running container of a compose project).
+type openPortForwardFormMsg struct{ targets []pfform.Target }
+
+// portForwardStartedMsg carries the outcome of opening a tunnel.
+type portForwardStartedMsg struct {
+	info portfwd.Info
+	err  error
+}
+
+// openPortForwardsMsg requests the tunnel list overlay (`:portforward`).
+type openPortForwardsMsg struct{}
+
+// portForwardChangedMsg carries the outcome of a stop/resume in the tunnel list.
+type portForwardChangedMsg struct{ err error }
+
 // ── model ─────────────────────────────────────────────────────────────────────
 
 type Model struct {
@@ -510,6 +530,16 @@ type Model struct {
 	execForm    execform.Model
 	fsBrowser   fsbrowser.Model
 	cpForm      cpform.Model
+	pfForm      pfform.Model
+
+	// pf owns the port-forward tunnels. They outlive view switches and survive
+	// auto-reconnect (the dialer is swapped to the new backend); a host switch
+	// or exit closes them. Shared by pointer across Model copies.
+	pf *portfwd.Manager
+	// pfCursor is the highlighted row of the tunnel list (ModePortForwards);
+	// pfErr is the last stop/resume failure shown inside that overlay.
+	pfCursor int
+	pfErr    string
 
 	// pushAuth remembers registry credentials for the session (keyed by registry
 	// host), so the push form pre-fills after the first push. Never persisted.
@@ -664,6 +694,8 @@ func NewModel(cfg *config.Config, backend docker.Backend, store *hosts.Store, co
 		execForm:       execform.New(),
 		fsBrowser:      fsbrowser.New(),
 		cpForm:         cpform.New(),
+		pfForm:         pfform.New(),
+		pf:             portfwd.New(),
 		pushAuth:       map[string]docker.RegistryAuth{},
 		keys:           keymap.Default(),
 		// The first periodic ping lands within one refresh tick and corrects
@@ -685,6 +717,7 @@ func NewModel(cfg *config.Config, backend docker.Backend, store *hosts.Store, co
 			return docker.ProbeHostSummary(cfg, h, hostSummaryTimeout)
 		}
 	}
+	m.pf.SetDialer(forwardDialer(backend))
 	// Seed columns for the starting resource so a fast first data update can't
 	// render rows against an empty column set (panic in bubbles renderRow).
 	m.applyColumns(0)

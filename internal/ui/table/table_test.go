@@ -1,6 +1,7 @@
 package table
 
 import (
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/kirg0/d9c/internal/hosts"
 	"github.com/kirg0/d9c/internal/ui/styles"
 
+	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 )
@@ -728,5 +730,51 @@ func TestShrinkRowsKeepsCursorInView(t *testing.T) {
 	}
 	if plain := stripANSI(m.View()); !strings.Contains(plain, "only-one") {
 		t.Errorf("rendered view is blank after shrink, want the single row:\n%s", plain)
+	}
+}
+
+// TestMarkForwards checks the ⇄ port-forward marker lands in the PORTS cell of
+// forwarded containers only, keeping the cell count (bubbles invariant).
+func TestMarkForwards(t *testing.T) {
+	containers := []docker.Container{
+		{ID: "abc123", Name: "web", Ports: "8080->80/tcp"},
+		{ID: "def456", Name: "api"},
+		{ID: "0a0b0c", Name: "db", Ports: "5432/tcp"},
+	}
+	rows := buildRows(containers, "", nil, nil, nil)
+	if got := markForwards(rows, nil); !reflect.DeepEqual(got, buildRows(containers, "", nil, nil, nil)) {
+		t.Error("no forwards must leave rows untouched")
+	}
+	rows = markForwards(rows, map[string]string{"abc123": "⇄:9000", "def456": "⇄:3000"})
+	if rows[0][portsCol] != "⇄:9000 8080->80/tcp" {
+		t.Errorf("web PORTS = %q", rows[0][portsCol])
+	}
+	if rows[1][portsCol] != "⇄:3000" {
+		t.Errorf("api PORTS = %q (empty ports → marker only)", rows[1][portsCol])
+	}
+	if rows[2][portsCol] != "5432/tcp" {
+		t.Errorf("db PORTS = %q, should be unmarked", rows[2][portsCol])
+	}
+	for _, r := range rows {
+		if len(r) != len(ContainerColumns(120)) {
+			t.Fatalf("row has %d cells, want %d", len(r), len(ContainerColumns(120)))
+		}
+	}
+	// Short rows (defensive) are skipped rather than indexed out of range.
+	short := markForwards([]table.Row{{"x"}}, map[string]string{"x": "⇄:1"})
+	if short[0][0] != "x" {
+		t.Error("short row must be left alone")
+	}
+
+	m := New()
+	m.SetColumns(ContainerColumns(120))
+	m.SetForwards(map[string]string{"abc123": "⇄:9000"})
+	m.SetContainers(containers, "", nil, false, nil, nil)
+	if got := m.Table().Rows()[0][portsCol]; !strings.HasPrefix(got, "⇄:9000") {
+		t.Errorf("SetContainers should apply forwards, PORTS = %q", got)
+	}
+	m.SetContainers(containers, "", nil, true, nil, nil) // stats layout: no PORTS column
+	if got := m.Table().Rows()[0]; strings.Contains(strings.Join(got, " "), "⇄") {
+		t.Errorf("stats layout must not carry the marker: %v", got)
 	}
 }

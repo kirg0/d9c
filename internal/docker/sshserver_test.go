@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -27,6 +28,7 @@ type sshTestServer struct {
 
 	mu            sync.Mutex
 	cmds          []string
+	tcpipTargets  []string
 	ptyRequests   int
 	windowChanges int
 }
@@ -71,6 +73,10 @@ func (s *sshTestServer) serveConn(conn net.Conn, cfg *ssh.ServerConfig) {
 	}
 	go ssh.DiscardRequests(reqs)
 	for nc := range chans {
+		if nc.ChannelType() == "direct-tcpip" {
+			go s.serveDirectTCPIP(nc)
+			continue
+		}
 		if nc.ChannelType() != "session" {
 			_ = nc.Reject(ssh.UnknownChannelType, "only sessions are supported")
 			continue
@@ -119,6 +125,47 @@ func (s *sshTestServer) serveSession(ch ssh.Channel, reqs <-chan *ssh.Request) {
 			}
 		}
 	}
+}
+
+// serveDirectTCPIP plays sshd's TCP forwarding (ssh.Client.Dial): it dials the
+// requested host:port locally and pipes the channel to it, recording the target.
+func (s *sshTestServer) serveDirectTCPIP(nc ssh.NewChannel) {
+	var payload struct {
+		Host       string
+		Port       uint32
+		OriginHost string
+		OriginPort uint32
+	}
+	if err := ssh.Unmarshal(nc.ExtraData(), &payload); err != nil {
+		_ = nc.Reject(ssh.ConnectionFailed, "bad payload")
+		return
+	}
+	target := net.JoinHostPort(payload.Host, strconv.Itoa(int(payload.Port)))
+	s.mu.Lock()
+	s.tcpipTargets = append(s.tcpipTargets, target)
+	s.mu.Unlock()
+	conn, err := net.DialTimeout("tcp", target, 2*time.Second)
+	if err != nil {
+		_ = nc.Reject(ssh.ConnectionFailed, "connect failed: "+err.Error())
+		return
+	}
+	ch, reqs, err := nc.Accept()
+	if err != nil {
+		_ = conn.Close()
+		return
+	}
+	go ssh.DiscardRequests(reqs)
+	go func() { _, _ = io.Copy(ch, conn); _ = ch.CloseWrite() }()
+	_, _ = io.Copy(conn, ch)
+	_ = conn.Close()
+	_ = ch.Close()
+}
+
+// forwardedTargets returns the direct-tcpip targets requested so far.
+func (s *sshTestServer) forwardedTargets() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.tcpipTargets...)
 }
 
 // commands returns the exec command lines received so far, in arrival order.

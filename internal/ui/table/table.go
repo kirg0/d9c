@@ -83,6 +83,10 @@ type Model struct {
 	// sortField/sortDesc order the containers view (other views ignore them).
 	sortField SortField
 	sortDesc  bool
+
+	// forwards maps container ID → the port-forward marker ("⇄:8080")
+	// prepended to the PORTS cell of the default containers layout.
+	forwards map[string]string
 }
 
 func New() Model {
@@ -131,7 +135,39 @@ func (m *Model) SetContainers(containers []docker.Container, filter string, stat
 		m.setRows(buildStatsRows(containers, filter, stats, selected, alerted))
 		return
 	}
-	m.setRows(buildRows(containers, filter, stats, selected, alerted))
+	m.setRows(markForwards(buildRows(containers, filter, stats, selected, alerted), m.forwards))
+}
+
+// SetForwards installs the port-forward markers (container ID → "⇄:<port>")
+// shown in the PORTS column on the next SetContainers; nil clears them.
+func (m *Model) SetForwards(forwards map[string]string) { m.forwards = forwards }
+
+// portsCol and idCol are the PORTS and ID column indices of the default
+// containers layout (see ContainerColumns / buildRows).
+const (
+	portsCol = 4
+	idCol    = 7
+)
+
+// markForwards prepends each forwarded container's marker to its PORTS cell,
+// so an active tunnel is visible in the table. Rows are modified in place.
+func markForwards(rows []table.Row, forwards map[string]string) []table.Row {
+	if len(forwards) == 0 {
+		return rows
+	}
+	for _, r := range rows {
+		if len(r) <= idCol {
+			continue
+		}
+		if mark, ok := forwards[r[idCol]]; ok {
+			if r[portsCol] == "" {
+				r[portsCol] = mark
+			} else {
+				r[portsCol] = mark + " " + r[portsCol]
+			}
+		}
+	}
+	return rows
 }
 
 // setRows installs rows and keeps the cursor in range. bubbles' SetRows leaves

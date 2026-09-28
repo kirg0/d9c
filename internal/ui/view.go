@@ -74,6 +74,10 @@ func (m Model) View() string {
 		body = m.fsBrowser.View()
 	case ModeCpForm:
 		body = m.cpForm.View(m.width, m.height-2)
+	case ModePortForwardForm:
+		body = m.pfForm.View(m.width, m.height-2)
+	case ModePortForwards:
+		body = m.viewPortForwardsOverlay()
 	default:
 		body = m.viewNormal()
 	}
@@ -147,6 +151,9 @@ func (m Model) viewHeader() string {
 	case ModeCpForm:
 		breadcrumb = styles.HeaderResource.Render(" Containers ") +
 			sep + styles.HeaderResource.Render(" cp: "+m.cpForm.Name()+" ")
+	case ModePortForwardForm:
+		breadcrumb = styles.HeaderResource.Render(" "+m.resource.String()+" ") +
+			sep + styles.HeaderResource.Render(" port-forward ")
 	default:
 		resName := m.resource.String()
 		if m.resource == ViewContainers && m.showAll {
@@ -187,6 +194,10 @@ func (m Model) viewHeader() string {
 				breadcrumb += styles.HeaderAlert.Render(fmt.Sprintf(" ⚠ %d ", n))
 			}
 		}
+	}
+	// Open port-forward tunnels, from any view (they outlive view switches).
+	if n := m.pf.Len(); n > 0 {
+		breadcrumb += styles.HeaderInfo.Render(fmt.Sprintf(" ⇄ %d ", n))
 	}
 
 	left := appBlock + verBlock + sep + breadcrumb
@@ -366,6 +377,16 @@ func (m Model) viewFooter() string {
 		sb.WriteString(keyHint("tab", "Switch field"))
 		sb.WriteString(keyHint("enter", "Open/Upload"))
 		sb.WriteString(keyHint("esc", "Cancel"))
+	case ModePortForwardForm:
+		sb.WriteString(keyHint("tab", "Switch field"))
+		sb.WriteString(keyHint("enter", "Forward"))
+		sb.WriteString(keyHint("esc", "Cancel"))
+	case ModePortForwards:
+		sb.WriteString(keyHint("↑↓", "Select"))
+		sb.WriteString(keyHint("s", "Stop/Start"))
+		sb.WriteString(keyHint("d", "Delete"))
+		sb.WriteString(keyHint("y", "Copy"))
+		sb.WriteString(keyHint("q/esc", "Close"))
 	case ModeComposeEdit:
 		sb.WriteString(keyHint("ctrl+s", "Save"))
 		sb.WriteString(keyHint("esc", "Cancel"))
@@ -413,6 +434,7 @@ func (m Model) viewFooter() string {
 			sb.WriteString(keyHint("enter", "Containers"))
 			sb.WriteString(keyHint("i", "Inspect"))
 			sb.WriteString(keyHint("l", "Logs"))
+			sb.WriteString(keyHint("F", "Forward"))
 			if m.composeHostOps {
 				sb.WriteString(keyHint("e", "Edit"))
 			}
@@ -423,6 +445,7 @@ func (m Model) viewFooter() string {
 			sb.WriteString(keyHint("l", "Logs"))
 			sb.WriteString(keyHint("x", "Shell"))
 			sb.WriteString(keyHint("f", "Files"))
+			sb.WriteString(keyHint("F", "Forward"))
 			sb.WriteString(keyHint("a", "All"))
 			sb.WriteString(keyHint("s", "Stats"))
 			sb.WriteString(keyHint("⇧N/S/C/M", "Sort"))

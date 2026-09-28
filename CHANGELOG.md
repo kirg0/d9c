@@ -6,8 +6,20 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.24.0] - 2026-09-28
+
 ### Added
 
+- **Port-forward over SSH.** `F` in Containers (or Compose — pick one of the project's
+  running containers) opens a form: container port (pre-filled) and local port (empty =
+  free). d9c listens on `127.0.0.1:<local>` and forwards each connection through the
+  already open SSH connection (`direct-tcpip`) to the published port or the container IP;
+  on `tcp://` hosts it dials a published port directly and explains that unpublished ports
+  need `ssh://`. Active tunnels are marked in PORTS (`⇄:8080`) and counted in the header;
+  `:portforward` (`:pf`) lists them with stop/start/delete/copy. Tunnels survive view
+  switches and auto-reconnect (shown as `failing` while the connection is down), and close
+  on host switch or exit. A busy local port gets a readable error. New remappable action
+  `port-forward` (default `F`).
 - **Public test coverage report.** On every push to `main`, CI publishes the
   HTML coverage report to <https://kirg0.github.io/d9c/coverage/> (plus
   `functions.txt` and a shields.io `badge.json` behind the new README coverage

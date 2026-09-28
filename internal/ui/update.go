@@ -121,6 +121,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case containersUpdatedMsg:
 		m.containers = msg.containers
 		if m.resource == ViewContainers {
+			m.table.SetForwards(forwardMarkers(m.pf.ByContainer()))
 			m.table.SetContainers(m.containers, m.filter.Value(), m.stats, m.statsView, m.selected, m.containerAlertSet())
 			// Keep a single stats batch in flight: on hosts with many containers
 			// a batch can outlive the refresh tick, and overlapping batches would
@@ -296,6 +297,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.backend.Close()
 		}
 		m.backend = msg.backend
+		// Tunnels belong to the old host: close them, then point the (now empty)
+		// manager at the new backend.
+		m.pf.CloseAll()
+		m.pf.SetDialer(forwardDialer(m.backend))
 		m.applyComposeCapability()
 		m.runtime = docker.RuntimeUnknown // re-probed below for the new host
 		m.cfg.Host = msg.host
@@ -451,6 +456,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.volForm.Open()
 		m.mode = ModeVolForm
 		m.relayout()
+		return m, nil
+
+	case openPortForwardFormMsg:
+		m.pfForm.Open(msg.targets)
+		m.mode = ModePortForwardForm
+		m.relayout()
+		return m, nil
+
+	case openPortForwardsMsg:
+		m.openPortForwards()
+		return m, nil
+
+	case portForwardStartedMsg:
+		return m.onPortForwardStarted(msg)
+
+	case portForwardChangedMsg:
+		m.pfErr = ""
+		if msg.err != nil {
+			m.pfErr = msg.err.Error()
+		}
+		m.refreshTableRows()
 		return m, nil
 
 	case openPullFormMsg:
@@ -668,6 +694,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		old := m.backend
 		m.backend = msg.backend
+		// Same host, new connection: tunnels keep listening and dial through it.
+		m.pf.SetDialer(forwardDialer(m.backend))
 		m.applyComposeCapability()
 		m.runtime = docker.RuntimeUnknown // re-probed below for the new connection
 		m.reconnecting = false
@@ -731,6 +759,7 @@ func (m *Model) refreshTableRows() {
 	case ViewCompose:
 		m.table.SetCompose(m.composes, m.filter.Value())
 	default:
+		m.table.SetForwards(forwardMarkers(m.pf.ByContainer()))
 		m.table.SetContainers(m.containers, m.filter.Value(), m.stats, m.statsView, m.selected, m.containerAlertSet())
 	}
 }
@@ -865,6 +894,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleFSBrowser(msg)
 	case ModeCpForm:
 		return m.handleCpForm(msg)
+	case ModePortForwardForm:
+		return m.handlePortForwardForm(msg)
+	case ModePortForwards:
+		return m.handlePortForwards(msg)
 	}
 	return m, nil
 }
@@ -1225,6 +1258,8 @@ func (m Model) handleAction(action keymap.Action) (tea.Model, tea.Cmd) {
 		}
 		m.copyNotif = i18n.T("автообновление возобновлено", "auto-refresh resumed")
 		return m, tea.Batch(m.fetchCurrentResource(), clearCopyNotifCmd())
+	case keymap.PortForward:
+		return m.openPortForward()
 	case keymap.Help:
 		m.mode = ModeHelp
 		m.help.SetContent(m.buildHelpContent())
