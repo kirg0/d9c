@@ -535,6 +535,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.openLangPicker()
 		return m, nil
 
+	case contextsLoadedMsg:
+		return m.handleContextsLoaded(msg)
+
 	case namespacesLoadedMsg:
 		if msg.err != nil {
 			m.copyNotif = i18n.T("не удалось получить namespaces: ", "could not list namespaces: ") + msg.err.Error()
@@ -860,6 +863,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleLangPicker(msg)
 	case ModeNamespacePicker:
 		return m.handleNamespacePicker(msg)
+	case ModeContextPicker:
+		return m.handleContextPicker(msg)
 	case ModeBackupPicker:
 		return m.handleBackupPicker(msg)
 	case ModeHelp:

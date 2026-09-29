@@ -36,6 +36,8 @@ func (m Model) View() string {
 		body = m.viewLangOverlay()
 	case ModeNamespacePicker:
 		body = m.viewNamespaceOverlay()
+	case ModeContextPicker:
+		body = m.viewContextOverlay()
 	case ModeConfirm:
 		body = m.viewConfirmOverlay()
 	case ModeNotice:
@@ -301,7 +303,7 @@ func (m Model) viewFooter() string {
 		case m.resource == ViewVolumes:
 			sb.WriteString(styles.FooterDesc.Render("  create · rm · prune  "))
 		case m.resource == ViewHosts:
-			sb.WriteString(styles.FooterDesc.Render("  connect · add <name> <url> · edit <name> <url> · rm  "))
+			sb.WriteString(styles.FooterDesc.Render("  connect · add <name> <url> · edit <name> <url> · rm · import contexts  "))
 		case m.resource == ViewCompose:
 			if m.composeHostOps {
 				sb.WriteString(styles.FooterDesc.Render("  create <dir> · up · down · pull · config · edit · backup · backups · restore [file] · start · stop · restart · pause · unpause · remove  "))
@@ -329,6 +331,12 @@ func (m Model) viewFooter() string {
 	case ModeNamespacePicker:
 		sb.WriteString(keyHint("↑↓", "Select"))
 		sb.WriteString(keyHint("enter", "Switch"))
+		sb.WriteString(keyHint("q/esc", "Cancel"))
+	case ModeContextPicker:
+		sb.WriteString(keyHint("↑↓", "Select"))
+		sb.WriteString(keyHint("space", "Toggle"))
+		sb.WriteString(keyHint("a", "All"))
+		sb.WriteString(keyHint("enter", "Import"))
 		sb.WriteString(keyHint("q/esc", "Cancel"))
 	case ModeConfirm:
 		sb.WriteString(keyHint("y/enter", "Confirm"))

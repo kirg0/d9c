@@ -178,6 +178,7 @@ go build -ldflags "-X github.com/kirg0/d9c/internal/version.Version=1.2.3" -o d9
 go run . -demo                 # демо-данные, без Docker
 go run . -H tcp://host:2375    # удалённый демон по TCP
 go run . -H ssh://user@host    # удалённый демон по SSH-туннелю
+go run . -context prod         # эндпоинт Docker CLI-контекста
 go run . -version              # вывести версию и выйти
 ```
 
@@ -212,6 +213,26 @@ go run . -version              # вывести версию и выйти
 > `backups` (только просмотр и удаление архивов — восстановление требует SSH) и управление
 > контейнерами проекта: `start` / `stop` / `restart` / `pause` / `unpause` / `remove`. Нужен
 > полный набор Compose — подключайтесь через `-H ssh://...`.
+
+### Docker contexts
+
+d9c читает хранилище контекстов Docker CLI (`~/.docker/contexts` или `$DOCKER_CONFIG/contexts`):
+
+- **`-context <имя>`** — старт сразу на эндпоинте контекста (`tcp://`, `ssh://`, `unix://`,
+  `npipe://`); хост запоминается в Hosts под именем контекста. Приоритеты как у Docker CLI:
+  `-context` важнее `DOCKER_HOST`/`DOCKER_CONTEXT`, но вместе с `-H` — ошибка; без `-context`
+  явный `-H` или `DOCKER_HOST` отключают контексты, иначе контекст берётся из `DOCKER_CONTEXT`.
+  `default` означает «без контекста». `currentContext` из `~/.docker/config.json`
+  автоматически **не** применяется — запуск без параметров по-прежнему открывает Hosts.
+- **`:import contexts`** в разделе Hosts открывает пикер (`space` — отметить, `a` — все,
+  `Enter` — импортировать отмеченные или подсвеченный); `:import contexts <имя>...` — импорт по
+  именам без пикера. Текущий контекст и уже сохранённые URL помечены; уже сохранённые URL
+  пропускаются, при совпадении имени добавляется суффикс (`prod-2`).
+- **TLS-контексты поддерживаются:** `ca.pem` / `cert.pem` / `key.pem` контекста сохраняются у
+  хоста (`tls_ca_cert` / `tls_cert` / `tls_key`) и применяются только к нему — включая пробу
+  дашборда и авто-реконнект; достаточно одного CA (без клиентского сертификата).
+  `SkipTLSVerify` **не** поддерживается: такие контексты импортируются, но сертификат сервера
+  всё равно проверяется (об этом сообщает футер).
 
 ### Podman
 
@@ -385,7 +406,8 @@ events (нужен cri-tools ≥ 1.26); `system df` эмулируется из 
 со статусом (● up/down) и агрегатом из `docker info` (контейнеры/запущено/образы/версия демона).
 Данные собираются по одному соединению на хост, обновляются раз в ~10 секунд. `Enter` — подключиться
 к выбранному хосту. Управление прямо из раздела: `a` — добавить, `e` — редактировать, `d` — удалить
-(с подтверждением); те же действия доступны командами `:add` / `:edit` / `:rm`. Команды
+(с подтверждением); те же действия доступны командами `:add` / `:edit` / `:rm`, а
+`:import contexts` добавляет хосты из Docker contexts (см. [Docker contexts](#docker-contexts)). Команды
 `:dashboard` / `:dash` — алиасы для `:hosts`. Список хостов хранится в общем
 `d9c-config.yaml` (секция `hosts:`, см. [Конфиг, темы и клавиши](#конфиг-темы-и-клавиши)).
 
@@ -462,6 +484,11 @@ hosts:                    # сохранённые хосты (раздел Host
     ssh_auth: password     # запрос пароля при подключении; пароль НЕ хранится
   - name: local
     host: tcp://localhost:2375
+  - name: secure           # например, импортирован из TLS-контекста Docker
+    host: tcp://secure.example.com:2376
+    tls_ca_cert: ~/.docker/contexts/tls/<id>/docker/ca.pem   # опционально, только tcp://
+    tls_cert: ~/.docker/contexts/tls/<id>/docker/cert.pem
+    tls_key: ~/.docker/contexts/tls/<id>/docker/key.pem
 ```
 
 Встроенные темы: `tokyonight`, `dracula`, `nord`, `gruvbox`, `solarized`,

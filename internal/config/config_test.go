@@ -63,7 +63,7 @@ func TestLoad_Flags(t *testing.T) {
 		"-ssh-key", "id_ed25519", "-ssh-password", "pw",
 		"-a", "-demo", "-version",
 		"-hosts-file", "hosts.json", "-plugins-file", "plugins.yml", "-config", "d9c.yml",
-		"-interval", "5s", "-read-only",
+		"-interval", "5s", "-read-only", "-context", "prod",
 	)
 	if cfg.Host != "tcp://box:2375" {
 		t.Errorf("Host = %q", cfg.Host)
@@ -83,6 +83,9 @@ func TestLoad_Flags(t *testing.T) {
 	if cfg.RefreshInterval != 5*time.Second {
 		t.Errorf("RefreshInterval = %v, want 5s", cfg.RefreshInterval)
 	}
+	if cfg.Context != "prod" || !cfg.HostFlagSet {
+		t.Errorf("Context = %q, HostFlagSet = %v", cfg.Context, cfg.HostFlagSet)
+	}
 }
 
 func TestLoad_EnvFallback(t *testing.T) {
@@ -94,6 +97,9 @@ func TestLoad_EnvFallback(t *testing.T) {
 	}
 	if cfg.SSHKeyFile != "env_key" {
 		t.Errorf("SSHKeyFile = %q, want env value", cfg.SSHKeyFile)
+	}
+	if cfg.HostFlagSet {
+		t.Error("DOCKER_HOST must not count as an explicit -H")
 	}
 }
 

@@ -40,6 +40,18 @@ type Host struct {
 	// only in the config file (the host form doesn't expose it), so edits made
 	// from the UI keep the stored value.
 	ReadOnly bool `json:"read_only,omitempty" yaml:"read_only,omitempty"`
+	// TLSCACert/TLSCert/TLSKey are client TLS file paths for a tcp:// host
+	// (typically imported from a Docker context). Like ReadOnly they are not
+	// exposed by the host form, so UI edits keep the stored values; they are
+	// dropped when the URL is no longer tcp://.
+	TLSCACert string `json:"tls_ca_cert,omitempty" yaml:"tls_ca_cert,omitempty"`
+	TLSCert   string `json:"tls_cert,omitempty" yaml:"tls_cert,omitempty"`
+	TLSKey    string `json:"tls_key,omitempty" yaml:"tls_key,omitempty"`
+}
+
+// HasTLS reports whether the host carries any client TLS material.
+func (h Host) HasTLS() bool {
+	return h.TLSCACert != "" || h.TLSCert != "" || h.TLSKey != ""
 }
 
 // Store holds the saved hosts and a callback that persists them. The zero value
@@ -171,7 +183,12 @@ func (s *Store) EditHost(name string, h Host) error {
 			return fmt.Errorf("host %q already exists", h.Name)
 		}
 	}
-	h.ReadOnly = s.Hosts[idx].ReadOnly
+	old := s.Hosts[idx]
+	h.ReadOnly = old.ReadOnly
+	if !h.HasTLS() {
+		h.TLSCACert, h.TLSCert, h.TLSKey = old.TLSCACert, old.TLSCert, old.TLSKey
+		h = h.normalized() // drop the carried TLS if the URL is no longer tcp://
+	}
 	s.Hosts[idx] = h
 	return nil
 }
@@ -229,6 +246,9 @@ func (h Host) normalized() Host {
 	if h.SSHAuth == SSHAuthPassword {
 		h.SSHKeyPath = "" // password auth never carries a key
 	}
+	if !strings.HasPrefix(h.Host, "tcp://") {
+		h.TLSCACert, h.TLSCert, h.TLSKey = "", "", "" // TLS applies to tcp:// only
+	}
 	return h
 }
 
@@ -257,6 +277,49 @@ func (s *Store) UpsertByHost(hostURL string) bool {
 	}
 	s.Hosts = append(s.Hosts, Host{Name: uniqueName(s, deriveName(hostURL)), Host: hostURL})
 	return true
+}
+
+// FindByURL returns the first saved host whose URL equals hostURL.
+func (s *Store) FindByURL(hostURL string) (Host, bool) {
+	if s == nil {
+		return Host{}, false
+	}
+	for _, h := range s.Hosts {
+		if h.Host == hostURL {
+			return h, true
+		}
+	}
+	return Host{}, false
+}
+
+// ImportResult classifies the outcome of Import for one host.
+type ImportResult int
+
+// Import outcomes.
+const (
+	// Imported: a new entry was appended (possibly under a suffixed name).
+	Imported ImportResult = iota
+	// ImportSkipped: an entry with the same URL already exists; nothing changed.
+	ImportSkipped
+	// ImportInvalid: the host had an empty name or URL.
+	ImportInvalid
+)
+
+// Import appends h unless a host with the same URL is already saved. A name
+// clash with a different URL gets a numeric suffix ("prod" → "prod-2"), so an
+// import never overwrites an existing entry. It returns the outcome and the
+// name the host was stored (or already exists) under.
+func (s *Store) Import(h Host) (ImportResult, string) {
+	h = h.normalized()
+	if h.Name == "" || h.Host == "" {
+		return ImportInvalid, ""
+	}
+	if existing, ok := s.FindByURL(h.Host); ok {
+		return ImportSkipped, existing.Name
+	}
+	h.Name = uniqueName(s, h.Name)
+	s.Hosts = append(s.Hosts, h)
+	return Imported, h.Name
 }
 
 // SSHUser extracts the login from an SSH URL ("ssh://user@host:22" → "user",

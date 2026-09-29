@@ -6,6 +6,26 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-09-29
+
+### Added
+
+- **Docker contexts.** `:import contexts` in the Hosts section reads the Docker CLI context
+  store (`~/.docker/contexts`, honoring `DOCKER_CONFIG`) and opens a picker (`space` — check,
+  `a` — all, `Enter` — import); `:import contexts <name>...` imports by name. Already-saved URLs
+  are skipped, name clashes get a suffix. The new `-context <name>` flag starts straight on a
+  context's endpoint; `DOCKER_CONTEXT` is honored unless `-H`/`DOCKER_HOST` is set, and `-H`
+  together with `-context` is rejected, as in the Docker CLI.
+- **Per-host TLS.** Saved hosts can carry `tls_ca_cert` / `tls_cert` / `tls_key` (filled in from
+  TLS contexts); they apply to that host only — connect, dashboard probe and auto-reconnect —
+  while the `-tls*` flags stay the session default. Starting with `-H` on a saved TLS host reuses
+  its files. `SkipTLSVerify` contexts are imported but still verify the server certificate.
+
+### Changed
+
+- A TLS CA certificate alone (without a client certificate/key) now switches a `tcp://`
+  connection to TLS.
+
 ## [1.27.0] - 2026-09-29
 
 ### Added

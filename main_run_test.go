@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/kirg0/d9c/internal/config"
+	"github.com/kirg0/d9c/internal/dockerctx"
 	"github.com/kirg0/d9c/internal/hosts"
 	"github.com/kirg0/d9c/internal/settings"
 	"github.com/kirg0/d9c/internal/version"
@@ -25,6 +26,8 @@ func runWithArgs(t *testing.T, args ...string) error {
 	flag.CommandLine = flag.NewFlagSet("d9c-test", flag.ContinueOnError)
 	os.Args = append([]string{"d9c"}, args...)
 	t.Setenv("DOCKER_HOST", "")
+	t.Setenv("DOCKER_CONTEXT", "")
+	t.Setenv("DOCKER_CONFIG", t.TempDir())
 	return run()
 }
 
@@ -156,4 +159,119 @@ func TestRememberHost(t *testing.T) {
 	// A failing save only warns; startup continues.
 	failing := hosts.NewStore(nil, func([]hosts.Host) error { return errors.New("disk full") })
 	rememberHost(failing, "ssh://ops@box")
+}
+
+// writeDockerContext creates a minimal Docker CLI context store entry.
+func writeDockerContext(t *testing.T, dir, name, host string, tlsFiles ...string) {
+	t.Helper()
+	metaDir := filepath.Join(dir, "contexts", "meta", dockerctx.ID(name))
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	meta, _ := json.Marshal(map[string]any{
+		"Name":      name,
+		"Endpoints": map[string]any{"docker": map[string]any{"Host": host, "SkipTLSVerify": len(tlsFiles) > 0}},
+	})
+	if err := os.WriteFile(filepath.Join(metaDir, "meta.json"), meta, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tlsDir := filepath.Join(dir, "contexts", "tls", dockerctx.ID(name), "docker")
+	for _, f := range tlsFiles {
+		if err := os.MkdirAll(tlsDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(tlsDir, f), []byte("pem"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestApplyDockerContext(t *testing.T) {
+	dir := t.TempDir()
+	writeDockerContext(t, dir, "prod", "tcp://prod:2376", "ca.pem", "cert.pem", "key.pem")
+	writeDockerContext(t, dir, "lab", "ssh://ops@lab")
+	noEnv := func(string) string { return "" }
+
+	// -context points cfg at the endpoint and its TLS files.
+	cfg := &config.Config{Context: "prod", Host: config.DefaultHost}
+	h, err := applyDockerContext(cfg, dir, noEnv)
+	if err != nil || h == nil {
+		t.Fatalf("applyDockerContext = %v, %v", h, err)
+	}
+	tlsDir := filepath.Join(dir, "contexts", "tls", dockerctx.ID("prod"), "docker")
+	if cfg.Host != "tcp://prod:2376" || cfg.TLSCACert != filepath.Join(tlsDir, "ca.pem") || cfg.TLSKey == "" {
+		t.Errorf("cfg = %+v", cfg)
+	}
+	if h.Name != "prod" || !h.HasTLS() {
+		t.Errorf("host = %+v", h)
+	}
+
+	// DOCKER_CONTEXT is honored when neither -H nor DOCKER_HOST is set.
+	cfg = &config.Config{Host: config.DefaultHost}
+	env := func(k string) string { return map[string]string{"DOCKER_CONTEXT": "lab"}[k] }
+	if h, err := applyDockerContext(cfg, dir, env); err != nil || h == nil || cfg.Host != "ssh://ops@lab" || cfg.Context != "lab" || cfg.TLSCACert != "" {
+		t.Errorf("DOCKER_CONTEXT: host=%v err=%v cfg=%+v", h, err, cfg)
+	}
+
+	// Nothing selected, or demo mode: cfg untouched.
+	for _, cfg := range []*config.Config{{Host: "tcp://x"}, {Demo: true, Context: "prod", Host: "tcp://x"}} {
+		if h, err := applyDockerContext(cfg, dir, noEnv); h != nil || err != nil || cfg.Host != "tcp://x" {
+			t.Errorf("no-op case: host=%v err=%v cfg=%+v", h, err, cfg)
+		}
+	}
+
+	// Unknown context and -H/-context conflict are startup errors.
+	if _, err := applyDockerContext(&config.Config{Context: "nope"}, dir, noEnv); err == nil || !strings.Contains(err.Error(), `"nope"`) {
+		t.Errorf("unknown context err = %v", err)
+	}
+	if _, err := applyDockerContext(&config.Config{Context: "prod", HostFlagSet: true}, dir, noEnv); err == nil {
+		t.Error("-H with -context must conflict")
+	}
+}
+
+func TestApplySavedHostTLS(t *testing.T) {
+	store := hosts.NewStore([]hosts.Host{{Name: "prod", Host: "tcp://prod:2376", TLSCACert: "ca", TLSCert: "cert", TLSKey: "key"}}, nil)
+
+	cfg := &config.Config{Host: "tcp://prod:2376"}
+	applySavedHostTLS(cfg, store)
+	if cfg.TLSCACert != "ca" || cfg.TLSCert != "cert" || cfg.TLSKey != "key" {
+		t.Errorf("saved TLS not applied: %+v", cfg)
+	}
+
+	// Explicit -tls* flags win; unknown hosts stay untouched.
+	cfg = &config.Config{Host: "tcp://prod:2376", TLSCACert: "flag-ca"}
+	applySavedHostTLS(cfg, store)
+	if cfg.TLSCACert != "flag-ca" || cfg.TLSCert != "" {
+		t.Errorf("flags overridden: %+v", cfg)
+	}
+	cfg = &config.Config{Host: "tcp://other:2376"}
+	applySavedHostTLS(cfg, store)
+	if cfg.TLSCACert != "" {
+		t.Errorf("unknown host got TLS: %+v", cfg)
+	}
+}
+
+func TestRememberContextHost(t *testing.T) {
+	saves := 0
+	store := hosts.NewStore(nil, func([]hosts.Host) error { saves++; return nil })
+	h := hosts.Host{Name: "prod", Host: "tcp://prod:2376", TLSCACert: "ca"}
+	rememberContextHost(store, h)
+	rememberContextHost(store, h) // same URL: skipped, not saved again
+	if saves != 1 || len(store.Hosts) != 1 || store.Hosts[0] != h {
+		t.Errorf("saves=%d hosts=%+v", saves, store.Hosts)
+	}
+	failing := hosts.NewStore(nil, func([]hosts.Host) error { return errors.New("disk full") })
+	rememberContextHost(failing, h) // only warns
+}
+
+// A -context naming a missing context aborts startup with a clear error, and
+// combining it with -H is rejected like the Docker CLI does.
+func TestRunContextErrors(t *testing.T) {
+	cfgFile := filepath.Join(t.TempDir(), "d9c.yaml")
+	if err := runWithArgs(t, "-config", cfgFile, "-context", "ghost"); err == nil || !strings.Contains(err.Error(), "ghost") {
+		t.Errorf("missing context err = %v", err)
+	}
+	if err := runWithArgs(t, "-config", cfgFile, "-H", "tcp://x:2375", "-context", "ghost"); err == nil || !strings.Contains(err.Error(), "conflicting") {
+		t.Errorf("-H + -context err = %v", err)
+	}
 }

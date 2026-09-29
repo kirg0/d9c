@@ -238,7 +238,9 @@ func newTCPBackend(cfg *config.Config) (Backend, error) {
 		client.WithAPIVersionNegotiation(),
 	}
 
-	if cfg.TLSCert != "" && cfg.TLSKey != "" {
+	// A CA alone (server-verified TLS without a client certificate, as some
+	// Docker contexts ship) is enough to switch to https.
+	if cfg.TLSCACert != "" || (cfg.TLSCert != "" && cfg.TLSKey != "") {
 		opts = append(opts, client.WithTLSClientConfig(cfg.TLSCACert, cfg.TLSCert, cfg.TLSKey))
 	}
 

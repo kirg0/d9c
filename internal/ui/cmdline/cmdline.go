@@ -59,6 +59,7 @@ var hostCmds = []cmdDef{
 	{"add", "<name> <url>"},
 	{"edit", "<name> <url>"},
 	{"rm", ""},
+	{"import", "contexts [name...] (no names = picker)"},
 }
 
 var composeCmds = []cmdDef{
