@@ -6,6 +6,25 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.27.0] - 2026-09-29
+
+### Added
+
+- **Configurable table columns.** A new `columns:` section in `d9c-config.yaml` sets which
+  columns each table shows and in what order — per section: `containers`, `stats` (the `s`
+  layout), `images`, `networks`, `volumes`, `compose`, `hosts`. Column names are case- and
+  punctuation-insensitive (`cpu %` = `CPU%` = `cpu`); the visible columns share the full width
+  in proportion to their default widths. The column that identifies the row (ID, or NAME/PATH)
+  is always kept — if omitted it is put back at its default position. Unknown sections/columns
+  and duplicates are skipped, an empty list keeps the default layout, and the problems are
+  listed in a notice window at startup.
+
+### Fixed
+
+- **No selected row after an empty list.** Loading a list after an empty one (e.g. the first
+  refresh at startup) left the table cursor at -1: no row was highlighted and Enter/actions did
+  nothing until an arrow key was pressed. The first row is now selected.
+
 ## [1.26.1] - 2026-09-28
 
 ### Changed

@@ -3,6 +3,8 @@ package settings
 import (
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/kirg0/d9c/internal/hosts"
@@ -10,6 +12,7 @@ import (
 	"github.com/kirg0/d9c/internal/keymap"
 	"github.com/kirg0/d9c/internal/theme"
 	"github.com/kirg0/d9c/internal/ui/styles"
+	"github.com/kirg0/d9c/internal/ui/table"
 )
 
 func TestLoadMissingFileYieldsDefaults(t *testing.T) {
@@ -267,5 +270,46 @@ func TestReadOnlyParsing(t *testing.T) {
 	var nilStore *Store
 	if nilStore.ReadOnly() {
 		t.Error("nil store must not be read-only")
+	}
+}
+
+func TestColumnsSection(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "d9c-config.yaml")
+	data := "columns:\n  containers: [name, status, cpu, id]\n  images: [bogus]\n"
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	layouts, warns := s.Columns()
+	if got := layouts.For(table.SectionContainers); !reflect.DeepEqual(got, []int{0, 2, 5, 7}) {
+		t.Errorf("containers layout = %v", got)
+	}
+	if layouts.For(table.SectionImages) != nil {
+		t.Error("all-invalid images list should keep the default layout")
+	}
+	if len(warns) != 1 || !strings.Contains(warns[0], "bogus") {
+		t.Errorf("warnings = %q", warns)
+	}
+
+	// The section survives a save driven by another setting.
+	if err := s.SetLang("en"); err != nil {
+		t.Fatalf("SetLang: %v", err)
+	}
+	s2, err := Load(path)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if !reflect.DeepEqual(s2.File.Columns, s.File.Columns) {
+		t.Errorf("columns lost on save: %v", s2.File.Columns)
+	}
+}
+
+func TestColumnsNilStore(t *testing.T) {
+	var s *Store
+	if l, w := s.Columns(); l != nil || w != nil {
+		t.Errorf("nil store Columns = %v, %v", l, w)
 	}
 }

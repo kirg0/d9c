@@ -47,6 +47,7 @@ Built on [Bubble Tea](https://github.com/charmbracelet/bubbletea) and the offici
 - [Stats view and graphs](#stats-view-and-graphs-s)
 - [Resource threshold alerts](#resource-threshold-alerts)
 - [Read-only mode](#read-only-mode)
+- [Table columns](#table-columns)
 - [Plugins](#plugins)
 - [Development](#development)
 - [Support the project](#support-the-project)
@@ -79,6 +80,8 @@ Built on [Bubble Tea](https://github.com/charmbracelet/bubbletea) and the offici
   and keys from YAML — like in k9s).
 - **Read-only mode** — `-read-only`, `readOnly:` in the config or `read_only` per host: view
   everything, change nothing (`RO` badge in the header).
+- **Configurable columns** — `columns:` in the config: which columns each table shows and in
+  what order.
 
 ---
 
@@ -648,6 +651,39 @@ switched off at runtime. `read_only` is set in the config file only — editing 
 UI keeps it. Local operations are not affected: managing saved hosts, themes, language, alert
 thresholds, compose backups (`:backup`, deleting local backup files) and downloading files from
 containers.
+
+## Table columns
+
+The `columns:` section of `d9c-config.yaml` sets which columns each table shows and in what
+order. Every key is optional — a section without an entry keeps the built-in layout:
+
+```yaml
+columns:
+  containers: [name, status, health, cpu, mem, id]   # default layout of Containers
+  stats: [name, cpu, mem, "mem %", id]               # the `s` (docker stats) layout
+  images: [repository, size, id]
+  networks: [name, driver, subnet, id]
+  volumes: [name, driver, created]
+  compose: [project, status, path]
+  hosts: [name, status, running, version]
+```
+
+| Section | Columns |
+| --- | --- |
+| `containers` | NAME, IMAGE, STATUS, HEALTH, PORTS, CPU %, MEM, **ID** |
+| `stats` | NAME, CPU %, MEM, MEM %, NET I/O, BLOCK I/O, **ID** |
+| `images` | REPOSITORY:TAG, SIZE, CREATED, **ID** |
+| `networks` | NAME, DRIVER, SCOPE, SUBNET, **ID** |
+| `volumes` | **NAME**, DRIVER, MOUNTPOINT, CREATED |
+| `compose` | PROJECT, NAME, **PATH**, STATUS, COMMAND |
+| `hosts` | **NAME**, HOST, STATUS, CONTAINERS, RUNNING, IMAGES, VERSION |
+
+Names are case- and punctuation-insensitive (`cpu %`, `CPU%` and `cpu` are the same column;
+`net io`/`net`, `block`, `repository`/`repo`/`tag` also work). The visible columns share the full
+table width in proportion to their default widths. The column in **bold** identifies the row
+(actions, drill-down, copy) and is always shown — if it is left out, it is put back at its default
+position. An unknown section or column and a duplicate are skipped; an empty list keeps the
+default layout. Such problems are listed in a notice window at startup.
 
 ---
 

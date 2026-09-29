@@ -25,6 +25,7 @@ import (
 	"github.com/kirg0/d9c/internal/keymap"
 	"github.com/kirg0/d9c/internal/theme"
 	"github.com/kirg0/d9c/internal/ui/styles"
+	"github.com/kirg0/d9c/internal/ui/table"
 )
 
 // File is the on-disk shape of d9c-config.yaml. Every section is optional;
@@ -37,8 +38,11 @@ type File struct {
 	Alerts *AlertsSection    `yaml:"alerts,omitempty"`
 	// ReadOnly forbids every mutating action on every host (see also the
 	// per-host read_only flag and the -read-only command-line flag).
-	ReadOnly bool         `yaml:"readOnly,omitempty"`
-	Hosts    []hosts.Host `yaml:"hosts,omitempty"`
+	ReadOnly bool `yaml:"readOnly,omitempty"`
+	// Columns sets the visible columns and their order per table section
+	// (containers/stats/images/networks/volumes/compose/hosts).
+	Columns map[string][]string `yaml:"columns,omitempty"`
+	Hosts   []hosts.Host        `yaml:"hosts,omitempty"`
 }
 
 // AlertsSection mirrors the "alerts:" block (CPU/MEM thresholds, percent).
@@ -127,6 +131,16 @@ func (s *Store) Alerts() (alerts.Thresholds, error) {
 		return alerts.Thresholds{}, nil
 	}
 	return alerts.Resolve(s.File.Alerts.CPU, s.File.Alerts.Mem)
+}
+
+// Columns resolves the "columns:" section into per-section column projections
+// plus validation warnings (never an error: bad entries fall back to the
+// defaults). Nil-safe, so callers without a loaded config get the defaults.
+func (s *Store) Columns() (table.Layouts, []string) {
+	if s == nil {
+		return nil, nil
+	}
+	return table.ResolveLayouts(s.File.Columns)
 }
 
 // SetTheme records a built-in theme name as the active theme and persists the

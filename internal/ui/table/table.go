@@ -87,6 +87,14 @@ type Model struct {
 	// forwards maps container ID → the port-forward marker ("⇄:8080")
 	// prepended to the PORTS cell of the default containers layout.
 	forwards map[string]string
+
+	// layout is the active column projection (default-column indices in display
+	// order, from the "columns:" config); nil shows the default layout. Row
+	// builders always produce full default rows: they are kept in rows and only
+	// the projection reaches bubbles, so every row still has exactly one cell per
+	// visible column while identity lookups (SelectedRow) see the full row.
+	layout []int
+	rows   []table.Row
 }
 
 func New() Model {
@@ -108,13 +116,22 @@ func (m *Model) SetSize(width, height int) {
 // SetColorizers installs the per-column colorizers used to color cells after
 // layout. Pass nil for views with no colored columns. The slice is indexed by
 // column; a nil entry leaves that column in the base style.
-func (m *Model) SetColorizers(cs []Colorizer) { m.colorize = cs }
+// Colorizers are given for the default layout and projected with it.
+func (m *Model) SetColorizers(cs []Colorizer) { m.colorize = projectColorizers(cs, m.layout) }
+
+// SetLayout selects the column projection (see ResolveLayouts) applied by the
+// following SetColumns/SetColorizers/row setters; nil restores the default
+// layout. Call it before SetColumns.
+func (m *Model) SetLayout(idx []int) { m.layout = idx }
 
 // SetColumns updates column definitions (called on resize or resource switch).
+// cols is the default layout; the active projection (SetLayout) is applied.
 // Rows are cleared ONLY when the column count changes to avoid
 // index-out-of-range in renderRow while preserving existing rows on resize.
 func (m *Model) SetColumns(cols []table.Column) {
+	cols = projectColumns(cols, m.layout)
 	if len(cols) != len(m.table.Columns()) {
+		m.rows = nil
 		m.table.SetRows(nil)
 	}
 	m.table.SetColumns(cols)
@@ -178,9 +195,23 @@ func markForwards(rows []table.Row, forwards map[string]string) []table.Row {
 // already within range is preserved, so a periodic refresh doesn't jump the
 // selection.
 func (m *Model) setRows(rows []table.Row) {
+	m.rows = rows
+	if m.layout != nil {
+		projected := make([]table.Row, len(rows))
+		for i, r := range rows {
+			projected[i] = projectRow(r, m.layout)
+		}
+		rows = projected
+	}
 	m.table.SetRows(rows)
-	if m.table.Cursor() >= len(rows) {
-		m.table.SetCursor(len(rows) - 1) // SetCursor clamps to ≥0 and re-runs UpdateViewport
+	switch c := m.table.Cursor(); {
+	case c >= len(rows):
+		m.table.SetCursor(len(rows) - 1) // re-runs UpdateViewport; -1 on an empty list
+	case c < 0 && len(rows) > 0:
+		// An earlier empty list parked the cursor at -1 (bubbles clamps to
+		// len-1); without this the first real data would show no selection and
+		// SelectedRow would stay nil until an arrow key moved the cursor.
+		m.table.SetCursor(0)
 	}
 }
 
@@ -286,7 +317,7 @@ func (m *Model) SetCompose(projects []docker.ComposeProject, filter string) {
 // (working_dir) equals id; it's a no-op if no row matches. Used to restore the
 // selection when returning from a drill-down to the deployment list.
 func (m *Model) SelectComposeRow(id string) {
-	for i, r := range m.table.Rows() {
+	for i, r := range m.rows {
 		if len(r) > ComposeIDColumn && r[ComposeIDColumn] == id {
 			m.table.SetCursor(i)
 			return
@@ -304,9 +335,11 @@ func (m Model) SelectedID() string {
 	return row[len(row)-1]
 }
 
-// SelectedRow returns the cells of the currently selected row, or nil.
+// SelectedRow returns the cells of the currently selected row, or nil. The row
+// is in the default (unprojected) layout, so identity columns sit at their
+// default indices whatever columns the config shows.
 func (m Model) SelectedRow() []string {
-	rows := m.table.Rows()
+	rows := m.rows
 	cursor := m.table.Cursor()
 	if cursor < 0 || cursor >= len(rows) {
 		return nil
