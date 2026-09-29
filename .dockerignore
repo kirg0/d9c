@@ -1,0 +1,18 @@
+# Build context for packaging/Dockerfile: sources only.
+.git
+.github
+.claude
+.vscode
+.idea
+docs
+dist
+pkg
+*.exe
+*.tar.gz
+*.zip
+*.test
+coverage.*
+d9c
+d9c-config.yaml
+d9c-plugins.yaml
+d9c-hosts.json*

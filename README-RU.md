@@ -86,10 +86,84 @@ Docker **по TCP или SSH**. Один бинарник, без агентов
 
 ## Установка
 
-### Готовые бинарники (рекомендуется)
+На удалённом хосте ничего ставить не нужно — d9c общается с Docker-демоном напрямую.
 
-Не нужны ни Go, ни компилятор — на удалённом хосте тоже ничего ставить не надо.
-Скачайте архив под свою ОС со страницы
+| Способ | Платформы | Команда |
+|--------|-----------|---------|
+| [Homebrew](#homebrew) | macOS, Linux | `brew install kirg0/tap/d9c` |
+| [Scoop](#scoop) | Windows | `scoop bucket add kirg0 https://github.com/kirg0/scoop-bucket`, затем `scoop install d9c` |
+| [Скрипт установки](#скрипт-установки) | Linux, macOS | `curl -fsSL https://raw.githubusercontent.com/kirg0/d9c/main/install.sh \| sh` |
+| [Docker-образ](#docker-образ) | везде, где есть Docker | `docker run --rm -it ghcr.io/kirg0/d9c -H ssh://user@host` |
+| [`go install`](#go-install) | везде, где есть Go 1.25+ | `go install github.com/kirg0/d9c@latest` |
+| [Архив](#готовые-бинарники) | Linux, macOS, Windows | скачать со страницы [Releases](https://github.com/kirg0/d9c/releases/latest) |
+
+Tap, bucket и образ обновляются автоматически при каждом релизе.
+
+### Homebrew
+
+```sh
+brew install kirg0/tap/d9c     # = brew tap kirg0/tap && brew install d9c
+brew upgrade d9c
+```
+
+Формула ставит готовый бинарник под вашу архитектуру (Intel / Apple Silicon, Linux
+x86-64 / ARM64) — Go-тулчейн не подтягивается.
+
+### Scoop
+
+```powershell
+scoop bucket add kirg0 https://github.com/kirg0/scoop-bucket
+scoop install d9c
+scoop update d9c
+```
+
+### Скрипт установки
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/kirg0/d9c/main/install.sh | sh
+```
+
+Скрипт определяет ОС (Linux / macOS) и архитектуру (amd64 / arm64), скачивает нужный архив
+из GitHub Releases, **сверяет его SHA-256 с `checksums.txt` релиза** (при несовпадении —
+прерывается) и ставит `d9c` в `/usr/local/bin` (через `sudo`, если каталог недоступен на
+запись) или в `~/.local/bin`, если `sudo` нет. Настройки — переменными окружения:
+
+| Переменная | Значение |
+|------------|----------|
+| `D9C_VERSION` | какой релиз ставить, например `v1.29.0` (по умолчанию — последний) |
+| `D9C_INSTALL_DIR` | каталог установки вместо `/usr/local/bin` |
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/kirg0/d9c/main/install.sh | D9C_VERSION=v1.29.0 D9C_INSTALL_DIR=~/bin sh
+```
+
+### Docker-образ
+
+Multi-arch образ (`linux/amd64`, `linux/arm64`) публикуется в
+[ghcr.io/kirg0/d9c](https://github.com/kirg0/d9c/pkgs/container/d9c) с тегами `latest`,
+`X.Y.Z` и `X.Y`. Запускать интерактивно (`-it`), аргументы передаются прямо в `d9c`:
+
+```sh
+# локальный демон через проброшенный сокет
+docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock \
+  ghcr.io/kirg0/d9c -H unix:///var/run/docker.sock
+
+# удалённый хост по SSH с вашими ключами (known_hosts дополняется при первом подключении)
+docker run --rm -it -v ~/.ssh:/root/.ssh ghcr.io/kirg0/d9c -H ssh://user@host
+
+# ...или через ssh-agent вместо файлов ключей
+docker run --rm -it -v "$SSH_AUTH_SOCK:/ssh-agent" -e SSH_AUTH_SOCK=/ssh-agent \
+  ghcr.io/kirg0/d9c -H ssh://user@host
+```
+
+Конфиг (`d9c-config.yaml`) и плагины (`d9c-plugins.yaml`) лежат в томе `/config` —
+примонтируйте туда каталог, чтобы сохранённые хосты, тема и клавиши переживали перезапуск:
+`-v ~/.config/d9c:/config`. Локально образ собирается `make image`
+(`packaging/Dockerfile`).
+
+### Готовые бинарники
+
+Не нужны ни Go, ни компилятор. Скачайте архив под свою ОС со страницы
 [**Releases**](https://github.com/kirg0/d9c/releases/latest):
 
 | ОС | Файл |
@@ -99,6 +173,7 @@ Docker **по TCP или SSH**. Один бинарник, без агентов
 | macOS (Intel) | `d9c_vX.Y.Z_darwin_amd64.tar.gz` |
 | macOS (Apple Silicon) | `d9c_vX.Y.Z_darwin_arm64.tar.gz` |
 | Windows (x86-64) | `d9c_vX.Y.Z_windows_amd64.zip` |
+| Windows (ARM64) | `d9c_vX.Y.Z_windows_arm64.zip` |
 
 Внутри архива — один исполняемый файл (`d9c` или `d9c.exe`) плюс `README.md` и `LICENSE`.
 

@@ -92,7 +92,7 @@ func run() error {
 		fb.StatsJitter = true // live-looking CPU/MEM graphs in the stats view
 		backend = fb
 
-	case !hostConfigured(cfg.Host):
+	case !hostConfigured(cfg.Host, cfg.HostFlagSet):
 		// No host specified: don't connect at all. Open the hosts view so the
 		// user can pick or add one; connecting happens on :connect / Enter.
 		backend = docker.NewDisconnected(nil)
@@ -201,8 +201,14 @@ func rememberContextHost(store *hosts.Store, h hosts.Host) {
 
 // hostConfigured reports whether the user explicitly provided a Docker host
 // (via -H or DOCKER_HOST) rather than falling back to the default socket.
-func hostConfigured(host string) bool {
-	return host != "" && host != config.DefaultHost
+// explicit is true when -H was given on the command line: then even the
+// default socket counts (e.g. the container image run with a mounted
+// /var/run/docker.sock and -H unix:///var/run/docker.sock).
+func hostConfigured(host string, explicit bool) bool {
+	if host == "" {
+		return false
+	}
+	return explicit || host != config.DefaultHost
 }
 
 // rememberHost saves an explicitly provided host to the store for next time.

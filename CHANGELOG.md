@@ -6,6 +6,29 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.29.0] - 2026-09-29
+
+### Added
+
+- **Distribution channels.** Every release now also updates a Homebrew tap
+  (`brew install kirg0/tap/d9c`) and a Scoop bucket (`scoop bucket add kirg0
+  https://github.com/kirg0/scoop-bucket`, `scoop install d9c`) — the formula and manifest are
+  generated from the release `checksums.txt` by `cmd/distgen`, and the Scoop manifest carries an
+  `autoupdate` block.
+- **Container image** `ghcr.io/kirg0/d9c` (`linux/amd64` + `linux/arm64`; tags `latest`,
+  `X.Y.Z`, `X.Y`), built from `packaging/Dockerfile`: run it with a mounted `docker.sock` or your
+  `~/.ssh` / ssh-agent; config and plugins live in the `/config` volume. `make image` builds it
+  locally.
+- **`install.sh`** for Linux/macOS: detects OS/arch, downloads the release archive, verifies its
+  SHA-256 against `checksums.txt` and installs into `/usr/local/bin` (or `~/.local/bin`);
+  `D9C_VERSION` / `D9C_INSTALL_DIR` override the version and the target directory.
+- A `windows/arm64` archive is now part of every release.
+
+### Changed
+
+- An explicit `-H unix:///var/run/docker.sock` now connects on start instead of opening the Hosts
+  view (only the implicit default socket still does) — needed for the container image.
+
 ## [1.28.0] - 2026-09-29
 
 ### Added

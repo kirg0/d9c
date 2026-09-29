@@ -2,7 +2,7 @@ BINARY := d9c
 VERSION ?= dev
 LDFLAGS := -ldflags "-X main.version=$(VERSION) -s -w"
 
-.PHONY: build run demo test race cover fmt fmtcheck vet staticcheck lint check tidy clean tools
+.PHONY: build run demo test race cover fmt fmtcheck vet staticcheck lint check tidy clean tools image
 
 build:
 	go build $(LDFLAGS) -o $(BINARY) .
@@ -59,3 +59,8 @@ tools:
 
 clean:
 	rm -f $(BINARY)
+
+# Build the container image locally (release.yml publishes it multi-arch to
+# ghcr.io/kirg0/d9c).
+image:
+	docker build -f packaging/Dockerfile -t d9c .
