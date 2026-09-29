@@ -87,10 +87,85 @@ Built on [Bubble Tea](https://github.com/charmbracelet/bubbletea) and the offici
 
 ## Installation
 
-### Prebuilt binaries (recommended)
+Nothing needs to be installed on the remote host — d9c talks to the Docker daemon directly.
 
-No Go and no compiler required — nothing needs to be installed on the remote host either.
-Download the archive for your OS from the
+| Method | Platforms | Command |
+|--------|-----------|---------|
+| [Homebrew](#homebrew) | macOS, Linux | `brew install kirg0/tap/d9c` |
+| [Scoop](#scoop) | Windows | `scoop bucket add kirg0 https://github.com/kirg0/scoop-bucket` then `scoop install d9c` |
+| [Install script](#install-script) | Linux, macOS | `curl -fsSL https://raw.githubusercontent.com/kirg0/d9c/main/install.sh \| sh` |
+| [Docker image](#docker-image) | any with Docker | `docker run --rm -it ghcr.io/kirg0/d9c -H ssh://user@host` |
+| [`go install`](#go-install) | any with Go 1.25+ | `go install github.com/kirg0/d9c@latest` |
+| [Archive](#prebuilt-binaries) | Linux, macOS, Windows | download from [Releases](https://github.com/kirg0/d9c/releases/latest) |
+
+The tap, the bucket and the image are updated automatically on every release.
+
+### Homebrew
+
+```sh
+brew install kirg0/tap/d9c     # = brew tap kirg0/tap && brew install d9c
+brew upgrade d9c
+```
+
+The formula installs the prebuilt binary for your architecture (Intel / Apple Silicon, Linux
+x86-64 / ARM64), so no Go toolchain is pulled in.
+
+### Scoop
+
+```powershell
+scoop bucket add kirg0 https://github.com/kirg0/scoop-bucket
+scoop install d9c
+scoop update d9c
+```
+
+### Install script
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/kirg0/d9c/main/install.sh | sh
+```
+
+The script detects the OS (Linux / macOS) and the architecture (amd64 / arm64), downloads the
+matching archive from GitHub Releases, **verifies its SHA-256 against the release
+`checksums.txt`** (aborting on a mismatch) and installs `d9c` into `/usr/local/bin` (via `sudo`
+when that directory is not writable), or `~/.local/bin` when there is no `sudo`. Settings are
+environment variables:
+
+| Variable | Meaning |
+|----------|---------|
+| `D9C_VERSION` | release to install, e.g. `v1.29.0` (default — the latest) |
+| `D9C_INSTALL_DIR` | target directory instead of `/usr/local/bin` |
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/kirg0/d9c/main/install.sh | D9C_VERSION=v1.29.0 D9C_INSTALL_DIR=~/bin sh
+```
+
+### Docker image
+
+A multi-arch image (`linux/amd64`, `linux/arm64`) is published to
+[ghcr.io/kirg0/d9c](https://github.com/kirg0/d9c/pkgs/container/d9c) with the tags `latest`,
+`X.Y.Z` and `X.Y`. Run it interactively (`-it`), arguments go straight to `d9c`:
+
+```sh
+# local daemon through the mounted socket
+docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock \
+  ghcr.io/kirg0/d9c -H unix:///var/run/docker.sock
+
+# remote host over SSH with your keys (known_hosts is updated on the first connect)
+docker run --rm -it -v ~/.ssh:/root/.ssh ghcr.io/kirg0/d9c -H ssh://user@host
+
+# ...or with the ssh-agent instead of key files
+docker run --rm -it -v "$SSH_AUTH_SOCK:/ssh-agent" -e SSH_AUTH_SOCK=/ssh-agent \
+  ghcr.io/kirg0/d9c -H ssh://user@host
+```
+
+The config (`d9c-config.yaml`) and plugins (`d9c-plugins.yaml`) live in the `/config`
+volume — mount a directory there to keep saved hosts, theme and keys between runs:
+`-v ~/.config/d9c:/config`. `make image` builds the image locally
+(`packaging/Dockerfile`).
+
+### Prebuilt binaries
+
+No Go and no compiler required. Download the archive for your OS from the
 [**Releases**](https://github.com/kirg0/d9c/releases/latest) page:
 
 | OS | File |
@@ -100,6 +175,7 @@ Download the archive for your OS from the
 | macOS (Intel) | `d9c_vX.Y.Z_darwin_amd64.tar.gz` |
 | macOS (Apple Silicon) | `d9c_vX.Y.Z_darwin_arm64.tar.gz` |
 | Windows (x86-64) | `d9c_vX.Y.Z_windows_amd64.zip` |
+| Windows (ARM64) | `d9c_vX.Y.Z_windows_arm64.zip` |
 
 Inside the archive there is a single executable (`d9c` or `d9c.exe`) plus `README.md` and `LICENSE`.
 

@@ -1,6 +1,8 @@
 name: Release
 
-# Build cross-platform binaries and publish a GitHub Release.
+# Build cross-platform binaries and publish a GitHub Release, then update the
+# Homebrew tap / Scoop bucket (job `packages`) and push the multi-arch image to
+# ghcr.io (job `image`).
 #
 # Fires automatically when a SemVer tag (vX.Y.Z) is pushed. For a tag that
 # already exists on the remote (e.g. v1.1.0), trigger it by hand from the
@@ -48,7 +50,7 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           LDFLAGS="-s -w -X github.com/kirg0/d9c/internal/version.Version=${VERSION}"
-          targets="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64"
+          targets="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64"
           for t in $targets; do
             export GOOS="${t%/*}" GOARCH="${t#*/}"
             bin="d9c"
@@ -102,3 +104,134 @@ jobs:
           body_path: ${{ steps.notes.outputs.found == 'true' && 'notes.md' || '' }}
           generate_release_notes: ${{ steps.notes.outputs.found != 'true' }}
           files: dist/*
+
+      - name: Keep checksums for the packaging jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: dist/checksums.txt
+
+  # Homebrew tap + Scoop bucket. The generator and its templates come from the
+  # default branch, so re-releasing an old tag via workflow_dispatch works too.
+  # Pushing to the tap/bucket repos needs a token with contents:write on them
+  # (secret TAP_GITHUB_TOKEN); without it the files are only generated and
+  # attached as a workflow artifact. Repo names can be overridden with the
+  # HOMEBREW_TAP_REPO / SCOOP_BUCKET_REPO repository variables.
+  packages:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      TAP_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+      HOMEBREW_TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO || 'kirg0/homebrew-tap' }}
+      SCOOP_BUCKET_REPO: ${{ vars.SCOOP_BUCKET_REPO || 'kirg0/scoop-bucket' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: checksums
+          path: dist
+
+      - name: Generate formula and manifest
+        run: go run ./cmd/distgen -version "$TAG" -repo "$GITHUB_REPOSITORY" -checksums dist/checksums.txt -out pkg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-manifests
+          path: pkg/
+
+      - name: Publish to Homebrew tap and Scoop bucket
+        run: |
+          set -euo pipefail
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "::notice::TAP_GITHUB_TOKEN is not set — skipping the Homebrew tap / Scoop bucket update"
+            exit 0
+          fi
+          # publish REPO SRC DEST — commit SRC as DEST in REPO's default branch.
+          publish() {
+            dir="$(mktemp -d)"
+            git clone --depth 1 "https://x-access-token:${TAP_TOKEN}@github.com/$1.git" "$dir"
+            mkdir -p "$dir/$(dirname "$3")"
+            cp "$2" "$dir/$3"
+            git -C "$dir" add "$3"
+            if git -C "$dir" diff --cached --quiet; then
+              echo "$1: $3 already up to date"
+              return
+            fi
+            git -C "$dir" -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "d9c ${TAG}"
+            git -C "$dir" push
+          }
+          publish "$HOMEBREW_TAP_REPO" pkg/d9c.rb Formula/d9c.rb
+          publish "$SCOOP_BUCKET_REPO" pkg/d9c.json bucket/d9c.json
+
+  # Multi-arch image on ghcr.io. The Dockerfile is taken from the default
+  # branch (an old tag may predate it); the sources are the tag's.
+  image:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+
+      - name: Dockerfile from the default branch
+        id: src
+        run: |
+          set -euo pipefail
+          branch="${{ github.event.repository.default_branch }}"
+          git fetch --no-tags --depth=1 origin "$branch"
+          git show "origin/${branch}:packaging/Dockerfile" > "$RUNNER_TEMP/Dockerfile"
+          git show "origin/${branch}:.dockerignore" > .dockerignore
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.src.outputs.image }}
+          # "latest" only moves on a real tag push, not when an older tag is
+          # re-released by hand.
+          tags: |
+            type=semver,pattern={{version}},value=${{ env.TAG }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.TAG }}
+            type=raw,value=latest,enable=${{ github.event_name == 'push' }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ runner.temp }}/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: VERSION=${{ steps.src.outputs.version }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
