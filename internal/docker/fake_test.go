@@ -231,10 +231,13 @@ func TestFakeCopy(t *testing.T) {
 
 func TestFakeContainerLogs(t *testing.T) {
 	f := NewFakeBackend()
-	ch, stop, err := f.ContainerLogs("id", LogOptions{})
+	ch, stop, err := f.ContainerLogs(f.Containers[0].ID, LogOptions{})
 	lines := collect(t, ch, stop, err)
 	if len(lines) != len(f.LogLines) {
 		t.Errorf("logs = %d lines, want %d", len(lines), len(f.LogLines))
+	}
+	if _, _, err := f.ContainerLogs("missing", LogOptions{}); !IsNotFound(err) {
+		t.Errorf("logs of a missing container: err = %v, want not-found", err)
 	}
 }
 

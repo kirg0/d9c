@@ -389,6 +389,9 @@ func (f *FakeBackend) CopyToContainer(containerID, localPath, destDir string) er
 }
 
 func (f *FakeBackend) ContainerLogs(id string, opts LogOptions) (<-chan string, func(), error) {
+	if _, err := f.InspectContainer(id); err != nil {
+		return nil, nil, err // same "no such container" as the daemon
+	}
 	ch := make(chan string, len(f.LogLines))
 	for _, l := range f.LogLines {
 		ch <- l

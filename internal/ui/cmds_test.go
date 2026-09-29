@@ -86,7 +86,8 @@ func TestFetchInspectAllResources(t *testing.T) {
 			t.Errorf("%v: msg = %#v, want inspectResultMsg", c.res, msg)
 		}
 	}
-	if _, ok := fetchInspect(fb, ViewContainers, "ghost")().(errMsg); !ok {
-		t.Error("inspect of unknown id should yield errMsg")
+	// A vanished object is reported as "already gone", not as a raw error.
+	if msg, ok := fetchInspect(fb, ViewContainers, "ghost")().(actionResultMsg); !ok || len(msg.gone) != 1 {
+		t.Error("inspect of unknown id should yield a gone actionResultMsg")
 	}
 }

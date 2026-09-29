@@ -6,6 +6,23 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.30.0] - 2026-09-29
+
+### Added
+
+- **Readable "already removed" errors.** An action on a stale row — a container, image, network,
+  volume or compose project removed by another client before the next refresh — no longer shows
+  the daemon's raw `No such container: …`. The footer says
+  `container already removed — possibly by another user; table refreshed` and the section is
+  refreshed immediately. Bulk operations report `N done, M already gone` (vanished targets are not
+  counted as failures). Covers `stop/start/restart/kill/rm`, image `rm`/`tag`, network/volume `rm`,
+  compose lifecycle commands, details and logs; recognized via Docker `errdefs.IsNotFound` and
+  the CRI-O/nerdctl error texts.
+
+### Changed
+
+- A failed action on a single target shows its error as is, without the `1 of 1 failed:` prefix.
+
 ## [1.29.1] - 2026-09-29
 
 ### Fixed

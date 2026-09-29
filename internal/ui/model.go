@@ -244,7 +244,16 @@ type connectRequestMsg struct{ host hosts.Host }
 
 type inspectResultMsg struct{ result *docker.InspectResult }
 type switchResourceMsg struct{ resource ResourceView }
-type actionResultMsg struct{ err error }
+
+// actionResultMsg reports the outcome of a mutating action. Row actions
+// (bulkAction) also report the targets that were already gone — removed by
+// another client since the last refresh — separately from real failures: gone
+// lists their ids and total is the number of targets attempted.
+type actionResultMsg struct {
+	err   error
+	gone  []string
+	total int
+}
 
 // connectResultMsg carries the outcome of a live :connect to another host.
 type connectResultMsg struct {
@@ -1286,6 +1295,9 @@ func fetchInspect(b docker.Backend, resource ResourceView, id string) tea.Cmd {
 		default:
 			result, err = b.InspectContainer(id)
 		}
+		if docker.IsNotFound(err) {
+			return actionResultMsg{gone: []string{id}, total: 1}
+		}
 		if err != nil {
 			return errMsg{err}
 		}
@@ -1296,6 +1308,9 @@ func fetchInspect(b docker.Backend, resource ResourceView, id string) tea.Cmd {
 func openLogs(b docker.Backend, id string, opts docker.LogOptions) tea.Cmd {
 	return func() tea.Msg {
 		ch, stop, err := b.ContainerLogs(id, opts)
+		if docker.IsNotFound(err) {
+			return actionResultMsg{gone: []string{id}, total: 1}
+		}
 		if err != nil {
 			return errMsg{err}
 		}
@@ -1504,7 +1519,7 @@ func streamEvents(ch <-chan string) tea.Cmd {
 
 func containerAction(fn func() error) tea.Cmd {
 	return func() tea.Msg {
-		return actionResultMsg{fn()}
+		return actionResultMsg{err: fn()}
 	}
 }
 
