@@ -480,6 +480,10 @@ type Model struct {
 	// or the :alert command.
 	alerts alerts.Thresholds
 
+	// columnLayouts holds the per-section column projections from the
+	// "columns:" config section (nil = default layouts everywhere).
+	columnLayouts table.Layouts
+
 	// sortField/sortDesc order the containers view (NAME/STATUS/CPU/MEM). The
 	// sort spec is also pushed into the table model so refreshes keep the order.
 	sortField table.SortField

@@ -19,6 +19,7 @@ func Run(cfg *config.Config, backend docker.Backend, store *hosts.Store, set *se
 	m.SetPlugins(pluginSet)
 	m.SetKeymap(keys)
 	m.SetAlerts(alertThresholds)
+	m.SetColumnLayouts(set.Columns())
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	_, err := p.Run()
 	// Tunnels hold local listeners; release them explicitly on exit.

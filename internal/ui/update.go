@@ -1673,6 +1673,9 @@ func (m *Model) relayout() {
 // column set before any data arrives — otherwise a fast in-memory update (e.g.
 // hosts) can render rows before the first WindowSizeMsg and panic in renderRow.
 func (m *Model) applyColumns(w int) {
+	// The configured projection must be selected before the columns and
+	// colorizers (both are given in the default layout and projected by it).
+	m.table.SetLayout(m.columnLayouts.For(m.columnSection()))
 	// Colored columns (STATUS/HEALTH) are stored as plain text and colored
 	// after layout via these colorizers; views with no colored column pass nil.
 	switch m.resource {
@@ -1705,5 +1708,27 @@ func (m *Model) applyColumns(w int) {
 			m.table.SetColumns(uitbl.ContainerColumns(w))
 			m.table.SetColorizers(uitbl.ContainerColorizers())
 		}
+	}
+}
+
+// columnSection names the table layout shown for the active resource — the key
+// of its "columns:" config entry.
+func (m *Model) columnSection() uitbl.Section {
+	switch m.resource {
+	case ViewImages:
+		return uitbl.SectionImages
+	case ViewNetworks:
+		return uitbl.SectionNetworks
+	case ViewVolumes:
+		return uitbl.SectionVolumes
+	case ViewHosts:
+		return uitbl.SectionHosts
+	case ViewCompose:
+		return uitbl.SectionCompose
+	default:
+		if m.statsView {
+			return uitbl.SectionStats
+		}
+		return uitbl.SectionContainers
 	}
 }

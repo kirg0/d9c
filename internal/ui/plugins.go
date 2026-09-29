@@ -9,9 +9,11 @@ import (
 	"sync"
 
 	"github.com/kirg0/d9c/internal/alerts"
+	"github.com/kirg0/d9c/internal/i18n"
 	"github.com/kirg0/d9c/internal/keymap"
 	"github.com/kirg0/d9c/internal/plugins"
 	"github.com/kirg0/d9c/internal/settings"
+	uitbl "github.com/kirg0/d9c/internal/ui/table"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -40,6 +42,23 @@ func (m *Model) SetAlerts(t alerts.Thresholds) {
 	m.alerts = t
 	m.applyColumns(m.width)
 	m.refreshTableRows()
+}
+
+// SetColumnLayouts installs the column projections resolved from the
+// "columns:" config section and re-lays the current table out. Validation
+// warnings (unknown/duplicate column, restored identity column) are surfaced
+// once at startup in the notice modal unless another startup notice (e.g. a
+// connection problem) already claims it.
+func (m *Model) SetColumnLayouts(l uitbl.Layouts, warnings []string) {
+	m.columnLayouts = l
+	m.applyColumns(m.width)
+	m.refreshTableRows()
+	if len(warnings) > 0 && m.startupNotice == nil {
+		m.startupNotice = &openNoticeMsg{
+			title: i18n.T("Настройка колонок", "Column settings"),
+			body:  strings.Join(warnings, "\n"),
+		}
+	}
 }
 
 // refreshPluginCmds pushes the plugin names available in the current view into
