@@ -12,6 +12,7 @@
 #                    it is not writable — otherwise ~/.local/bin)
 #   D9C_BASE_URL     releases base URL (default: https://github.com/kirg0/d9c/releases)
 #   D9C_OS, D9C_ARCH override platform detection (linux|darwin, amd64|arm64)
+#   D9C_DOWNLOADER   force curl or wget (default: curl if installed)
 set -eu
 
 BASE_URL="${D9C_BASE_URL:-https://github.com/kirg0/d9c/releases}"
@@ -38,27 +39,47 @@ detect_arch() {
 	esac
 }
 
+# downloader — curl when available, else wget (GNU or BusyBox);
+# D9C_DOWNLOADER forces one of them.
+downloader() {
+	case "${D9C_DOWNLOADER:-}" in
+	curl | wget)
+		has "$D9C_DOWNLOADER" || die "D9C_DOWNLOADER=$D9C_DOWNLOADER, but it is not installed"
+		echo "$D9C_DOWNLOADER"
+		;;
+	"")
+		if has curl; then
+			echo curl
+		elif has wget; then
+			echo wget
+		else
+			die "need curl or wget"
+		fi
+		;;
+	*) die "D9C_DOWNLOADER must be curl or wget, got '$D9C_DOWNLOADER'" ;;
+	esac
+}
+
 # fetch URL FILE — download to a file.
 fetch() {
-	if has curl; then
+	if [ "$dl" = curl ]; then
 		curl -fsSL -o "$2" "$1"
-	elif has wget; then
-		wget -q -O "$2" "$1"
 	else
-		die "need curl or wget"
+		wget -q -O "$2" "$1"
 	fi
 }
 
 # latest_tag — resolve the newest release tag from the /latest redirect
 # (no GitHub API, so no rate limit).
 latest_tag() {
-	if has curl; then
+	if [ "$dl" = curl ]; then
 		url=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "$BASE_URL/latest")
-	elif has wget; then
-		url=$(wget -S --spider --max-redirect=0 "$BASE_URL/latest" 2>&1 |
-			sed -n 's/^ *[Ll]ocation: *//p' | tr -d '\r' | tail -n 1)
 	else
-		die "need curl or wget"
+		# BusyBox wget has no --max-redirect: follow the redirects and pick the
+		# Location that points at the release tag (GNU wget appends
+		# " [following]" to it, so keep only the URL).
+		url=$(wget -S --spider "$BASE_URL/latest" 2>&1 | tr -d '\r' |
+			sed -n 's/^ *[Ll]ocation: *\([^ ]*\).*/\1/p' | grep '/tag/' | tail -n 1 || true)
 	fi
 	tag="${url##*/}"
 	case "$tag" in
@@ -80,6 +101,7 @@ sha256_of() {
 }
 
 main() {
+	dl=$(downloader)
 	os=$(detect_os)
 	arch=$(detect_arch)
 	tag="${D9C_VERSION:-}"
