@@ -599,6 +599,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, clearCopyNotifCmd()
 
 	case actionResultMsg:
+		if len(msg.gone) > 0 {
+			return m.handleGoneTargets(msg)
+		}
 		if msg.err != nil {
 			// A failed create lands inside the still-open modal form, so the user
 			// can correct the input; other errors go to the footer.
@@ -726,6 +729,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// handleGoneTargets reports an action whose targets (some or all) had already
+// been removed by another client: a readable notice instead of the daemon's raw
+// "No such …" text, plus an immediate refresh so the stale rows disappear
+// without waiting for the next tick. Vanished ids leave the bulk selection; a
+// run without real failures consumes the whole selection like a success.
+func (m Model) handleGoneTargets(msg actionResultMsg) (tea.Model, tea.Cmd) {
+	m.err = goneNotice(m.resource, msg.total, len(msg.gone), msg.err)
+	m.mode = ModeNormal
+	if msg.err == nil {
+		m.selected = nil
+	} else {
+		for _, id := range msg.gone {
+			delete(m.selected, id)
+		}
+	}
+	return m, m.fetchCurrentResource()
 }
 
 // fetchCurrentResource returns a Cmd that refreshes data for the active view.

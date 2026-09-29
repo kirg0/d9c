@@ -273,10 +273,10 @@ func (m *Model) dispatchCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 			return bulkAction(refs, func(ref string) error { return m.backend.RemoveImage(ref, force) }), nil
 		case ViewNetworks:
 			id := m.selectedID()
-			return containerAction(func() error { return m.backend.RemoveNetwork(id) }), nil
+			return bulkAction([]string{id}, m.backend.RemoveNetwork), nil
 		case ViewVolumes:
 			id := m.selectedID()
-			return containerAction(func() error { return m.backend.RemoveVolume(id) }), nil
+			return bulkAction([]string{id}, m.backend.RemoveVolume), nil
 		default:
 			ids := m.targetContainerIDs()
 			if len(ids) == 0 {
@@ -466,17 +466,17 @@ func (m *Model) dispatchComposeCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error)
 	label := m.composeNameFor(project) // short name for op titles
 	switch cmd.Name {
 	case "start":
-		return containerAction(func() error { return m.backend.ComposeStart(project) }), nil
+		return bulkAction([]string{project}, m.backend.ComposeStart), nil
 	case "stop":
-		return containerAction(func() error { return m.backend.ComposeStop(project) }), nil
+		return bulkAction([]string{project}, m.backend.ComposeStop), nil
 	case "restart":
-		return containerAction(func() error { return m.backend.ComposeRestart(project) }), nil
+		return bulkAction([]string{project}, m.backend.ComposeRestart), nil
 	case "pause":
-		return containerAction(func() error { return m.backend.ComposePause(project) }), nil
+		return bulkAction([]string{project}, m.backend.ComposePause), nil
 	case "unpause":
-		return containerAction(func() error { return m.backend.ComposeUnpause(project) }), nil
+		return bulkAction([]string{project}, m.backend.ComposeUnpause), nil
 	case "remove", "rm":
-		return containerAction(func() error { return m.backend.ComposeRemove(project) }), nil
+		return bulkAction([]string{project}, m.backend.ComposeRemove), nil
 	case "up":
 		return streamOpCmd(func() (<-chan string, func(), error) { return m.backend.ComposeUp(project) }, "compose up: "+label), nil
 	case "pull":
@@ -534,7 +534,7 @@ func (m *Model) dispatchImageCommand(cmd *cmdline.CommandMsg) (bool, tea.Cmd, er
 			return true, nil, fmt.Errorf("no image selected")
 		}
 		target := cmd.Args[0]
-		return true, containerAction(func() error { return m.backend.TagImage(ref, target) }), nil
+		return true, bulkAction([]string{ref}, func(ref string) error { return m.backend.TagImage(ref, target) }), nil
 
 	case "push":
 		ref := m.selectedImageRef()
@@ -631,24 +631,75 @@ func (m Model) targetContainerIDs() []string {
 }
 
 // bulkAction applies fn to every id, aggregating the outcome into a single
-// actionResultMsg. On any failure it reports how many of how many failed,
-// wrapping the first error.
+// actionResultMsg. Targets that no longer exist (docker.IsNotFound — removed by
+// another client since the last refresh) are collected in gone rather than
+// counted as failures; on a real failure it reports how many of how many
+// failed, wrapping the first error (a single target reports its error as is).
 func bulkAction(ids []string, fn func(id string) error) tea.Cmd {
 	return func() tea.Msg {
 		var failed int
 		var firstErr error
+		var gone []string
 		for _, id := range ids {
-			if err := fn(id); err != nil {
+			err := fn(id)
+			switch {
+			case err == nil:
+			case docker.IsNotFound(err):
+				gone = append(gone, id)
+			default:
 				failed++
 				if firstErr == nil {
 					firstErr = err
 				}
 			}
 		}
-		if failed > 0 {
-			return actionResultMsg{fmt.Errorf("%d of %d failed: %w", failed, len(ids), firstErr)}
+		res := actionResultMsg{gone: gone, total: len(ids)}
+		switch {
+		case failed == 0:
+		case len(ids) == 1:
+			res.err = firstErr // "1 of 1 failed" would only add noise
+		default:
+			res.err = fmt.Errorf("%d of %d failed: %w", failed, len(ids), firstErr)
 		}
-		return actionResultMsg{}
+		return res
+	}
+}
+
+// goneNotice renders the footer text for an action whose targets (some or all)
+// were already removed by another client. A single vanished object gets a
+// resource-specific sentence; a bulk run gets an "N done, M already gone"
+// summary, with any real failure (failErr) put first.
+func goneNotice(resource ResourceView, total, gone int, failErr error) string {
+	refreshed := i18n.T("таблица обновлена", "table refreshed")
+	if total <= 1 && failErr == nil {
+		return goneSubject(resource) + " — " + i18n.T("возможно, другим пользователем", "possibly by another user") + "; " + refreshed
+	}
+	var b strings.Builder
+	if failErr != nil {
+		// The failure text already carries the "N of M failed" counts.
+		b.WriteString(failErr.Error())
+		b.WriteString("; ")
+	} else {
+		fmt.Fprintf(&b, i18n.T("%d выполнено, ", "%d done, "), total-gone)
+	}
+	fmt.Fprintf(&b, i18n.T("%d уже отсутствуют (возможно, удалены другим пользователем); ", "%d already gone (possibly removed by another user); "), gone)
+	b.WriteString(refreshed)
+	return b.String()
+}
+
+// goneSubject is the "<object> already removed" phrase for a resource section.
+func goneSubject(resource ResourceView) string {
+	switch resource {
+	case ViewImages:
+		return i18n.T("образ уже удалён", "image already removed")
+	case ViewNetworks:
+		return i18n.T("сеть уже удалена", "network already removed")
+	case ViewVolumes:
+		return i18n.T("том уже удалён", "volume already removed")
+	case ViewCompose:
+		return i18n.T("compose-проект уже удалён", "compose project already removed")
+	default:
+		return i18n.T("контейнер уже удалён", "container already removed")
 	}
 }
 
