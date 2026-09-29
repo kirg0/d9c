@@ -6,6 +6,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.29.1] - 2026-09-29
+
+### Fixed
+
+- `install.sh` failed to resolve the latest release with wget: BusyBox wget (Alpine) has no
+  `--max-redirect`, and GNU wget appends ` [following]` to the redirect location. The wget path
+  now works on both; `D9C_DOWNLOADER=curl|wget` forces a downloader.
+
 ## [1.29.0] - 2026-09-29
 
 ### Added

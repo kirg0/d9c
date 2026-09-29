@@ -132,6 +132,7 @@ curl -fsSL https://raw.githubusercontent.com/kirg0/d9c/main/install.sh | sh
 |------------|----------|
 | `D9C_VERSION` | какой релиз ставить, например `v1.29.0` (по умолчанию — последний) |
 | `D9C_INSTALL_DIR` | каталог установки вместо `/usr/local/bin` |
+| `D9C_DOWNLOADER` | `curl` или `wget` (по умолчанию — curl, если есть; BusyBox wget тоже подходит) |
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/kirg0/d9c/main/install.sh | D9C_VERSION=v1.29.0 D9C_INSTALL_DIR=~/bin sh

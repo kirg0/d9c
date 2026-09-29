@@ -81,7 +81,13 @@ func (f *fakeRelease) handler() http.Handler {
 // POSIX tools the script needs are missing (e.g. a bare Windows box).
 func runInstaller(t *testing.T, env ...string) (string, error) {
 	t.Helper()
-	for _, tool := range []string{"sh", "tar", "curl", "awk"} {
+	dl := "curl"
+	for _, e := range env {
+		if e == "D9C_DOWNLOADER=wget" {
+			dl = "wget"
+		}
+	}
+	for _, tool := range []string{"sh", "tar", "awk", dl} {
 		if _, err := exec.LookPath(tool); err != nil {
 			t.Skipf("%s not on PATH", tool)
 		}
@@ -104,6 +110,9 @@ func TestInstallScript(t *testing.T) {
 	}{
 		{name: "latest release", env: []string{"D9C_ARCH=x86_64"}},
 		{name: "explicit version without v", env: []string{"D9C_VERSION=9.9.9", "D9C_ARCH=amd64"}},
+		// The wget path must resolve /latest without --max-redirect (BusyBox).
+		{name: "latest release via wget", env: []string{"D9C_DOWNLOADER=wget", "D9C_ARCH=amd64"}},
+		{name: "unknown downloader", env: []string{"D9C_DOWNLOADER=aria2c", "D9C_ARCH=amd64"}, wantErr: "must be curl or wget"},
 		{name: "unsupported arch", env: []string{"D9C_ARCH=mips"}, wantErr: "unsupported architecture"},
 		{name: "unsupported os", env: []string{"D9C_OS=Plan9", "D9C_ARCH=amd64"}, wantErr: "unsupported OS"},
 		{name: "asset not released", env: []string{"D9C_ARCH=arm64"}, wantErr: "download failed"},

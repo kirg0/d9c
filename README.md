@@ -134,6 +134,7 @@ environment variables:
 |----------|---------|
 | `D9C_VERSION` | release to install, e.g. `v1.29.0` (default — the latest) |
 | `D9C_INSTALL_DIR` | target directory instead of `/usr/local/bin` |
+| `D9C_DOWNLOADER` | `curl` or `wget` (default — curl if installed; BusyBox wget works too) |
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/kirg0/d9c/main/install.sh | D9C_VERSION=v1.29.0 D9C_INSTALL_DIR=~/bin sh
