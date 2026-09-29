@@ -390,7 +390,8 @@ func firstNonEmpty(a, b string) string {
 	return b
 }
 
-// dispatchHostCommand handles the hosts view command set: connect/add/edit/rm.
+// dispatchHostCommand handles the hosts view command set: connect/add/edit/rm
+// and import (Docker CLI contexts).
 func (m *Model) dispatchHostCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 	switch cmd.Name {
 	case "connect":
@@ -429,6 +430,9 @@ func (m *Model) dispatchHostCommand(cmd *cmdline.CommandMsg) (tea.Cmd, error) {
 			return nil, err
 		}
 		return m.saveHostsThenRefresh()
+
+	case "import":
+		return m.dispatchImportCommand(cmd.Args)
 
 	default:
 		return nil, fmt.Errorf("unknown hosts command: %s", cmd.Name)

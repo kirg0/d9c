@@ -6,6 +6,7 @@ import (
 
 	"github.com/kirg0/d9c/internal/config"
 	"github.com/kirg0/d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/dockerctx"
 	"github.com/kirg0/d9c/internal/hosts"
 	"github.com/kirg0/d9c/internal/i18n"
 	"github.com/kirg0/d9c/internal/plugins"
@@ -74,6 +75,14 @@ func run() error {
 		return fmt.Errorf("loading alerts: %w", err)
 	}
 
+	ctxHost, err := applyDockerContext(cfg, dockerctx.Dir(), os.Getenv)
+	if err != nil {
+		return err
+	}
+	if ctxHost == nil && !cfg.Demo {
+		applySavedHostTLS(cfg, store)
+	}
+
 	var backend docker.Backend
 	var connectErr error
 	var startInHosts bool
@@ -100,7 +109,11 @@ func run() error {
 		} else {
 			backend = b
 		}
-		rememberHost(store, cfg.Host)
+		if ctxHost != nil {
+			rememberContextHost(store, *ctxHost)
+		} else {
+			rememberHost(store, cfg.Host)
+		}
 	}
 	defer backend.Close()
 
@@ -134,6 +147,56 @@ func migrateLegacyHosts(set *settings.Store, cfg *config.Config) error {
 		fmt.Fprintf(os.Stderr, "warning: migrated hosts into %s but could not rename %s: %v\n", set.Path(), legacyPath, err)
 	}
 	return nil
+}
+
+// applyDockerContext resolves the Docker CLI context to start with (-context,
+// else DOCKER_CONTEXT unless -H/DOCKER_HOST is set) and points cfg at its
+// endpoint and TLS files. It returns the context as a saved-host entry to
+// remember, or nil when no context applies. Demo mode ignores contexts.
+func applyDockerContext(cfg *config.Config, dir string, getenv func(string) string) (*hosts.Host, error) {
+	if cfg.Demo {
+		return nil, nil
+	}
+	name, err := dockerctx.Select(cfg.Context, cfg.HostFlagSet, getenv)
+	if err != nil || name == "" {
+		return nil, err
+	}
+	c, err := dockerctx.Find(dir, name)
+	if err != nil {
+		return nil, err
+	}
+	cfg.Context = c.Name
+	cfg.Host = c.Host
+	if c.HasTLS() {
+		cfg.TLSCACert, cfg.TLSCert, cfg.TLSKey = c.TLSCACert, c.TLSCert, c.TLSKey
+	}
+	if c.SkipTLSVerify {
+		fmt.Fprintf(os.Stderr, "warning: docker context %q sets SkipTLSVerify, which d9c does not support; the server certificate will be verified\n", c.Name)
+	}
+	h := c.SavedHost()
+	return &h, nil
+}
+
+// applySavedHostTLS reuses the TLS files of the saved host matching cfg.Host
+// (e.g. an imported context started with -H) when no -tls* flags were given.
+func applySavedHostTLS(cfg *config.Config, store *hosts.Store) {
+	if cfg.TLSCACert != "" || cfg.TLSCert != "" || cfg.TLSKey != "" {
+		return
+	}
+	if h, ok := store.FindByURL(cfg.Host); ok && h.HasTLS() {
+		cfg.TLSCACert, cfg.TLSCert, cfg.TLSKey = h.TLSCACert, h.TLSCert, h.TLSKey
+	}
+}
+
+// rememberContextHost saves the host of the startup Docker context under the
+// context's name (unless a host with that URL is already saved).
+func rememberContextHost(store *hosts.Store, h hosts.Host) {
+	if res, _ := store.Import(h); res != hosts.Imported {
+		return
+	}
+	if err := store.Save(); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not save host: %v\n", err)
+	}
 }
 
 // hostConfigured reports whether the user explicitly provided a Docker host

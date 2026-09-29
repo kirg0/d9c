@@ -183,6 +183,7 @@ func (m Model) allResourceKeyRows() []helpRow {
 			{"a", i18n.T("Добавить хост (форма)", "Add a host (form)")},
 			{"e", i18n.T("Редактировать выбранный хост (форма)", "Edit the selected host (form)")},
 			{"d", i18n.T("Удалить выбранный хост (с подтверждением)", "Delete the selected host (with confirmation)")},
+			{":import contexts [name…]", i18n.T("Импорт Docker contexts (~/.docker/contexts; без имён — пикер)", "Import Docker contexts (~/.docker/contexts; no names = picker)")},
 			{"—", i18n.T("STATUS + агрегат docker info (контейнеры/образы/версия) по каждому хосту", "STATUS + docker info summary (containers/images/version) per host")},
 		}
 	case ViewImages:

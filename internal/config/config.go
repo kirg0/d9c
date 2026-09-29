@@ -29,6 +29,13 @@ type Config struct {
 	// ReadOnly forbids every mutating action (stop/rm/prune/run/exec/…) for the
 	// whole session, regardless of the config file and per-host settings.
 	ReadOnly bool
+	// Context names the Docker CLI context to start with (-context). Empty
+	// means none; DOCKER_CONTEXT is resolved later, honoring DOCKER_HOST.
+	Context string
+	// HostFlagSet records whether -H was given explicitly on the command line
+	// (as opposed to the DOCKER_HOST / default fallback), so -H and -context
+	// can be reported as conflicting like the Docker CLI does.
+	HostFlagSet bool
 }
 
 func Load() *Config {
@@ -48,7 +55,13 @@ func Load() *Config {
 	flag.StringVar(&cfg.ConfigFile, "config", "", "Path to the unified config file (theme/colors/keys/alerts/hosts; default: next to the binary)")
 	flag.DurationVar(&cfg.RefreshInterval, "interval", DefaultRefreshInterval, "Auto-refresh interval (e.g. 1s, 5s); toggle pause at runtime with 'p'")
 	flag.BoolVar(&cfg.ReadOnly, "read-only", false, "Read-only mode: forbid every mutating action (stop/kill/rm/prune/run/exec/cp/compose/build/push/create)")
+	flag.StringVar(&cfg.Context, "context", "", "Docker CLI context to connect with (from ~/.docker/contexts; overrides DOCKER_HOST and DOCKER_CONTEXT)")
 	flag.Parse()
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "H" {
+			cfg.HostFlagSet = true
+		}
+	})
 
 	return cfg
 }

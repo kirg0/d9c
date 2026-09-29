@@ -14,6 +14,7 @@ import (
 	"github.com/kirg0/d9c/internal/alerts"
 	"github.com/kirg0/d9c/internal/config"
 	"github.com/kirg0/d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/dockerctx"
 	"github.com/kirg0/d9c/internal/hosts"
 	"github.com/kirg0/d9c/internal/i18n"
 	"github.com/kirg0/d9c/internal/keymap"
@@ -109,6 +110,7 @@ const (
 	ModeConnecting           // connection-progress window for hosts without a credential prompt
 	ModePortForwardForm      // port-forward modal form ('F' in containers/compose)
 	ModePortForwards         // tunnel list overlay (`:portforward`)
+	ModeContextPicker        // Docker context import picker (`:import contexts` in hosts)
 )
 
 // copyItem is one selectable entry in the copy overlay.
@@ -637,6 +639,17 @@ type Model struct {
 	nsNames  []string
 	nsCursor int
 
+	// Docker context import picker (ModeContextPicker) state: the contexts read
+	// from dockerCfgDir, their checked flags and the cursor.
+	ctxItems     []dockerctx.Context
+	ctxChecked   []bool
+	ctxCursor    int
+	dockerCfgDir string
+
+	// baseTLS is the session-wide TLS from the -tls* flags; hosts carrying their
+	// own TLS files (imported contexts) override it per connection.
+	baseTLS tlsFiles
+
 	// Generic confirmation overlay (ModeConfirm) state.
 	confirmPrompt string
 	confirmAction tea.Cmd
@@ -716,6 +729,8 @@ func NewModel(cfg *config.Config, backend docker.Backend, store *hosts.Store, co
 		summaries:       map[string]docker.HostSummary{},
 		refreshInterval: clampInterval(interval),
 		roGlobal:        cfg.ReadOnly,
+		dockerCfgDir:    dockerctx.Dir(),
+		baseTLS:         baselineTLS(cfg, store),
 	}
 	m.syncReadOnly()
 	// Saved-host summaries dial real TCP/SSH connections; demo mode (which also
@@ -727,8 +742,13 @@ func NewModel(cfg *config.Config, backend docker.Backend, store *hosts.Store, co
 			return s
 		}
 	} else {
+		base := m.baseTLS
 		m.summarizeHost = func(h string) docker.HostSummary {
-			return docker.ProbeHostSummary(cfg, h, hostSummaryTimeout)
+			c := *cfg
+			if saved, ok := store.FindByURL(h); ok {
+				setCfgTLS(&c, hostTLS(saved, base))
+			}
+			return docker.ProbeHostSummary(&c, h, hostSummaryTimeout)
 		}
 	}
 	m.pf.SetDialer(forwardDialer(backend))
@@ -1171,6 +1191,7 @@ func connectCmd(base *config.Config, hostURL string) tea.Cmd {
 // dial is in flight. The chosen auth fields are written onto m.cfg so a later
 // auto-reconnect reuses them.
 func (m Model) beginConnect(h hosts.Host) (tea.Model, tea.Cmd) {
+	setCfgTLS(m.cfg, hostTLS(h, m.baseTLS))
 	if hosts.IsSSH(h.Host) && h.SSHAuth == hosts.SSHAuthPassword {
 		m.connForm.Open(h.Name, h.Host, hosts.SSHUser(h.Host))
 		m.mode = ModeConnectAuth

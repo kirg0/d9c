@@ -179,6 +179,7 @@ and printed by the `-version` flag.
 go run . -demo                 # demo data, no Docker
 go run . -H tcp://host:2375    # remote daemon over TCP
 go run . -H ssh://user@host    # remote daemon over an SSH tunnel
+go run . -context prod         # endpoint of a Docker CLI context
 go run . -version              # print the version and exit
 ```
 
@@ -211,6 +212,26 @@ or add a new one — the connection happens via `Enter` / `:connect`.
 > directory (view and delete archives only — restore requires SSH) and project container
 > management: `start` / `stop` / `restart` / `pause` / `unpause` / `remove`. Need the
 > full Compose set — connect via `-H ssh://...`.
+
+### Docker contexts
+
+d9c reads the Docker CLI context store (`~/.docker/contexts`, or `$DOCKER_CONFIG/contexts`):
+
+- **`-context <name>`** starts straight on that context's endpoint (`tcp://`, `ssh://`,
+  `unix://`, `npipe://`) and remembers it in Hosts under the context name. Precedence follows the
+  Docker CLI: `-context` wins over `DOCKER_HOST`/`DOCKER_CONTEXT`, but combining it with `-H` is an
+  error; without `-context`, an explicit `-H` or `DOCKER_HOST` disables contexts, otherwise
+  `DOCKER_CONTEXT` names one. `default` means "no context". The `currentContext` from
+  `~/.docker/config.json` is **not** applied automatically — a bare launch still opens Hosts.
+- **`:import contexts`** in the Hosts section opens a picker (`space` — check, `a` — all,
+  `Enter` — import the checked ones or the highlighted one); `:import contexts <name>...` imports
+  by name without the picker. The current context and ones whose URL is already saved are marked;
+  already-saved URLs are skipped, and a name clash gets a suffix (`prod-2`).
+- **TLS contexts are supported:** `ca.pem` / `cert.pem` / `key.pem` from the context are stored
+  per host (`tls_ca_cert` / `tls_cert` / `tls_key`) and used for that host only — including
+  the dashboard probe and auto-reconnect; a CA alone (without a client certificate) is enough.
+  `SkipTLSVerify` is **not** supported: such contexts are imported, but the server certificate
+  is still verified (the footer says so).
 
 ### containerd
 
@@ -357,7 +378,8 @@ The **Hosts** section is both the list of saved hosts and a multi-host dashboard
 with status (● up/down) and an aggregate from `docker info` (containers/running/images/daemon version).
 Data is collected over a single connection per host, refreshed roughly every 10 seconds. `Enter` — connect
 to the selected host. Management right from the section: `a` — add, `e` — edit, `d` — delete
-(with confirmation); the same actions are available via the `:add` / `:edit` / `:rm` commands. The
+(with confirmation); the same actions are available via the `:add` / `:edit` / `:rm` commands, and
+`:import contexts` adds hosts from Docker contexts (see [Docker contexts](#docker-contexts)). The
 `:dashboard` / `:dash` commands are aliases for `:hosts`. The host list is stored in the shared
 `d9c-config.yaml` (the `hosts:` section, see [Config, themes and keys](#config-themes-and-keys)).
 
@@ -434,6 +456,11 @@ hosts:                    # saved hosts (Hosts section; usually edited from the 
     ssh_auth: password     # prompts for the password on connect; never stored
   - name: local
     host: tcp://localhost:2375
+  - name: secure           # e.g. imported from a TLS Docker context
+    host: tcp://secure.example.com:2376
+    tls_ca_cert: ~/.docker/contexts/tls/<id>/docker/ca.pem   # optional, tcp:// only
+    tls_cert: ~/.docker/contexts/tls/<id>/docker/cert.pem
+    tls_key: ~/.docker/contexts/tls/<id>/docker/key.pem
 ```
 
 Built-in themes: `tokyonight`, `dracula`, `nord`, `gruvbox`, `solarized`,

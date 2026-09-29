@@ -252,3 +252,93 @@ func TestEditHostKeepsReadOnly(t *testing.T) {
 		t.Error("Edit dropped read_only")
 	}
 }
+
+func TestHostTLSNormalization(t *testing.T) {
+	tls := Host{TLSCACert: "ca", TLSCert: "cert", TLSKey: "key"}
+	if !tls.HasTLS() || (Host{}).HasTLS() {
+		t.Fatal("HasTLS mismatch")
+	}
+	tests := []struct {
+		url     string
+		keepTLS bool
+	}{
+		{"tcp://prod:2376", true},
+		{"ssh://ops@prod", false},
+		{"unix:///var/run/docker.sock", false},
+		{"npipe:////./pipe/docker_engine", false},
+	}
+	for _, tt := range tests {
+		h := tls
+		h.Name, h.Host = "x", tt.url
+		if got := h.normalized().HasTLS(); got != tt.keepTLS {
+			t.Errorf("normalized(%s).HasTLS = %v, want %v", tt.url, got, tt.keepTLS)
+		}
+	}
+}
+
+// TLS files are not exposed by the host form, so a UI edit keeps them — but
+// only while the host stays tcp://.
+func TestEditHostKeepsTLS(t *testing.T) {
+	s := NewStore([]Host{{Name: "prod", Host: "tcp://prod:2376", TLSCACert: "ca", TLSCert: "cert", TLSKey: "key"}}, nil)
+	if err := s.EditHost("prod", Host{Name: "prod", Host: "tcp://prod2:2376"}); err != nil {
+		t.Fatal(err)
+	}
+	if h, _ := s.Find("prod"); h.TLSCACert != "ca" || h.TLSCert != "cert" || h.TLSKey != "key" {
+		t.Errorf("EditHost dropped TLS: %+v", h)
+	}
+	// Explicit TLS in the edit wins over the stored one.
+	if err := s.EditHost("prod", Host{Name: "prod", Host: "tcp://prod2:2376", TLSCACert: "ca2"}); err != nil {
+		t.Fatal(err)
+	}
+	if h, _ := s.Find("prod"); h.TLSCACert != "ca2" || h.TLSCert != "" {
+		t.Errorf("explicit TLS not applied: %+v", h)
+	}
+	if err := s.EditHost("prod", Host{Name: "prod", Host: "ssh://ops@prod"}); err != nil {
+		t.Fatal(err)
+	}
+	if h, _ := s.Find("prod"); h.HasTLS() {
+		t.Errorf("TLS must be dropped for ssh://: %+v", h)
+	}
+}
+
+func TestFindByURL(t *testing.T) {
+	s := NewStore([]Host{{Name: "a", Host: "tcp://a:2375"}, {Name: "b", Host: "tcp://a:2375"}}, nil)
+	if h, ok := s.FindByURL("tcp://a:2375"); !ok || h.Name != "a" {
+		t.Errorf("FindByURL = %+v, %v; want the first match", h, ok)
+	}
+	if _, ok := s.FindByURL("tcp://none"); ok {
+		t.Error("unknown URL found")
+	}
+	var nilStore *Store
+	if _, ok := nilStore.FindByURL("tcp://a:2375"); ok {
+		t.Error("nil store found a host")
+	}
+}
+
+func TestImport(t *testing.T) {
+	s := NewStore([]Host{{Name: "prod", Host: "tcp://old:2375"}, {Name: "lab", Host: "ssh://ops@lab"}}, nil)
+	tests := []struct {
+		name     string
+		in       Host
+		wantRes  ImportResult
+		wantName string
+	}{
+		{"new", Host{Name: " dev ", Host: "tcp://dev:2376", TLSCACert: "ca"}, Imported, "dev"},
+		{"name clash", Host{Name: "prod", Host: "tcp://prod:2376"}, Imported, "prod-2"},
+		{"same URL", Host{Name: "other", Host: "ssh://ops@lab"}, ImportSkipped, "lab"},
+		{"empty name", Host{Host: "tcp://x"}, ImportInvalid, ""},
+		{"empty url", Host{Name: "x"}, ImportInvalid, ""},
+	}
+	for _, tt := range tests {
+		res, name := s.Import(tt.in)
+		if res != tt.wantRes || name != tt.wantName {
+			t.Errorf("%s: Import = %v, %q; want %v, %q", tt.name, res, name, tt.wantRes, tt.wantName)
+		}
+	}
+	if len(s.Hosts) != 4 {
+		t.Fatalf("hosts = %+v, want 4", s.Hosts)
+	}
+	if h, _ := s.Find("dev"); h.TLSCACert != "ca" {
+		t.Errorf("imported TLS lost: %+v", h)
+	}
+}
