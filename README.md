@@ -503,8 +503,11 @@ A regex error is highlighted right in the filter line.
 ## Config, themes and keys
 
 **All application settings** — theme, color overrides, hotkeys, alert thresholds
-and the **list of saved hosts** — live in a single YAML file. By default d9c looks for
-**`d9c-config.yaml` next to the executable**; a different path can be set with a flag:
+and the **list of saved hosts** — live in a single YAML file. By default it is
+**`~/.d9c/d9c-config.yaml`** (`%USERPROFILE%` on Windows), so it survives
+`brew upgrade` / `scoop update`; the directory is created on first save. A config left next to
+the executable by versions before 1.31 is copied there once on startup. A different path can be
+set with a flag:
 
 ```sh
 d9c -config /path/to/d9c-config.yaml
@@ -800,7 +803,7 @@ d9c runs) with substitution of the selected row's data. This lets you wire in `d
 
 ### Where the file lives
 
-By default d9c looks for the file **`d9c-plugins.yaml` next to the executable**.
+By default d9c looks for the file **`~/.d9c/d9c-plugins.yaml`** (`%USERPROFILE%` on Windows).
 A different path can be set with a flag:
 
 ```sh

@@ -6,6 +6,17 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.31.0] - 2026-10-01
+
+### Changed
+
+- **Config files moved to the per-user directory.** `d9c-config.yaml` and `d9c-plugins.yaml` now
+  live in `~/.d9c/` (`%USERPROFILE%\.d9c\` on Windows) instead of next to the binary, so they
+  survive package-manager upgrades (Scoop and Homebrew keep each version in its own directory)
+  and work with read-only install locations. The directory is created on first save. Files left
+  next to the binary by older versions are copied over once on startup (the originals are left in
+  place); `-config` / `-plugins-file` still override the location.
+
 ## [1.30.0] - 2026-09-29
 
 ### Added

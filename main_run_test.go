@@ -138,6 +138,38 @@ func TestMigrateLegacyHosts(t *testing.T) {
 	}
 }
 
+func TestMigrateLegacyFile(t *testing.T) {
+	dir := t.TempDir()
+	legacy := filepath.Join(dir, "bin", "d9c-config.yaml")
+	dst := filepath.Join(dir, "home", ".d9c", "d9c-config.yaml")
+	if err := os.MkdirAll(filepath.Dir(legacy), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacy, []byte("theme: nord\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name, dst, want string
+	}{
+		{"copies once", dst, "copied"},
+		{"already migrated: silent", dst, ""},
+		{"failure is a warning", filepath.Join(legacy, "x.yaml"), "warning:"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var out strings.Builder
+			migrateLegacyFile(tt.dst, legacy, &out)
+			if got := out.String(); (tt.want == "") != (got == "") || !strings.Contains(got, tt.want) {
+				t.Errorf("output = %q, want containing %q", got, tt.want)
+			}
+		})
+	}
+	if data, err := os.ReadFile(dst); err != nil || string(data) != "theme: nord\n" {
+		t.Errorf("dst = %q / %v", data, err)
+	}
+}
+
 func TestRememberHost(t *testing.T) {
 	var saved [][]hosts.Host
 	store := hosts.NewStore(nil, func(list []hosts.Host) error {

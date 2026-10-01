@@ -504,7 +504,7 @@ type Model struct {
 	// toggle). Only used in the containers view; empty means "act on the cursor".
 	selected map[string]bool
 
-	// Saved-hosts store (persisted next to the binary)
+	// Saved-hosts store (persisted in the unified config, ~/.d9c by default)
 	hostStore *hosts.Store
 
 	// settings is the unified config store; used to persist runtime changes such

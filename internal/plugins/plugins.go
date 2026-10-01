@@ -31,10 +31,11 @@ package plugins
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/kirg0/d9c/internal/appdir"
 )
 
 // Plugin is a single user-defined action.
@@ -68,15 +69,13 @@ var validScopes = map[string]bool{
 	"networks": true, "volumes": true, "compose": true, "hosts": true,
 }
 
-// DefaultPath returns the plugins file location next to the running binary,
-// falling back to the current directory if the executable path is unavailable.
+// FileName is the base name of the plugins file.
+const FileName = "d9c-plugins.yaml"
+
+// DefaultPath returns the default plugins file location in the per-user d9c
+// directory (~/.d9c/d9c-plugins.yaml).
 func DefaultPath() string {
-	const name = "d9c-plugins.yaml"
-	exe, err := os.Executable()
-	if err != nil {
-		return name
-	}
-	return filepath.Join(filepath.Dir(exe), name)
+	return appdir.Path(FileName)
 }
 
 // Load reads and validates the plugins file at path. A missing file yields an

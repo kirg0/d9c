@@ -8,8 +8,23 @@ import (
 )
 
 func TestDefaultPath(t *testing.T) {
-	if got := DefaultPath(); !strings.HasSuffix(got, "d9c-config.yaml") {
-		t.Errorf("DefaultPath = %q", got)
+	want := filepath.Join(".d9c", FileName)
+	if got := DefaultPath(); !strings.HasSuffix(got, want) {
+		t.Errorf("DefaultPath = %q, want suffix %q", got, want)
+	}
+}
+
+func TestSaveCreatesDir(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ".d9c", FileName)
+	s, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetLang("ru"); err != nil {
+		t.Fatalf("save into a missing dir: %v", err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Errorf("config not written: %v", err)
 	}
 }
 
@@ -45,9 +60,9 @@ func TestLoadSaveRoundTrip(t *testing.T) {
 		t.Error("malformed YAML should fail")
 	}
 
-	// Save into a non-existent directory fails.
-	bad := &Store{path: filepath.Join(t.TempDir(), "ghost", "sub", "cfg.yaml")}
+	// Save under a path whose "directory" is a regular file fails.
+	bad := &Store{path: filepath.Join(path, "sub", "cfg.yaml")}
 	if err := bad.Save(); err == nil {
-		t.Error("save into missing directory should fail")
+		t.Error("save under a file should fail")
 	}
 }
