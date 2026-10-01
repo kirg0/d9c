@@ -10,8 +10,9 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
+
+	"github.com/kirg0/d9c/internal/appdir"
 )
 
 // SSH authentication methods stored per host. The empty value means the legacy
@@ -71,12 +72,7 @@ func NewStore(initial []Host, persist func([]Host) error) *Store {
 // LegacyDefaultPath returns the location of the old standalone hosts file next
 // to the running binary, used only for one-time migration into the config.
 func LegacyDefaultPath() string {
-	const name = "d9c-hosts.json"
-	exe, err := os.Executable()
-	if err != nil {
-		return name
-	}
-	return filepath.Join(filepath.Dir(exe), name)
+	return appdir.LegacyPath("d9c-hosts.json")
 }
 
 type legacyFile struct {

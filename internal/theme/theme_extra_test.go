@@ -3,17 +3,10 @@ package theme
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/kirg0/d9c/internal/ui/styles"
 )
-
-func TestDefaultPathTheme(t *testing.T) {
-	if got := DefaultPath(); !strings.HasSuffix(got, "d9c-config.yaml") {
-		t.Errorf("DefaultPath = %q", got)
-	}
-}
 
 func TestLoadBranches(t *testing.T) {
 	dir := t.TempDir()

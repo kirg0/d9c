@@ -1,12 +1,14 @@
 package plugins
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestDefaultPathPlugins(t *testing.T) {
-	if got := DefaultPath(); !strings.HasSuffix(got, "d9c-plugins.yaml") {
-		t.Errorf("DefaultPath = %q", got)
+	want := filepath.Join(".d9c", FileName)
+	if got := DefaultPath(); !strings.HasSuffix(got, want) {
+		t.Errorf("DefaultPath = %q, want suffix %q", got, want)
 	}
 }

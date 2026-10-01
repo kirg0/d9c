@@ -15,7 +15,6 @@ package theme
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -150,17 +149,6 @@ func Names() []string {
 	}
 	sort.Strings(out)
 	return out
-}
-
-// DefaultPath returns the config file location next to the running binary,
-// falling back to the current directory if the executable path is unavailable.
-func DefaultPath() string {
-	const name = "d9c-config.yaml"
-	exe, err := os.Executable()
-	if err != nil {
-		return name
-	}
-	return filepath.Join(filepath.Dir(exe), name)
 }
 
 // Load reads the config file at path and resolves it to a palette: the named

@@ -20,6 +20,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/kirg0/d9c/internal/alerts"
+	"github.com/kirg0/d9c/internal/appdir"
 	"github.com/kirg0/d9c/internal/hosts"
 	"github.com/kirg0/d9c/internal/i18n"
 	"github.com/kirg0/d9c/internal/keymap"
@@ -57,15 +58,13 @@ type Store struct {
 	File File
 }
 
-// DefaultPath returns the config file location next to the running binary,
-// falling back to the current directory if the executable path is unavailable.
+// FileName is the base name of the config file.
+const FileName = "d9c-config.yaml"
+
+// DefaultPath returns the default config file location in the per-user d9c
+// directory (~/.d9c/d9c-config.yaml).
 func DefaultPath() string {
-	const name = "d9c-config.yaml"
-	exe, err := os.Executable()
-	if err != nil {
-		return name
-	}
-	return filepath.Join(filepath.Dir(exe), name)
+	return appdir.Path(FileName)
 }
 
 // Load reads the config file at path. A missing file yields an empty store bound
@@ -90,11 +89,15 @@ func Load(path string) (*Store, error) {
 // Path returns the file the store is bound to.
 func (s *Store) Path() string { return s.path }
 
-// Save writes the whole config back to its file, preserving every section.
+// Save writes the whole config back to its file, preserving every section. The
+// file's directory is created if missing (a fresh ~/.d9c).
 func (s *Store) Save() error {
 	data, err := yaml.Marshal(&s.File)
 	if err != nil {
 		return fmt.Errorf("encode config: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
+		return fmt.Errorf("create config dir: %w", err)
 	}
 	if err := os.WriteFile(s.path, data, 0o600); err != nil {
 		return fmt.Errorf("write config file: %w", err)

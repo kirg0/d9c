@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 
+	"github.com/kirg0/d9c/internal/appdir"
 	"github.com/kirg0/d9c/internal/config"
 	"github.com/kirg0/d9c/internal/docker"
 	"github.com/kirg0/d9c/internal/dockerctx"
@@ -34,6 +36,7 @@ func run() error {
 	configPath := cfg.ConfigFile
 	if configPath == "" {
 		configPath = settings.DefaultPath()
+		migrateLegacyFile(configPath, appdir.LegacyPath(settings.FileName), os.Stderr)
 	}
 	set, err := settings.Load(configPath)
 	if err != nil {
@@ -47,6 +50,7 @@ func run() error {
 	pluginsPath := cfg.PluginsFile
 	if pluginsPath == "" {
 		pluginsPath = plugins.DefaultPath()
+		migrateLegacyFile(pluginsPath, appdir.LegacyPath(plugins.FileName), os.Stderr)
 	}
 	pluginSet, err := plugins.Load(pluginsPath)
 	if err != nil {
@@ -118,6 +122,19 @@ func run() error {
 	defer backend.Close()
 
 	return ui.Run(cfg, backend, store, set, pluginSet, keys, alertThresholds, connectErr, startInHosts)
+}
+
+// migrateLegacyFile copies a file that versions before 1.31 kept next to the
+// binary into the per-user directory (~/.d9c), once. A failure is only a
+// warning: d9c still starts, using the new (empty) location.
+func migrateLegacyFile(dst, legacy string, w io.Writer) {
+	copied, err := appdir.Migrate(dst, legacy)
+	switch {
+	case err != nil:
+		_, _ = fmt.Fprintf(w, "warning: could not copy %s to %s: %v\n", legacy, dst, err)
+	case copied:
+		_, _ = fmt.Fprintf(w, "d9c: copied %s to %s (the old file is no longer used)\n", legacy, dst)
+	}
 }
 
 // migrateLegacyHosts imports hosts from the old standalone d9c-hosts.json into
