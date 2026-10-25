@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/kirg0/d9c/internal/i18n"
 	"github.com/kirg0/d9c/internal/keymap"
@@ -84,16 +83,16 @@ func (m *Model) SetReadOnly(v bool) {
 	m.refreshPluginCmds()
 }
 
-// readOnlyCommandList renders the `:` commands still available in the current
+// readOnlyCommandList lists the `:` commands still available in the current
 // view under read-only mode, for the command-mode footer.
-func (m Model) readOnlyCommandList() string {
+func (m Model) readOnlyCommandList() []string {
 	cmds := cmdline.CommandsFor(m.pluginScope(), m.composeHostOps, true)
 	if len(cmds) == 0 {
-		return i18n.T("изменения запрещены (read-only)", "changes are disabled (read-only)")
+		return []string{i18n.T("изменения запрещены (read-only)", "changes are disabled (read-only)")}
 	}
 	names := make([]string, 0, len(cmds))
 	for _, c := range cmds {
 		names = append(names, c.Name)
 	}
-	return strings.Join(names, " · ")
+	return names
 }

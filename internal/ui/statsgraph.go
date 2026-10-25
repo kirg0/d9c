@@ -86,7 +86,7 @@ func (m Model) statsPanelHeight() int {
 	if statsGraphWidth(m.width) < statsGraphMinW {
 		return 0
 	}
-	rows := statsGraphRows(m.height - 2)
+	rows := statsGraphRows(m.bodyHeight())
 	if rows == 0 {
 		return 0
 	}
@@ -95,7 +95,7 @@ func (m Model) statsPanelHeight() int {
 
 // viewStatsPanel renders the graph panel for the container under the cursor.
 func (m Model) viewStatsPanel() string {
-	rows := statsGraphRows(m.height - 2)
+	rows := statsGraphRows(m.bodyHeight())
 	id := m.selectedID()
 	name := ""
 	for _, c := range m.containers {

@@ -584,6 +584,9 @@ type Model struct {
 	width  int
 	height int
 	err    string
+	// footerH is the footer's line count at the last relayout: on narrow
+	// windows the key hints wrap and the body shrinks by the extra lines.
+	footerH int
 
 	// Auto-reconnect state: set while retrying a dropped daemon connection.
 	reconnecting     bool

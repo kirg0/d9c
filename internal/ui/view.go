@@ -49,25 +49,25 @@ func (m Model) View() string {
 	case ModeShell:
 		body = m.shell.View()
 	case ModeHostForm:
-		body = m.hostForm.View(m.width, m.height-2)
+		body = m.hostForm.View(m.width, m.bodyHeight())
 	case ModeConnectAuth:
-		body = m.connForm.View(m.width, m.height-2)
+		body = m.connForm.View(m.width, m.bodyHeight())
 	case ModeConnecting:
-		body = m.connWait.View(m.width, m.height-2)
+		body = m.connWait.View(m.width, m.bodyHeight())
 	case ModePushForm:
-		body = m.pushForm.View(m.width, m.height-2)
+		body = m.pushForm.View(m.width, m.bodyHeight())
 	case ModeNetForm:
-		body = m.netForm.View(m.width, m.height-2)
+		body = m.netForm.View(m.width, m.bodyHeight())
 	case ModeVolForm:
-		body = m.volForm.View(m.width, m.height-2)
+		body = m.volForm.View(m.width, m.bodyHeight())
 	case ModePullForm:
-		body = m.pullForm.View(m.width, m.height-2)
+		body = m.pullForm.View(m.width, m.bodyHeight())
 	case ModeBuildForm:
-		body = m.buildForm.View(m.width, m.height-2)
+		body = m.buildForm.View(m.width, m.bodyHeight())
 	case ModeRunForm:
-		body = m.runForm.View(m.width, m.height-2)
+		body = m.runForm.View(m.width, m.bodyHeight())
 	case ModeExecForm:
-		body = m.execForm.View(m.width, m.height-2)
+		body = m.execForm.View(m.width, m.bodyHeight())
 	case ModeComposeEdit:
 		body = m.composeEdit.View(m.width)
 	case ModeEvents:
@@ -75,9 +75,9 @@ func (m Model) View() string {
 	case ModeFSBrowser:
 		body = m.fsBrowser.View()
 	case ModeCpForm:
-		body = m.cpForm.View(m.width, m.height-2)
+		body = m.cpForm.View(m.width, m.bodyHeight())
 	case ModePortForwardForm:
-		body = m.pfForm.View(m.width, m.height-2)
+		body = m.pfForm.View(m.width, m.bodyHeight())
 	case ModePortForwards:
 		body = m.viewPortForwardsOverlay()
 	default:
@@ -234,270 +234,286 @@ func (m Model) viewHeader() string {
 	return left + styles.HeaderBg.Render(strings.Repeat(" ", gap)) + right
 }
 
-// viewFooter renders the bottom bar with context-sensitive key hints.
+// viewFooter renders the bottom bar with context-sensitive key hints,
+// wrapped onto as many lines as footerLines allows for the window width.
 func (m Model) viewFooter() string {
-	w := m.width
+	return strings.Join(m.footerLines(), "\n")
+}
 
-	var sb strings.Builder
+// footerLines lays the footer hints out to the window width: hints that do not
+// fit on one line wrap onto the next (up to maxFooterLines), and every line is
+// padded with the footer background.
+func (m Model) footerLines() []string {
+	lines := wrapSegments(m.footerSegments(), m.width, m.maxFooterLines())
+	for i, l := range lines {
+		gap := max(m.width-lipgloss.Width(l), 0)
+		lines[i] = l + styles.FooterBg.Render(strings.Repeat(" ", gap))
+	}
+	return lines
+}
+
+// footerSegments returns the footer as indivisible pieces (one key hint, one
+// command name, the error badge…), the units wrapSegments breaks lines between.
+func (m Model) footerSegments() []string {
+	var segs []string
+	add := func(s ...string) { segs = append(segs, s...) }
 
 	if m.err != "" {
-		sb.WriteString(styles.FooterError.Render(" ✖ " + m.err + " "))
+		add(styles.FooterError.Render(" ✖ " + m.err + " "))
 	}
 	if m.copyNotif != "" {
-		sb.WriteString(styles.CopySuccess.Render(" ✔ " + m.copyNotif + " "))
+		add(styles.CopySuccess.Render(" ✔ " + m.copyNotif + " "))
 	}
 
 	switch m.mode {
 	case ModeDetail:
 		switch {
 		case m.detail.IsSearching():
-			sb.WriteString(keyHint("type", "Query"))
-			sb.WriteString(keyHint("enter", "Confirm"))
-			sb.WriteString(keyHint("esc", "Cancel"))
+			add(keyHint("type", "Query"))
+			add(keyHint("enter", "Confirm"))
+			add(keyHint("esc", "Cancel"))
 		case m.detail.HasSearch():
-			sb.WriteString(keyHint("n/N", "Next/Prev"))
-			sb.WriteString(keyHint("/", "New search"))
-			sb.WriteString(keyHint("esc", "Clear"))
-			sb.WriteString(keyHint("q", "Back"))
+			add(keyHint("n/N", "Next/Prev"))
+			add(keyHint("/", "New search"))
+			add(keyHint("esc", "Clear"))
+			add(keyHint("q", "Back"))
 		default:
-			sb.WriteString(keyHint("↑↓", "Scroll"))
-			sb.WriteString(keyHint("/", "Search"))
-			sb.WriteString(keyHint("PgUp/PgDn", "Page"))
-			sb.WriteString(keyHint("q/esc", "Back"))
+			add(keyHint("↑↓", "Scroll"))
+			add(keyHint("/", "Search"))
+			add(keyHint("PgUp/PgDn", "Page"))
+			add(keyHint("q/esc", "Back"))
 		}
 	case ModeLogs:
 		switch {
 		case m.logs.IsSearching():
-			sb.WriteString(keyHint("type", "Query"))
-			sb.WriteString(keyHint("enter", "Confirm"))
-			sb.WriteString(keyHint("esc", "Cancel"))
+			add(keyHint("type", "Query"))
+			add(keyHint("enter", "Confirm"))
+			add(keyHint("esc", "Cancel"))
 		case m.logs.HasSearch():
-			sb.WriteString(keyHint("n/N", "Next/Prev"))
-			sb.WriteString(keyHint("/", "New search"))
-			sb.WriteString(keyHint("esc", "Clear"))
-			sb.WriteString(keyHint("q", "Back"))
+			add(keyHint("n/N", "Next/Prev"))
+			add(keyHint("/", "New search"))
+			add(keyHint("esc", "Clear"))
+			add(keyHint("q", "Back"))
 		default:
-			sb.WriteString(keyHint("↑↓", "Scroll"))
+			add(keyHint("↑↓", "Scroll"))
 			follow := "Follow: off"
 			if m.logs.IsFollowing() {
 				follow = "Follow: on"
 			}
-			sb.WriteString(keyHint("f", follow))
-			sb.WriteString(keyHint("/", "Search"))
-			sb.WriteString(keyHint("s", "Save"))
-			sb.WriteString(keyHint("q/esc", "Back"))
+			add(keyHint("f", follow))
+			add(keyHint("/", "Search"))
+			add(keyHint("s", "Save"))
+			add(keyHint("q/esc", "Back"))
 		}
 	case ModeFilter:
-		sb.WriteString(keyHint("type", "Filter"))
-		sb.WriteString(keyHint("enter", "Apply"))
-		sb.WriteString(keyHint("esc", "Cancel"))
+		add(keyHint("type", "Filter"))
+		add(keyHint("enter", "Apply"))
+		add(keyHint("esc", "Cancel"))
 	case ModeCommand:
 		switch {
 		case m.readOnly() && m.resource != ViewHosts:
 			// Read-only: list only the commands still available in this view.
-			sb.WriteString(styles.FooterDesc.Render("  " + m.readOnlyCommandList() + "  "))
+			add(cmdHints(m.readOnlyCommandList()...)...)
 		case m.resource == ViewImages:
-			sb.WriteString(styles.FooterDesc.Render("  run · exec · build <dir> [tag] · tag <new-ref> · push · history · pull · rm [-f] · prune  "))
+			add(cmdHints("run", "exec", "build <dir> [tag]", "tag <new-ref>", "push", "history", "pull", "rm [-f]", "prune")...)
 		case m.resource == ViewNetworks:
-			sb.WriteString(styles.FooterDesc.Render("  create · rm  "))
+			add(cmdHints("create", "rm")...)
 		case m.resource == ViewVolumes:
-			sb.WriteString(styles.FooterDesc.Render("  create · rm · prune  "))
+			add(cmdHints("create", "rm", "prune")...)
 		case m.resource == ViewHosts:
-			sb.WriteString(styles.FooterDesc.Render("  connect · add <name> <url> · edit <name> <url> · rm · import contexts  "))
+			add(cmdHints("connect", "add <name> <url>", "edit <name> <url>", "rm", "import contexts")...)
 		case m.resource == ViewCompose:
 			if m.composeHostOps {
-				sb.WriteString(styles.FooterDesc.Render("  create <dir> · up · down · pull · config · edit · backup · backups · restore [file] · start · stop · restart · pause · unpause · remove  "))
+				add(cmdHints("create <dir>", "up", "down", "pull", "config", "edit", "backup", "backups", "restore [file]", "start", "stop", "restart", "pause", "unpause", "remove")...)
 			} else {
 				// tcp://: SSH-only ops (create/up/down/pull/config/edit/backup/restore) hidden.
-				sb.WriteString(styles.FooterDesc.Render("  backups · start · stop · restart · pause · unpause · remove  "))
+				add(cmdHints("backups", "start", "stop", "restart", "pause", "unpause", "remove")...)
 			}
 		default:
-			sb.WriteString(styles.FooterDesc.Render("  run · start · stop · restart · kill · rm · logs · exec · files [path] · cp <local> <ctr-dir>  "))
+			add(cmdHints("run", "start", "stop", "restart", "kill", "rm", "logs", "exec", "files [path]", "cp <local> <ctr-dir>")...)
 		}
-		sb.WriteString(keyHint("enter", "Run"))
-		sb.WriteString(keyHint("esc", "Cancel"))
+		add(keyHint("enter", "Run"))
+		add(keyHint("esc", "Cancel"))
 	case ModeCopy:
-		sb.WriteString(keyHint("↑↓", "Select"))
-		sb.WriteString(keyHint("enter", "Copy"))
-		sb.WriteString(keyHint("esc", "Cancel"))
+		add(keyHint("↑↓", "Select"))
+		add(keyHint("enter", "Copy"))
+		add(keyHint("esc", "Cancel"))
 	case ModeThemePicker:
-		sb.WriteString(keyHint("↑↓", "Preview"))
-		sb.WriteString(keyHint("enter", "Apply"))
-		sb.WriteString(keyHint("q/esc", "Cancel"))
+		add(keyHint("↑↓", "Preview"))
+		add(keyHint("enter", "Apply"))
+		add(keyHint("q/esc", "Cancel"))
 	case ModeLangPicker:
-		sb.WriteString(keyHint("↑↓", "Preview"))
-		sb.WriteString(keyHint("enter", "Apply"))
-		sb.WriteString(keyHint("q/esc", "Cancel"))
+		add(keyHint("↑↓", "Preview"))
+		add(keyHint("enter", "Apply"))
+		add(keyHint("q/esc", "Cancel"))
 	case ModeNamespacePicker:
-		sb.WriteString(keyHint("↑↓", "Select"))
-		sb.WriteString(keyHint("enter", "Switch"))
-		sb.WriteString(keyHint("q/esc", "Cancel"))
+		add(keyHint("↑↓", "Select"))
+		add(keyHint("enter", "Switch"))
+		add(keyHint("q/esc", "Cancel"))
 	case ModeContextPicker:
-		sb.WriteString(keyHint("↑↓", "Select"))
-		sb.WriteString(keyHint("space", "Toggle"))
-		sb.WriteString(keyHint("a", "All"))
-		sb.WriteString(keyHint("enter", "Import"))
-		sb.WriteString(keyHint("q/esc", "Cancel"))
+		add(keyHint("↑↓", "Select"))
+		add(keyHint("space", "Toggle"))
+		add(keyHint("a", "All"))
+		add(keyHint("enter", "Import"))
+		add(keyHint("q/esc", "Cancel"))
 	case ModeConfirm:
-		sb.WriteString(keyHint("y/enter", "Confirm"))
-		sb.WriteString(keyHint("n/esc", "Cancel"))
+		add(keyHint("y/enter", "Confirm"))
+		add(keyHint("n/esc", "Cancel"))
 	case ModeNotice:
-		sb.WriteString(keyHint("enter/esc", "Close"))
+		add(keyHint("enter/esc", "Close"))
 	case ModeBackupPicker:
 		if m.backupConfirmDelete != "" {
-			sb.WriteString(styles.FooterError.Render(" delete " + m.backupConfirmDelete + "? "))
-			sb.WriteString(keyHint("d", "Confirm"))
-			sb.WriteString(keyHint("esc", "Cancel"))
+			add(styles.FooterError.Render(" delete " + m.backupConfirmDelete + "? "))
+			add(keyHint("d", "Confirm"))
+			add(keyHint("esc", "Cancel"))
 		} else {
-			sb.WriteString(keyHint("↑↓", "Select"))
+			add(keyHint("↑↓", "Select"))
 			// Restore is SSH-only; over tcp:// the catalog is view/delete only.
 			if m.composeHostOps && !m.readOnly() {
-				sb.WriteString(keyHint("enter", "Restore"))
+				add(keyHint("enter", "Restore"))
 			}
-			sb.WriteString(keyHint("d", "Delete"))
-			sb.WriteString(keyHint("esc", "Close"))
+			add(keyHint("d", "Delete"))
+			add(keyHint("esc", "Close"))
 		}
 	case ModeHostForm:
-		sb.WriteString(keyHint("tab", "Switch field"))
-		sb.WriteString(keyHint("enter", "Save"))
-		sb.WriteString(keyHint("esc", "Cancel"))
+		add(keyHint("tab", "Switch field"))
+		add(keyHint("enter", "Save"))
+		add(keyHint("esc", "Cancel"))
 	case ModeConnectAuth:
-		sb.WriteString(keyHint("tab", "Switch field"))
-		sb.WriteString(keyHint("enter", "Connect"))
-		sb.WriteString(keyHint("esc", "Cancel"))
+		add(keyHint("tab", "Switch field"))
+		add(keyHint("enter", "Connect"))
+		add(keyHint("esc", "Cancel"))
 	case ModeConnecting:
 		if m.connWait.Busy() {
-			sb.WriteString(keyHint("esc", "Cancel"))
+			add(keyHint("esc", "Cancel"))
 		} else {
-			sb.WriteString(keyHint("enter", "Retry"))
-			sb.WriteString(keyHint("esc", "Close"))
+			add(keyHint("enter", "Retry"))
+			add(keyHint("esc", "Close"))
 		}
 	case ModePushForm:
-		sb.WriteString(keyHint("tab", "Switch field"))
-		sb.WriteString(keyHint("enter", "Push"))
-		sb.WriteString(keyHint("esc", "Cancel"))
+		add(keyHint("tab", "Switch field"))
+		add(keyHint("enter", "Push"))
+		add(keyHint("esc", "Cancel"))
 	case ModeNetForm, ModeVolForm:
-		sb.WriteString(keyHint("tab", "Switch field"))
-		sb.WriteString(keyHint("enter", "Create"))
-		sb.WriteString(keyHint("esc", "Cancel"))
+		add(keyHint("tab", "Switch field"))
+		add(keyHint("enter", "Create"))
+		add(keyHint("esc", "Cancel"))
 	case ModeRunForm, ModeExecForm:
-		sb.WriteString(keyHint("tab", "Switch field"))
-		sb.WriteString(keyHint("enter", "Run"))
-		sb.WriteString(keyHint("esc", "Cancel"))
+		add(keyHint("tab", "Switch field"))
+		add(keyHint("enter", "Run"))
+		add(keyHint("esc", "Cancel"))
 	case ModeBuildForm:
-		sb.WriteString(keyHint("tab", "Switch field"))
-		sb.WriteString(keyHint("enter", "Build"))
-		sb.WriteString(keyHint("esc", "Cancel"))
+		add(keyHint("tab", "Switch field"))
+		add(keyHint("enter", "Build"))
+		add(keyHint("esc", "Cancel"))
 	case ModePullForm:
-		sb.WriteString(keyHint("enter", "Pull"))
-		sb.WriteString(keyHint("esc", "Cancel"))
+		add(keyHint("enter", "Pull"))
+		add(keyHint("esc", "Cancel"))
 	case ModeCpForm:
-		sb.WriteString(keyHint("tab", "Switch field"))
-		sb.WriteString(keyHint("enter", "Open/Upload"))
-		sb.WriteString(keyHint("esc", "Cancel"))
+		add(keyHint("tab", "Switch field"))
+		add(keyHint("enter", "Open/Upload"))
+		add(keyHint("esc", "Cancel"))
 	case ModePortForwardForm:
-		sb.WriteString(keyHint("tab", "Switch field"))
-		sb.WriteString(keyHint("enter", "Forward"))
-		sb.WriteString(keyHint("esc", "Cancel"))
+		add(keyHint("tab", "Switch field"))
+		add(keyHint("enter", "Forward"))
+		add(keyHint("esc", "Cancel"))
 	case ModePortForwards:
-		sb.WriteString(keyHint("↑↓", "Select"))
-		sb.WriteString(keyHint("s", "Stop/Start"))
-		sb.WriteString(keyHint("d", "Delete"))
-		sb.WriteString(keyHint("y", "Copy"))
-		sb.WriteString(keyHint("q/esc", "Close"))
+		add(keyHint("↑↓", "Select"))
+		add(keyHint("s", "Stop/Start"))
+		add(keyHint("d", "Delete"))
+		add(keyHint("y", "Copy"))
+		add(keyHint("q/esc", "Close"))
 	case ModeComposeEdit:
-		sb.WriteString(keyHint("ctrl+s", "Save"))
-		sb.WriteString(keyHint("esc", "Cancel"))
+		add(keyHint("ctrl+s", "Save"))
+		add(keyHint("esc", "Cancel"))
 	case ModeHelp:
-		sb.WriteString(keyHint("↑↓", "Scroll"))
-		sb.WriteString(keyHint("PgUp/PgDn", "Page"))
-		sb.WriteString(keyHint("q/esc", "Close"))
+		add(keyHint("↑↓", "Scroll"))
+		add(keyHint("PgUp/PgDn", "Page"))
+		add(keyHint("q/esc", "Close"))
 	case ModeShell:
 		if m.shell.Closed() {
-			sb.WriteString(styles.FooterDesc.Render(i18n.T("  процесс завершён  ", "  process finished  ")))
-			sb.WriteString(keyHint("q/esc/enter", "Close"))
+			add(styles.FooterDesc.Render(i18n.T("  процесс завершён  ", "  process finished  ")))
+			add(keyHint("q/esc/enter", "Close"))
 		} else {
-			sb.WriteString(styles.FooterDesc.Render(i18n.T("  ввод → контейнер  ", "  input → container  ")))
-			sb.WriteString(keyHint("exit/Ctrl-D", "Quit shell"))
-			sb.WriteString(keyHint("ctrl+\\", "Detach"))
+			add(styles.FooterDesc.Render(i18n.T("  ввод → контейнер  ", "  input → container  ")))
+			add(keyHint("exit/Ctrl-D", "Quit shell"))
+			add(keyHint("ctrl+\\", "Detach"))
 		}
 	case ModeEvents:
-		sb.WriteString(keyHint("↑↓", "Scroll"))
-		sb.WriteString(keyHint("r", "Refresh"))
-		sb.WriteString(keyHint("q/esc", "Back"))
+		add(keyHint("↑↓", "Scroll"))
+		add(keyHint("r", "Refresh"))
+		add(keyHint("q/esc", "Back"))
 	case ModeFSBrowser:
-		sb.WriteString(keyHint("↑↓", "Navigate"))
-		sb.WriteString(keyHint("enter/l", "Open"))
-		sb.WriteString(keyHint("bksp/h", "Up"))
-		sb.WriteString(keyHint("d", "Download"))
-		sb.WriteString(keyHint("q/esc", "Back"))
+		add(keyHint("↑↓", "Navigate"))
+		add(keyHint("enter/l", "Open"))
+		add(keyHint("bksp/h", "Up"))
+		add(keyHint("d", "Download"))
+		add(keyHint("q/esc", "Back"))
 	default:
 		// While images are bulk-selected, collapse the footer to the actions that
 		// apply to the selection: navigate, remove (with confirmation), clear, quit.
 		if m.resource == ViewImages && len(m.selected) > 0 {
-			sb.WriteString(keyHint("↑↓", "Navigate"))
+			add(keyHint("↑↓", "Navigate"))
 			if !m.readOnly() {
-				sb.WriteString(keyHint("r", "Remove"))
+				add(keyHint("r", "Remove"))
 			}
-			sb.WriteString(keyHint("esc", "Clear"))
-			sb.WriteString(keyHint("q", "Quit"))
+			add(keyHint("esc", "Clear"))
+			add(keyHint("q", "Quit"))
 			break
 		}
-		sb.WriteString(keyHint("↑↓", "Navigate"))
+		add(keyHint("↑↓", "Navigate"))
 		switch m.resource {
 		case ViewHosts:
-			sb.WriteString(keyHint("enter", "Connect"))
-			sb.WriteString(keyHint("a", "Add"))
-			sb.WriteString(keyHint("e", "Edit"))
-			sb.WriteString(keyHint("d", "Delete"))
+			add(keyHint("enter", "Connect"))
+			add(keyHint("a", "Add"))
+			add(keyHint("e", "Edit"))
+			add(keyHint("d", "Delete"))
 		case ViewCompose:
-			sb.WriteString(keyHint("enter", "Containers"))
-			sb.WriteString(keyHint("i", "Inspect"))
-			sb.WriteString(keyHint("l", "Logs"))
-			sb.WriteString(keyHint("F", "Forward"))
+			add(keyHint("enter", "Containers"))
+			add(keyHint("i", "Inspect"))
+			add(keyHint("l", "Logs"))
+			add(keyHint("F", "Forward"))
 			if m.composeHostOps && !m.readOnly() {
-				sb.WriteString(keyHint("e", "Edit"))
+				add(keyHint("e", "Edit"))
 			}
 		default:
-			sb.WriteString(keyHint("i", "Inspect"))
+			add(keyHint("i", "Inspect"))
 		}
 		if m.resource == ViewContainers {
-			sb.WriteString(keyHint("l", "Logs"))
+			add(keyHint("l", "Logs"))
 			if !m.readOnly() {
-				sb.WriteString(keyHint("x", "Shell"))
+				add(keyHint("x", "Shell"))
 			}
-			sb.WriteString(keyHint("f", "Files"))
-			sb.WriteString(keyHint("F", "Forward"))
-			sb.WriteString(keyHint("a", "All"))
-			sb.WriteString(keyHint("s", "Stats"))
-			sb.WriteString(keyHint("⇧N/S/C/M", "Sort"))
-			sb.WriteString(keyHint("space", "Select"))
+			add(keyHint("f", "Files"))
+			add(keyHint("F", "Forward"))
+			add(keyHint("a", "All"))
+			add(keyHint("s", "Stats"))
+			add(keyHint("⇧N/S/C/M", "Sort"))
+			add(keyHint("space", "Select"))
 			if m.composeFilter != "" {
-				sb.WriteString(keyHint("esc", "Back"))
+				add(keyHint("esc", "Back"))
 			}
 		}
 		if m.resource == ViewImages {
-			sb.WriteString(keyHint("space", "Select"))
+			add(keyHint("space", "Select"))
 		}
 		for _, p := range m.scopedPluginsWithKeys() {
-			sb.WriteString(keyHint(p.Key, p.Name))
+			add(keyHint(p.Key, p.Name))
 		}
-		sb.WriteString(keyHint("y", "Copy"))
-		sb.WriteString(keyHint("/", "Filter"))
-		sb.WriteString(keyHint(":", "Cmd"))
-		sb.WriteString(keyHint("r", "Refresh"))
+		add(keyHint("y", "Copy"))
+		add(keyHint("/", "Filter"))
+		add(keyHint(":", "Cmd"))
+		add(keyHint("r", "Refresh"))
 		if m.paused {
-			sb.WriteString(keyHint("p", "Resume"))
+			add(keyHint("p", "Resume"))
 		} else {
-			sb.WriteString(keyHint("p", "Pause"))
+			add(keyHint("p", "Pause"))
 		}
-		sb.WriteString(keyHint("?", "Help"))
-		sb.WriteString(keyHint("q", "Quit"))
+		add(keyHint("?", "Help"))
+		add(keyHint("q", "Quit"))
 	}
 
-	content := sb.String()
-	gap := max(w-lipgloss.Width(content), 0)
-	return content + styles.FooterBg.Render(strings.Repeat(" ", gap))
+	return segs
 }
 
 func (m Model) currentResourceLen() int {
@@ -523,7 +539,7 @@ func keyHint(key, desc string) string {
 
 // viewCopyOverlay renders the copy-menu panel centered in the body area.
 func (m Model) viewCopyOverlay() string {
-	bodyH := m.height - 2 // header + footer
+	bodyH := m.bodyHeight()
 
 	var rows []string
 	maxLabel := 0
@@ -561,7 +577,7 @@ func (m Model) viewCopyOverlay() string {
 // the live preview (header/footer/list re-colored by the highlighted theme)
 // stays visible around the modal.
 func (m Model) viewThemeOverlay() string {
-	bodyH := m.height - 2 // header + footer
+	bodyH := m.bodyHeight()
 
 	maxName := 0
 	for _, name := range m.themeNames {
@@ -598,7 +614,7 @@ func (m Model) viewThemeOverlay() string {
 // mirroring the theme picker: the highlighted language is applied live, so the
 // surrounding UI text already reflects the choice.
 func (m Model) viewLangOverlay() string {
-	bodyH := m.height - 2 // header + footer
+	bodyH := m.bodyHeight()
 
 	maxName := 0
 	for _, l := range m.langNames {
@@ -631,7 +647,7 @@ func (m Model) viewLangOverlay() string {
 // the current view. There is no live preview (switching re-queries the daemon),
 // so the highlight simply moves until Enter commits.
 func (m Model) viewNamespaceOverlay() string {
-	bodyH := m.height - 2 // header + footer
+	bodyH := m.bodyHeight()
 
 	maxName := 0
 	for _, n := range m.nsNames {
@@ -666,7 +682,7 @@ func (m Model) viewNamespaceOverlay() string {
 // viewConfirmOverlay renders the generic confirmation panel centered over the
 // current resource view, so the underlying list stays visible around the modal.
 func (m Model) viewConfirmOverlay() string {
-	bodyH := m.height - 2 // header + footer
+	bodyH := m.bodyHeight()
 
 	title := styles.CopyMenuTitle.Render(i18n.T(" Подтверждение ", " Confirm "))
 	hint := styles.CopyMenuHint.Render(i18n.T("  y/enter подтвердить   n/esc отмена", "  y/enter confirm   n/esc cancel"))
@@ -679,7 +695,7 @@ func (m Model) viewConfirmOverlay() string {
 // viewNoticeOverlay renders the informational modal centered in the body area:
 // a title plus a free-form body. Any key dismisses it; no action is attached.
 func (m Model) viewNoticeOverlay() string {
-	bodyH := m.height - 2 // header + footer
+	bodyH := m.bodyHeight()
 
 	title := styles.CopyMenuTitle.Render(m.noticeTitle)
 	hint := styles.CopyMenuHint.Render(i18n.T("  enter/esc закрыть", "  enter/esc close"))
@@ -691,7 +707,7 @@ func (m Model) viewNoticeOverlay() string {
 
 // viewBackupOverlay renders the backup catalog panel centered in the body area.
 func (m Model) viewBackupOverlay() string {
-	bodyH := m.height - 2 // header + footer
+	bodyH := m.bodyHeight()
 
 	maxName := 0
 	for _, it := range m.backupItems {
