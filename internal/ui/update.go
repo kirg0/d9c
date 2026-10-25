@@ -21,7 +21,23 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// Update handles msg and then re-lays the body out when the footer's wrapped
+// height changed (a new mode, an error badge, a toggled hint…), so the header,
+// body and footer always add up to exactly the window height.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.update(msg)
+	nm, ok := next.(Model)
+	if !ok || nm.width == 0 || len(nm.footerLines()) == nm.footerH {
+		return next, cmd
+	}
+	nm.relayout()
+	if nm.mode == ModeShell {
+		cmd = tea.Batch(cmd, nm.shell.ResizeRemoteCmd())
+	}
+	return nm, cmd
+}
+
+func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
@@ -1665,7 +1681,9 @@ func (m Model) containerState(id string) string {
 
 func (m *Model) relayout() {
 	w := m.width
-	h := m.height - 2 // 1 header + 1 footer
+	// The footer wraps on narrow windows: size it first, the body gets the rest.
+	m.footerH = len(m.footerLines())
+	h := m.bodyHeight()
 
 	tableHeight := h
 	if m.mode == ModeFilter || m.mode == ModeCommand {

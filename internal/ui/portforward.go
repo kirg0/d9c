@@ -244,7 +244,7 @@ func forwardRow(t portfwd.Info) string {
 
 // viewPortForwardsOverlay renders the tunnel list centered over the table.
 func (m Model) viewPortForwardsOverlay() string {
-	bodyH := m.height - 2 // header + footer
+	bodyH := m.bodyHeight()
 	list := m.pf.List()
 
 	var rows []string

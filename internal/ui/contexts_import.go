@@ -238,7 +238,7 @@ func (m Model) contextPickerRow(i, nameW int) string {
 // viewContextOverlay renders the Docker context picker centered over the
 // hosts view.
 func (m Model) viewContextOverlay() string {
-	bodyH := m.height - 2 // header + footer
+	bodyH := m.bodyHeight()
 
 	nameW := 0
 	for _, c := range m.ctxItems {
