@@ -197,6 +197,17 @@ func TestRunCLI(t *testing.T) {
 		}
 	})
 
+	t.Run("output options", func(t *testing.T) {
+		code, out, errOut := cliRun(t, &config.Config{ConfigFile: cfgPath}, "ps", "-a", "-demo", "-o", "text", "--fields", "name,state", "--limit", "1")
+		if code != 0 || out != "NAME  STATE\nweb   running\n" || !strings.HasPrefix(errOut, "truncated: showing the first 1 of 3") {
+			t.Errorf("text: exit %d, stdout %q, stderr %q", code, out, errOut)
+		}
+		code, out, errOut = cliRun(t, &config.Config{ConfigFile: cfgPath}, "logs", "web", "-n", "2", "-demo", "-o", "ndjson")
+		if lines := strings.Split(strings.TrimSpace(out), "\n"); code != 0 || errOut != "" || len(lines) != 3 || !strings.Contains(lines[2], `"truncated":true`) {
+			t.Errorf("ndjson: exit %d, stdout %q, stderr %q", code, out, errOut)
+		}
+	})
+
 	t.Run("help", func(t *testing.T) {
 		code, out, _ := cliRun(t, &config.Config{ConfigFile: cfgPath}, "help")
 		if code != 0 || !strings.Contains(out, "hosts ls") || !strings.Contains(out, "info") {
@@ -211,6 +222,8 @@ func TestRunCLI(t *testing.T) {
 		wantCode agent.Code
 	}{
 		{"usage", config.Config{ConfigFile: cfgPath}, []string{"info", "--bogus"}, agent.CodeUsage},
+		{"unknown field", config.Config{ConfigFile: cfgPath}, []string{"ps", "-demo", "--fields", "bogus"}, agent.CodeUsage},
+		{"limit on object", config.Config{ConfigFile: cfgPath}, []string{"info", "-demo", "--limit", "1"}, agent.CodeUsage},
 		{"unknown saved host", config.Config{ConfigFile: cfgPath}, []string{"info", "--host", "nope"}, agent.CodeNotFound},
 		{"password host without env", config.Config{ConfigFile: cfgPath}, []string{"info", "--host", "pw"}, agent.CodeAuthRequired},
 		{"unreachable saved host", config.Config{ConfigFile: cfgPath}, []string{"info", "--host", "prod"}, agent.CodeConnection},

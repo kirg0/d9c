@@ -114,7 +114,15 @@ func volumesOp() Op {
 type SystemDFData struct {
 	Rows   []map[string]string `json:"rows"`
 	Report string              `json:"report,omitempty"`
+	// columns keeps the engine's header order for table renderers.
+	columns []string
 }
+
+// ItemsKey implements Lister: the per-type rows are the items.
+func (SystemDFData) ItemsKey() string { return "rows" }
+
+// ItemFields implements Fielder: the row keys in the engine's column order.
+func (d SystemDFData) ItemFields() []string { return d.columns }
 
 func systemDFOp() Op {
 	return Op{
@@ -156,6 +164,10 @@ func parseDF(text string) SystemDFData {
 	if header[0] != "TYPE" {
 		return raw
 	}
+	columns := make([]string, len(header))
+	for i, h := range header {
+		columns[i] = strings.ToLower(h)
+	}
 	rows := make([]map[string]string, 0, len(lines)-1)
 	for _, l := range lines[1:] {
 		cells := dfColumnSep.Split(l, -1)
@@ -164,11 +176,11 @@ func parseDF(text string) SystemDFData {
 		}
 		row := make(map[string]string, len(cells))
 		for i, c := range cells {
-			row[strings.ToLower(header[i])] = c
+			row[columns[i]] = c
 		}
 		rows = append(rows, row)
 	}
-	return SystemDFData{Rows: rows}
+	return SystemDFData{Rows: rows, columns: columns}
 }
 
 // EventsData is the `events` output: the window queried (as passed to the
@@ -179,6 +191,9 @@ type EventsData struct {
 	Until  string   `json:"until"`
 	Events []string `json:"events"`
 }
+
+// ItemsKey implements Lister: the events are the items.
+func (EventsData) ItemsKey() string { return "events" }
 
 func eventsOp() Op {
 	return Op{

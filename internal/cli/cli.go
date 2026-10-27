@@ -49,6 +49,8 @@ type Invocation struct {
 	Args agent.Args
 	// Help asks for usage text instead of running Op (-h/--help, `d9c help`).
 	Help bool
+	// Output holds -o/--output, --fields and --limit.
+	Output Output
 }
 
 // global is a connection flag accepted anywhere after the command (before it,
@@ -149,6 +151,13 @@ func Parse(reg *agent.Registry, cfg *config.Config, args []string) (Invocation, 
 			}
 			i++
 			return rest[i], nil
+		}
+
+		if ok, err := inv.Output.parseFlag(name, tok, takeValue); ok {
+			if err != nil {
+				return Invocation{}, err
+			}
+			continue
 		}
 
 		if g, ok := findGlobal(name); ok {
@@ -342,7 +351,10 @@ func WriteHelp(w io.Writer, reg *agent.Registry, inv Invocation, ceiling agent.T
 			fmt.Fprintf(&b, "  %-*s  %s\n", width, op.Name, op.Summary)
 		}
 		b.WriteString("\nGlobal flags: " + globalUsage() + "\n")
-		b.WriteString("Output: one JSON document on stdout; errors as JSON on stderr with a non-zero exit status.\n")
+		b.WriteString("Output flags: " + outputUsage + "\n")
+		b.WriteString("Output: one JSON envelope {\"schema\",\"host\",\"runtime\",\"data\",\"truncated\"} on stdout by default;\n" +
+			"-o ndjson writes list items one per line, -o text a compact table;\n" +
+			"errors as JSON on stderr with a non-zero exit status.\n")
 		b.WriteString("Run `d9c help <command>` for the arguments of a command.\n")
 	} else {
 		op := inv.Op
@@ -371,14 +383,10 @@ func WriteHelp(w io.Writer, reg *agent.Registry, inv Invocation, ceiling agent.T
 			}
 		}
 		b.WriteString("\nGlobal flags: " + globalUsage() + "\n")
+		b.WriteString("Output flags: " + outputUsage + "\n")
 	}
 	_, err := io.WriteString(w, b.String())
 	return err
-}
-
-// WriteResult writes env as one compact JSON line.
-func WriteResult(w io.Writer, env agent.Envelope) error {
-	return newEncoder(w).Encode(env)
 }
 
 // newEncoder returns a JSON encoder that keeps <, > and & literal: port maps

@@ -416,11 +416,11 @@ func TestParseDF(t *testing.T) {
 		{"docker", dockerDF, SystemDFData{Rows: []map[string]string{
 			{"type": "Images", "total": "4", "active": "2", "size": "631.0 MB", "reclaimable": "5.0 MB"},
 			{"type": "Local Volumes", "total": "2", "active": "1", "size": "256.0 MB", "reclaimable": "32.0 MB"},
-		}}},
+		}, columns: []string{"type", "total", "active", "size", "reclaimable"}}},
 		{"nerdctl", nerdctlDF, SystemDFData{Rows: []map[string]string{
 			{"type": "Images", "total": "3", "active": "-", "size": "631MB"},
 			{"type": "Containers", "total": "2", "active": "1", "size": "-"},
-		}}},
+		}, columns: []string{"type", "total", "active", "size"}}},
 		{"not a table", "nothing to see\nhere", SystemDFData{Rows: []map[string]string{}, Report: "nothing to see\nhere"}},
 		{"ragged row", "TYPE  TOTAL\nImages  1  2\n", SystemDFData{Rows: []map[string]string{}, Report: "TYPE  TOTAL\nImages  1  2"}},
 		{"empty", "", SystemDFData{Rows: []map[string]string{}}},
