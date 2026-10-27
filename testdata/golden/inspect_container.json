@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "type": "container",
+    "name": "web",
+    "object": {
+      "Config": {
+        "Env": [
+          "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin",
+          "API_TOKEN=<redacted>"
+        ]
+      },
+      "Id": "9ae942fd8fbc",
+      "Image": "nginx:1.25",
+      "Name": "web",
+      "State": "running",
+      "Status": "Up 2 hours (healthy)"
+    }
+  },
+  "truncated": false,
+  "hint": "1 secret-looking env value(s) masked; pass --no-redact to show them"
+}

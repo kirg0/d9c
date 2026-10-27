@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "target": "web",
+    "lines": [
+      "<time> WARN  cache miss for key=session:abc",
+      "<time> ERROR failed to connect to upstream: timeout",
+      "<time> INFO  retrying connection (attempt 2)"
+    ]
+  },
+  "truncated": true,
+  "hint": "older lines may exist; raise --tail (0 = all) or set --since"
+}

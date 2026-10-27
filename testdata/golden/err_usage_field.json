@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "usage",
+    "message": "unknown field \"bogus\"",
+    "hint": "available fields: created, health, id, image, name, networks, ports, state, status"
+  }
+}

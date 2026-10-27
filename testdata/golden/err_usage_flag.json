@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "usage",
+    "message": "unknown flag --bogus for \"ps\"",
+    "hint": "usage: d9c ps [--all]"
+  }
+}

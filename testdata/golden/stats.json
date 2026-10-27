@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": [
+    {
+      "id": "9ae942fd8fbc",
+      "name": "web",
+      "cpu_percent": 2.5,
+      "mem_usage": 50331648,
+      "mem_limit": 536870912,
+      "mem_percent": 9.4,
+      "net_rx": 1048576,
+      "net_tx": 524288,
+      "block_read": 8388608,
+      "block_write": 2097152
+    },
+    {
+      "id": "d2c94e258dcb",
+      "name": "api",
+      "cpu_percent": 0.1,
+      "mem_usage": 6291456,
+      "mem_limit": 536870912,
+      "mem_percent": 1.2,
+      "net_rx": 2048,
+      "net_tx": 1024,
+      "block_read": 524288,
+      "block_write": 0
+    }
+  ],
+  "truncated": false
+}

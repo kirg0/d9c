@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": [
+    {
+      "id": "9ae942fd8fbc",
+      "name": "web",
+      "image": "nginx:1.25",
+      "state": "running",
+      "status": "Up 2 hours (healthy)",
+      "health": "healthy",
+      "ports": "0.0.0.0:8080->80/tcp",
+      "created": "<time>",
+      "networks": [
+        "bridge",
+        "frontend"
+      ]
+    },
+    {
+      "id": "d2c94e258dcb",
+      "name": "api",
+      "image": "hello-world:latest",
+      "state": "running",
+      "status": "Up 5 minutes (health: starting)",
+      "health": "starting",
+      "created": "<time>",
+      "networks": [
+        "backend"
+      ]
+    },
+    {
+      "id": "3f1ab77c9012",
+      "name": "db",
+      "image": "postgres:16",
+      "state": "exited",
+      "status": "Exited (0) 1 hour ago",
+      "ports": "5432/tcp",
+      "created": "<time>",
+      "networks": [
+        "backend"
+      ]
+    }
+  ],
+  "truncated": false
+}

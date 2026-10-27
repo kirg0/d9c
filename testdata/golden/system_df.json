@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "rows": [
+      {
+        "active": "2",
+        "reclaimable": "5.0 MB",
+        "size": "631.0 MB",
+        "total": "4",
+        "type": "Images"
+      },
+      {
+        "active": "2",
+        "reclaimable": "4.0 MB",
+        "size": "12.0 MB",
+        "total": "3",
+        "type": "Containers"
+      },
+      {
+        "active": "1",
+        "reclaimable": "32.0 MB",
+        "size": "256.0 MB",
+        "total": "2",
+        "type": "Local Volumes"
+      },
+      {
+        "active": "0",
+        "reclaimable": "48.0 MB",
+        "size": "48.0 MB",
+        "total": "3",
+        "type": "Build Cache"
+      }
+    ]
+  },
+  "truncated": false
+}

@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": [
+    {
+      "project": "webapp",
+      "name": "webapp",
+      "working_dir": "/srv/webapp",
+      "config_files": "/srv/webapp/docker-compose.yml",
+      "status": "running",
+      "running": 3,
+      "total": 3
+    },
+    {
+      "project": "monitoring",
+      "name": "monitoring",
+      "working_dir": "/srv/monitoring",
+      "config_files": "/srv/monitoring/compose.yaml",
+      "status": "partial",
+      "running": 1,
+      "total": 2
+    },
+    {
+      "project": "legacy",
+      "name": "legacy",
+      "working_dir": "/opt/legacy",
+      "config_files": "/opt/legacy/docker-compose.yaml",
+      "status": "stopped",
+      "running": 0,
+      "total": 2
+    }
+  ],
+  "truncated": false
+}

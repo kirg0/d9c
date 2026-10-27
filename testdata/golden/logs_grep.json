@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "target": "web",
+    "lines": [
+      "<time> ERROR failed to connect to upstream: timeout"
+    ]
+  },
+  "truncated": false
+}

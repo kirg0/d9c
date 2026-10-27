@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": [
+    {
+      "id": "f0a1b2c3d4e5",
+      "name": "bridge",
+      "driver": "bridge",
+      "scope": "local",
+      "subnet": "172.17.0.0/16"
+    },
+    {
+      "id": "1122334455aa",
+      "name": "host",
+      "driver": "host",
+      "scope": "local"
+    },
+    {
+      "id": "aabbccddeeff",
+      "name": "app-net",
+      "driver": "bridge",
+      "scope": "local",
+      "subnet": "172.20.0.0/16"
+    }
+  ],
+  "truncated": false
+}

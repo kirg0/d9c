@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "usage",
+    "message": "missing required argument \"target\"",
+    "hint": "target (string): ID or name of the object to inspect."
+  }
+}
