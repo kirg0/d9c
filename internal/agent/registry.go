@@ -192,9 +192,21 @@ func (r *Registry) Invoke(ctx context.Context, env *Env, name string, args Args,
 	if err != nil {
 		return Result{}, err
 	}
-	res, err := op.Handler(ctx, env, norm)
+	res, err := callHandler(ctx, op, env, norm)
 	if err != nil {
 		return Result{}, Classify(err)
 	}
 	return res, nil
+}
+
+// callHandler runs op's handler, turning a panic into an internal *Error so a
+// handler bug still honours the stderr contract instead of dumping a Go trace.
+func callHandler(ctx context.Context, op Op, env *Env, args Args) (res Result, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = Errorf(CodeInternal, "operation %q panicked: %v", op.Name, r).
+				WithHint("this is a d9c bug; please report it with the command that triggered it")
+		}
+	}()
+	return op.Handler(ctx, env, args)
 }

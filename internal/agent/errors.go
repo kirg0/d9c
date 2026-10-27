@@ -92,9 +92,16 @@ func (e *Error) WithHint(hint string) *Error {
 	return &c
 }
 
+// daemonPrefix is the Docker SDK's preamble on every API error; it carries no
+// information for an agent, so Classify drops it from the message.
+const daemonPrefix = "Error response from daemon: "
+
 // Classify turns any error from a handler or backend into an *Error with the
 // matching code and an English hint. An *Error anywhere in the chain is
-// returned as is; nil stays nil.
+// returned as is; nil stays nil. A docker.FriendlyError in the chain is
+// reused: its message replaces the raw text, its recommendation becomes the
+// hint, and the code still follows the raw cause (so a reworded "no such
+// container" stays not_found).
 func Classify(err error) *Error {
 	if err == nil {
 		return nil
@@ -103,8 +110,13 @@ func Classify(err error) *Error {
 	if errors.As(err, &ae) {
 		return ae
 	}
+	msg := message(err)
+	fe, isFriendly := docker.AsFriendly(err)
 	wrap := func(code Code, hint string) *Error {
-		return &Error{Code: code, Message: err.Error(), Hint: hint, Err: err}
+		if isFriendly && fe.Hint != "" {
+			hint = fe.Hint
+		}
+		return &Error{Code: code, Message: msg, Hint: hint, Err: err}
 	}
 	switch {
 	case docker.IsUnknownHostKeyError(err):
@@ -126,6 +138,16 @@ func Classify(err error) *Error {
 	default:
 		return wrap(CodeInternal, "")
 	}
+}
+
+// message renders err for the agent: without the daemon preamble, and with a
+// FriendlyError's recommendation cut out of the text (it goes to the hint).
+func message(err error) string {
+	msg := err.Error()
+	if fe, ok := docker.AsFriendly(err); ok && fe.Hint != "" {
+		msg = strings.Replace(msg, fe.Error(), fe.Msg, 1)
+	}
+	return strings.ReplaceAll(msg, daemonPrefix, "")
 }
 
 // isAuthError reports whether err is an SSH authentication failure ("ssh:

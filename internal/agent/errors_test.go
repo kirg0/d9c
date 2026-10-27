@@ -74,6 +74,47 @@ func TestClassify(t *testing.T) {
 	}
 }
 
+// TestClassifyMessage checks the message/hint the agent sees: no daemon
+// preamble, and a FriendlyError's recommendation moved into the hint while
+// the code still follows the raw cause.
+func TestClassifyMessage(t *testing.T) {
+	noImage := &docker.FriendlyError{Msg: "image not found on the host", Hint: "pull it first",
+		Cause: errors.New("Error response from daemon: No such image: nginx:x")}
+	gone := &docker.FriendlyError{Msg: "container not found",
+		Cause: errors.New("Error response from daemon: No such container: web")}
+	conflict := &docker.FriendlyError{Msg: "the image is used by a container", Hint: "run rm -f",
+		Cause: errors.New("conflict: unable to remove repository reference (must force)")}
+	tests := []struct {
+		name     string
+		err      error
+		wantCode Code
+		wantMsg  string
+		wantHint string
+	}{
+		{"daemon prefix dropped", errors.New("Error response from daemon: No such container: web"), CodeNotFound,
+			"No such container: web", "the object may have been removed by another client; list the resources again"},
+		{"wrapped daemon prefix dropped", fmt.Errorf("inspect: %w", errors.New("Error response from daemon: boom")), CodeInternal,
+			"inspect: boom", ""},
+		{"friendly hint replaces generic", noImage, CodeNotFound, "image not found on the host", "pull it first"},
+		{"wrapped friendly keeps context", fmt.Errorf("run web: %w", noImage), CodeNotFound, "run web: image not found on the host", "pull it first"},
+		{"friendly without hint keeps generic", gone, CodeNotFound, "container not found",
+			"the object may have been removed by another client; list the resources again"},
+		{"friendly conflict", conflict, CodeInternal, "the image is used by a container", "run rm -f"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Classify(tt.err)
+			if got.Code != tt.wantCode || got.Message != tt.wantMsg || got.Hint != tt.wantHint {
+				t.Errorf("Classify = {%q, %q, %q}\nwant       {%q, %q, %q}",
+					got.Code, got.Message, got.Hint, tt.wantCode, tt.wantMsg, tt.wantHint)
+			}
+			if !errors.Is(got, tt.err) {
+				t.Error("classified error lost its cause")
+			}
+		})
+	}
+}
+
 func TestErrorJSONAndString(t *testing.T) {
 	cause := errors.New("boom")
 	e := &Error{Code: CodeNotFound, Message: "no such container: web", Hint: "list again", Err: cause}

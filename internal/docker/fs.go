@@ -59,13 +59,14 @@ func (b *dockerBackend) ListPath(containerID, dir string) ([]FileEntry, error) {
 func friendlyListErr(dir, stderr string) error {
 	low := strings.ToLower(stderr)
 	mentionsDir := dir != "/" && strings.Contains(low, strings.ToLower(dir))
-	noLs := errors.New(i18n.T("в контейнере нет `ls` — обзор файловой системы недоступен", "the container has no `ls` — filesystem browsing is unavailable"))
-	notFound := fmt.Errorf(i18n.T("путь %s не найден", "path %s not found"), dir)
+	cause := errors.New(strings.TrimSpace(stderr))
+	noLs := friendly(cause, i18n.T("в контейнере нет `ls` — обзор файловой системы недоступен", "the container has no `ls` — filesystem browsing is unavailable"), "")
+	notFound := friendly(cause, fmt.Sprintf(i18n.T("путь %s не найден", "path %s not found"), dir), "")
 	switch {
 	case strings.Contains(low, "executable file not found"):
 		return noLs
 	case strings.Contains(low, "permission denied"):
-		return fmt.Errorf(i18n.T("нет доступа к %s", "no access to %s"), dir)
+		return friendly(cause, fmt.Sprintf(i18n.T("нет доступа к %s", "no access to %s"), dir), "")
 	case strings.Contains(low, "no such file or directory") && mentionsDir:
 		return notFound
 	case strings.Contains(low, "no such file or directory") && strings.Contains(low, "ls"):
@@ -177,13 +178,13 @@ func friendlyCopyErr(err error) error {
 	msg := strings.ToLower(err.Error())
 	switch {
 	case strings.Contains(msg, "no such container"):
-		return errors.New(i18n.T("контейнер не найден", "container not found"))
+		return friendly(err, i18n.T("контейнер не найден", "container not found"), "")
 	case strings.Contains(msg, "could not find the file"), strings.Contains(msg, "no such file"):
-		return errors.New(i18n.T("путь в контейнере не найден", "path in the container not found"))
+		return friendly(err, i18n.T("путь в контейнере не найден", "path in the container not found"), "")
 	case strings.Contains(msg, "not a directory"):
-		return errors.New(i18n.T("целевой путь в контейнере — не каталог", "target path in the container is not a directory"))
+		return friendly(err, i18n.T("целевой путь в контейнере — не каталог", "target path in the container is not a directory"), "")
 	case strings.Contains(msg, "permission denied"):
-		return errors.New(i18n.T("нет доступа к пути", "no access to the path"))
+		return friendly(err, i18n.T("нет доступа к пути", "no access to the path"), "")
 	}
 	return fmt.Errorf("docker cp: %w", err)
 }

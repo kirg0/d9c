@@ -33,7 +33,8 @@ var notFoundObjectRe = regexp.MustCompile(`\b(container|image|network|volume|pod
 // IsNotFound reports whether err says the targeted object no longer exists —
 // typically because another client removed it after the table was last
 // refreshed. It recognizes typed Docker errdefs.ErrNotFound (anywhere in the
-// wrap chain) and the textual variants of the CLI-driven backends. Callers
+// wrap chain), the textual variants of the CLI-driven backends and the raw
+// cause behind a FriendlyError (whose own text is reworded). Callers
 // should only apply it to operations on an existing row: a pull of a missing
 // image is also a daemon "not found", but means something else.
 func IsNotFound(err error) bool {
@@ -49,5 +50,11 @@ func IsNotFound(err error) bool {
 			return true
 		}
 	}
-	return notFoundObjectRe.MatchString(msg)
+	if notFoundObjectRe.MatchString(msg) {
+		return true
+	}
+	if fe, ok := AsFriendly(err); ok && fe.Cause != nil {
+		return IsNotFound(fe.Cause)
+	}
+	return false
 }

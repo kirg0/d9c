@@ -34,6 +34,10 @@ func TestIsNotFound(t *testing.T) {
 		{"exec binary", errors.New(`exec: "bash": executable file not found in $PATH`), false},
 		{"pull manifest", errors.New("manifest for nginx:nope not found: manifest unknown"), false},
 		{"friendly copy", errors.New("container not found"), false},
+		{"friendly over not found", friendlyCopyErr(errors.New("Error response from daemon: No such container: web")), true},
+		{"wrapped friendly over not found", fmt.Errorf("cp: %w", friendlyRunErr(errors.New("No such image: nginx:x"))), true},
+		{"friendly over conflict", friendlyImageRemoveErr(errors.New("conflict: image has dependent child")), false},
+		{"friendly without cause", &FriendlyError{Msg: "x"}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

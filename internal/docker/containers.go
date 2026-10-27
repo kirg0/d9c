@@ -3,7 +3,6 @@ package docker
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -249,11 +248,14 @@ func friendlyRunErr(err error) error {
 	msg := strings.ToLower(err.Error())
 	switch {
 	case strings.Contains(msg, "no such image"):
-		return errors.New(i18n.T("образ не найден на хосте — скачайте его сначала (:pull в разделе Images)", "image not found on the host — pull it first (:pull in the Images view)"))
+		return friendly(err, i18n.T("образ не найден на хосте", "image not found on the host"),
+			i18n.T("скачайте его сначала (:pull в разделе Images)", "pull it first (:pull in the Images view)"))
 	case strings.Contains(msg, "is already in use"):
-		return errors.New(i18n.T("имя контейнера занято — выберите другое или удалите старый контейнер", "container name is taken — pick another or remove the old container"))
+		return friendly(err, i18n.T("имя контейнера занято", "container name is taken"),
+			i18n.T("выберите другое или удалите старый контейнер", "pick another or remove the old container"))
 	case strings.Contains(msg, "invalid containerport"), strings.Contains(msg, "invalid port"):
-		return errors.New(i18n.T("неверный формат порта — используйте host:container, например 8080:80", "invalid port format — use host:container, e.g. 8080:80"))
+		return friendly(err, i18n.T("неверный формат порта", "invalid port format"),
+			i18n.T("используйте host:container, например 8080:80", "use host:container, e.g. 8080:80"))
 	}
 	return fmt.Errorf("create container: %w", err)
 }

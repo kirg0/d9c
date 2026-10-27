@@ -227,6 +227,7 @@ func TestRunCLI(t *testing.T) {
 		{"unknown saved host", config.Config{ConfigFile: cfgPath}, []string{"info", "--host", "nope"}, agent.CodeNotFound},
 		{"password host without env", config.Config{ConfigFile: cfgPath}, []string{"info", "--host", "pw"}, agent.CodeAuthRequired},
 		{"unreachable saved host", config.Config{ConfigFile: cfgPath}, []string{"info", "--host", "prod"}, agent.CodeConnection},
+		{"missing container", config.Config{ConfigFile: cfgPath}, []string{"inspect", "ghost", "-demo"}, agent.CodeNotFound},
 		{"broken config", config.Config{ConfigFile: writeCLIConfig(t, "  - [")}, []string{"info", "-demo"}, agent.CodeInternal},
 	}
 	for _, tt := range errorCases {
@@ -242,6 +243,9 @@ func TestRunCLI(t *testing.T) {
 			}
 			if doc.Error.Code != tt.wantCode || code != tt.wantCode.ExitCode() {
 				t.Errorf("code = %s exit %d, want %s exit %d", doc.Error.Code, code, tt.wantCode, tt.wantCode.ExitCode())
+			}
+			if doc.Error.Message == "" || strings.Contains(doc.Error.Message, "Error response from daemon") {
+				t.Errorf("message = %q, want a non-empty message without the daemon preamble", doc.Error.Message)
 			}
 		})
 	}
