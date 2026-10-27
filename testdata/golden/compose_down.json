@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "action": "compose down",
+    "project": "webapp",
+    "output": [
+      "[+] Running 2/2",
+      " ⠿ Container webapp-web-1  Stopping",
+      " ⠿ Container webapp-web-1  Removed",
+      " ⠿ Network webapp_default  Removed"
+    ]
+  },
+  "truncated": false
+}

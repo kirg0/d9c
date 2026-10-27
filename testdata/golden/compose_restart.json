@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "action": "compose restart",
+    "project": "monitoring",
+    "output": []
+  },
+  "truncated": false
+}

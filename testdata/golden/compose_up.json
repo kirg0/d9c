@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "action": "compose up",
+    "project": "legacy",
+    "output": [
+      "[+] Running 2/2",
+      " ⠿ Container legacy-web-1  Created",
+      " ⠿ Container legacy-web-1  Started"
+    ]
+  },
+  "truncated": false
+}

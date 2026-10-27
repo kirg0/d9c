@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "project": "webapp",
+    "path": "<backup>",
+    "size": 22
+  },
+  "truncated": false
+}

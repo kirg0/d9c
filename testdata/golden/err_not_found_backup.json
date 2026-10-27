@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "not_found",
+    "message": "backup archive \"nope.tar.gz\" not found",
+    "hint": "make one with `d9c compose backup <project>`; the path is local to this machine"
+  }
+}

@@ -319,6 +319,22 @@ func TestMockImages(t *testing.T) {
 	}
 }
 
+// The daemon reports a failed pull as an error frame inside a 200 stream; it
+// must surface as an error, not as a successful pull.
+func TestMockPullStreamError(t *testing.T) {
+	b := newMockBackend(t, func(w http.ResponseWriter, r *http.Request) {
+		if m, p := route(r); m == "POST" && p == "/images/create" {
+			jsonOK(w, `{"status":"Pulling from library/nginx"}
+{"errorDetail":{"message":"manifest unknown"},"error":"manifest unknown"}`)
+			return
+		}
+		jsonErr(w, http.StatusNotFound, "unexpected request")
+	})
+	if err := b.PullImage("nginx:nope"); err == nil || !strings.Contains(err.Error(), "manifest unknown") {
+		t.Errorf("pull = %v, want the stream error", err)
+	}
+}
+
 func TestMockBuildImage(t *testing.T) {
 	b := newMockBackend(t, func(w http.ResponseWriter, r *http.Request) {
 		if m, p := route(r); m == "POST" && p == "/build" {

@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "action": "compose restore",
+    "project": "webapp",
+    "output": [
+      "extracting webapp.tar.gz into /srv/webapp",
+      "starting project…",
+      "[+] Running 1/1",
+      " ⠿ Container webapp-web-1  Started"
+    ]
+  },
+  "truncated": false
+}

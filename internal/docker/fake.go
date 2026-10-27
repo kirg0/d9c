@@ -730,10 +730,11 @@ func (f *FakeBackend) ComposeUp(project string) (<-chan string, func(), error) {
 	if err := f.setComposeState(project, "running", f.composeTotal(project)); err != nil {
 		return nil, nil, err
 	}
+	name := f.composeName(project)
 	ch, stop := fakeProgress([]string{
 		"[+] Running 2/2",
-		" ⠿ Container " + project + "-web-1  Created",
-		" ⠿ Container " + project + "-web-1  Started",
+		" ⠿ Container " + name + "-web-1  Created",
+		" ⠿ Container " + name + "-web-1  Started",
 	})
 	return ch, stop, nil
 }
@@ -757,11 +758,12 @@ func (f *FakeBackend) ComposeDown(project string) (<-chan string, func(), error)
 	if err := f.setComposeState(project, "stopped", 0); err != nil {
 		return nil, nil, err
 	}
+	name := f.composeName(project)
 	ch, stop := fakeProgress([]string{
 		"[+] Running 2/2",
-		" ⠿ Container " + project + "-web-1  Stopping",
-		" ⠿ Container " + project + "-web-1  Removed",
-		" ⠿ Network " + project + "_default  Removed",
+		" ⠿ Container " + name + "-web-1  Stopping",
+		" ⠿ Container " + name + "-web-1  Removed",
+		" ⠿ Network " + name + "_default  Removed",
 	})
 	return ch, stop, nil
 }
@@ -851,12 +853,33 @@ func (f *FakeBackend) RestoreComposeProject(project, backupPath string) (<-chan 
 		return nil, nil, err
 	}
 	ch, stop := fakeProgress([]string{
-		"extracting " + backupPath + " into /srv/" + project,
+		"extracting " + backupPath + " into " + f.composeWorkdir(project),
 		"starting project…",
 		"[+] Running 1/1",
-		" ⠿ Container " + project + "-web-1  Started",
+		" ⠿ Container " + f.composeName(project) + "-web-1  Started",
 	})
 	return ch, stop, nil
+}
+
+// composeName returns the compose project name of a deployment identity —
+// what the engine prefixes container and network names with.
+func (f *FakeBackend) composeName(identity string) string {
+	for _, c := range f.Composes {
+		if composeIdentity(c.Project, c.WorkingDir) == identity {
+			return c.Project
+		}
+	}
+	return identity
+}
+
+// composeWorkdir returns the working directory of a deployment identity.
+func (f *FakeBackend) composeWorkdir(identity string) string {
+	for _, c := range f.Composes {
+		if composeIdentity(c.Project, c.WorkingDir) == identity && c.WorkingDir != "" {
+			return c.WorkingDir
+		}
+	}
+	return "/srv/" + identity
 }
 
 func (f *FakeBackend) composeTotal(project string) int {

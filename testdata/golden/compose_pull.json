@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "action": "compose pull",
+    "project": "webapp",
+    "output": [
+      "[+] Pulling 1/1",
+      " ⠿ web Pulling",
+      " ⠿ nginx:1.25 Pull complete",
+      " ⠿ web Pulled"
+    ]
+  },
+  "truncated": false
+}
