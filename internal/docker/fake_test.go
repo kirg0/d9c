@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -238,6 +239,17 @@ func TestFakeContainerLogs(t *testing.T) {
 	}
 	if _, _, err := f.ContainerLogs("missing", LogOptions{}); !IsNotFound(err) {
 		t.Errorf("logs of a missing container: err = %v, want not-found", err)
+	}
+
+	// Tail keeps the last lines, and a name addresses the container too.
+	ch, stop, err = f.ContainerLogs(f.Containers[0].Name, LogOptions{Tail: 2, NoFollow: true})
+	lines = collect(t, ch, stop, err)
+	if want := f.LogLines[len(f.LogLines)-2:]; !reflect.DeepEqual(lines, want) {
+		t.Errorf("tail 2 = %q, want %q", lines, want)
+	}
+	ch, stop, err = f.ComposeLogs(f.Composes[0].Identity(), LogOptions{Tail: 1})
+	if lines = collect(t, ch, stop, err); len(lines) != 1 || !strings.HasPrefix(lines[0], "web | ") {
+		t.Errorf("compose tail 1 = %q", lines)
 	}
 }
 
@@ -621,7 +633,7 @@ func TestFakeMisc(t *testing.T) {
 		t.Errorf("info = %+v / %v", info, err)
 	}
 
-	ch, stop, err := f.Events()
+	ch, stop, err := f.Events(EventOptions{})
 	if err != nil {
 		t.Fatalf("events: %v", err)
 	}
@@ -632,6 +644,20 @@ func TestFakeMisc(t *testing.T) {
 	stop() // idempotent
 	for range ch {
 	} // channel must be closed after stop
+
+	// A windowed query delivers its lines and ends on its own.
+	ch, stop, err = f.Events(EventOptions{Since: "10m", Until: "now"})
+	if err != nil {
+		t.Fatalf("windowed events: %v", err)
+	}
+	n := 0
+	for range ch {
+		n++
+	}
+	stop() // still safe after the natural end
+	if n == 0 {
+		t.Error("windowed events delivered nothing")
+	}
 }
 
 // TestFakeContainerStats_Jitter checks StatsJitter varies CPU/MEM between calls

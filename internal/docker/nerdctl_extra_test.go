@@ -290,8 +290,11 @@ func TestNerdctlSystemAndInfo(t *testing.T) {
 	if out, err := b.SystemPrune(); err != nil || out != "reclaimed stuff" {
 		t.Errorf("prune = %q / %v", out, err)
 	}
-	if _, _, err := b.Events(); err != nil {
+	if _, _, err := b.Events(EventOptions{}); err != nil {
 		t.Errorf("events: %v", err)
+	}
+	if _, _, err := b.Events(EventOptions{Since: "10m"}); err == nil || !strings.Contains(err.Error(), "live only") {
+		t.Errorf("windowed events: err = %v, want live-only refusal", err)
 	}
 
 	info, err := b.Info()

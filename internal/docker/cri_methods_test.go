@@ -119,8 +119,14 @@ func TestCRIContainerOps(t *testing.T) {
 	if _, _, err := b.ContainerLogs("c1", LogOptions{Tail: 5}); err != nil || criLastCall(fr) != "logs -f --timestamps --tail 5 c1" {
 		t.Errorf("logs argv = %q, %v", criLastCall(fr), err)
 	}
-	if _, _, err := b.Events(); err != nil || criLastCall(fr) != "events" {
+	if _, _, err := b.Events(EventOptions{}); err != nil || criLastCall(fr) != "events" {
 		t.Errorf("events argv = %q, %v", criLastCall(fr), err)
+	}
+	if _, _, err := b.Events(EventOptions{Until: "5m"}); err == nil || !strings.Contains(err.Error(), "live only") {
+		t.Errorf("windowed events: err = %v, want live-only refusal", err)
+	}
+	if _, _, err := b.ContainerLogs("c1", LogOptions{NoFollow: true}); err != nil || criLastCall(fr) != "logs --timestamps c1" {
+		t.Errorf("one-shot logs argv = %q, %v", criLastCall(fr), err)
 	}
 	if _, err := b.ExecInteractive("c1", []string{"bash"}); err != nil || !strings.HasPrefix(criLastCall(fr), "exec -i -t c1") {
 		t.Errorf("exec argv = %q, %v", criLastCall(fr), err)

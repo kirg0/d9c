@@ -1497,7 +1497,7 @@ func streamLogs(ch <-chan string, containerID string) tea.Cmd {
 // openEvents starts the daemon event stream and opens the events viewer.
 func openEvents(b docker.Backend) tea.Cmd {
 	return func() tea.Msg {
-		ch, stop, err := b.Events()
+		ch, stop, err := b.Events(docker.EventOptions{})
 		if err != nil {
 			return errMsg{err}
 		}

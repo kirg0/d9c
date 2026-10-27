@@ -108,9 +108,10 @@ func (f *FakeBackend) ListContainers(showAll bool) ([]Container, error) {
 	return out, nil
 }
 
+// InspectContainer accepts an ID or a name, like the daemon.
 func (f *FakeBackend) InspectContainer(id string) (*InspectResult, error) {
 	for _, c := range f.Containers {
-		if c.ID == id {
+		if c.ID == id || c.Name == id {
 			return &InspectResult{Name: c.Name, RawYAML: fmt.Sprintf("Id: %s\nName: %s\nImage: %s\nState: %s\nStatus: %s\n", c.ID, c.Name, c.Image, c.State, c.Status)}, nil
 		}
 	}
@@ -392,12 +393,22 @@ func (f *FakeBackend) ContainerLogs(id string, opts LogOptions) (<-chan string, 
 	if _, err := f.InspectContainer(id); err != nil {
 		return nil, nil, err // same "no such container" as the daemon
 	}
-	ch := make(chan string, len(f.LogLines))
-	for _, l := range f.LogLines {
+	lines := tailLines(f.LogLines, opts.Tail)
+	ch := make(chan string, len(lines))
+	for _, l := range lines {
 		ch <- l
 	}
 	close(ch)
 	return ch, func() {}, nil
+}
+
+// tailLines returns the last n lines (all of them for n <= 0), as the
+// daemon's tail option does.
+func tailLines(lines []string, n int) []string {
+	if n > 0 && len(lines) > n {
+		return lines[len(lines)-n:]
+	}
+	return lines
 }
 
 // ── Images ──────────────────────────────────────────────────────────────────
@@ -651,8 +662,9 @@ func (f *FakeBackend) InspectComposeProject(project string) (*InspectResult, err
 func (f *FakeBackend) ComposeLogs(project string, opts LogOptions) (<-chan string, func(), error) {
 	for _, p := range f.Composes {
 		if composeIdentity(p.Project, p.WorkingDir) == project {
-			ch := make(chan string, len(f.LogLines))
-			for _, l := range f.LogLines {
+			lines := tailLines(f.LogLines, opts.Tail)
+			ch := make(chan string, len(lines))
+			for _, l := range lines {
 				ch <- "web | " + l
 			}
 			close(ch)
@@ -932,9 +944,10 @@ func (f *FakeBackend) Info() (HostSummary, error) {
 func (f *FakeBackend) Close() {}
 
 // Events returns a fake event stream that emits a small set of deterministic
-// demo events so the UI can exercise the events view without a daemon. The
-// channel stays open (mimicking a live subscription) until stop closes it.
-func (f *FakeBackend) Events() (<-chan string, func(), error) {
+// demo events so the UI can exercise the events view without a daemon. A live
+// stream stays open (mimicking a subscription) until stop closes it; a windowed
+// one is closed once the lines are delivered, like the daemon's.
+func (f *FakeBackend) Events(opts EventOptions) (<-chan string, func(), error) {
 	lines := []string{
 		"container create 9ae942fd8fbc (local)",
 		"container start 9ae942fd8fbc (local)",
@@ -948,5 +961,8 @@ func (f *FakeBackend) Events() (<-chan string, func(), error) {
 	}
 	var once sync.Once
 	stop := func() { once.Do(func() { close(ch) }) }
+	if opts.Windowed() {
+		stop()
+	}
 	return ch, stop, nil
 }

@@ -109,10 +109,12 @@ type Backend interface {
 	// SystemPrune removes stopped containers, unused networks, dangling images
 	// and the build cache; it returns a human-readable summary.
 	SystemPrune() (string, error)
-	// Events returns a live stream of Docker daemon events as formatted strings.
-	// stop ends the subscription and closes the channel; the caller MUST call it
-	// when it abandons the stream (closing the view, refreshing).
-	Events() (lines <-chan string, stop func(), err error)
+	// Events returns a stream of daemon events as formatted strings: live with
+	// zero opts, or the past events of a bounded window (opts.Windowed), after
+	// which the channel closes. stop ends the subscription and closes the
+	// channel; the caller MUST call it when it abandons the stream (closing the
+	// view, refreshing).
+	Events(opts EventOptions) (lines <-chan string, stop func(), err error)
 	// Ping checks the connection to the daemon is alive (used by auto-reconnect).
 	Ping() error
 	// Runtime reports which container engine backs the connection (Docker vs
@@ -287,13 +289,31 @@ func (b *dockerBackend) Close() {
 	b.closeFn()
 }
 
+// EventOptions bounds an event query. Since/Until take Docker's syntax (a
+// duration like "10m" counted back from now, an RFC3339 timestamp or Unix
+// seconds); both empty means a live subscription.
+type EventOptions struct {
+	Since string
+	Until string
+}
+
+// Windowed reports whether opts asks for past events rather than a live feed.
+func (o EventOptions) Windowed() bool { return o.Since != "" || o.Until != "" }
+
+// errEventWindowUnsupported is returned by engines whose event stream is live
+// only (nerdctl, crictl): they keep no history to query a window from.
+func errEventWindowUnsupported(engine string) error {
+	return fmt.Errorf("event history (--since/--until) is not supported by %s: its event stream is live only", engine)
+}
+
 // Events opens a stream of Docker daemon events and formats them into human-
-// readable lines. The returned stop cancels the subscription and closes the
-// channel; every send also watches the context so an abandoned stream can't
-// block the producer forever.
-func (b *dockerBackend) Events() (<-chan string, func(), error) {
+// readable lines; a windowed query prefixes each with its RFC3339 time, since
+// the lines no longer arrive as they happen. The returned stop cancels the
+// subscription and closes the channel; every send also watches the context so
+// an abandoned stream can't block the producer forever.
+func (b *dockerBackend) Events(opts EventOptions) (<-chan string, func(), error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	msgCh, errCh := b.cli.Events(ctx, events.ListOptions{})
+	msgCh, errCh := b.cli.Events(ctx, events.ListOptions{Since: opts.Since, Until: opts.Until})
 
 	ch := make(chan string, 256)
 	send := func(line string) bool {
@@ -312,11 +332,20 @@ func (b *dockerBackend) Events() (<-chan string, func(), error) {
 			case <-ctx.Done():
 				return
 			case msg, ok := <-msgCh:
-				if !ok || !send(formatEvent(msg)) {
+				if !ok {
+					return
+				}
+				line := formatEvent(msg)
+				if opts.Windowed() {
+					line = time.Unix(0, msg.TimeNano).UTC().Format(time.RFC3339) + " " + line
+				}
+				if !send(line) {
 					return
 				}
 			case err, ok := <-errCh:
-				if !ok || !send("[error] "+err.Error()) {
+				// The daemon ends a windowed query with io.EOF on errCh once
+				// Until is reached: that is the normal end, not an error line.
+				if !ok || errors.Is(err, io.EOF) || !send("[error] "+err.Error()) {
 					return
 				}
 			}

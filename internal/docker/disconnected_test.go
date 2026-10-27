@@ -71,7 +71,7 @@ func TestDisconnectedBackend(t *testing.T) {
 		{"ComposePause", func() error { return b.ComposePause("p") }},
 		{"ComposeUnpause", func() error { return b.ComposeUnpause("p") }},
 		{"ComposeRemove", func() error { return b.ComposeRemove("p") }},
-		{"Events", func() error { _, _, err := b.Events(); return err }},
+		{"Events", func() error { _, _, err := b.Events(EventOptions{}); return err }},
 	}
 	for _, c := range checks {
 		t.Run(c.name, func(t *testing.T) {

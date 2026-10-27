@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"sync/atomic"
@@ -596,7 +598,7 @@ func TestMockEvents(t *testing.T) {
 		jsonErr(w, http.StatusNotFound, "unexpected")
 	})
 
-	ch, stop, err := b.Events()
+	ch, stop, err := b.Events(EventOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -619,6 +621,71 @@ func TestMockEvents(t *testing.T) {
 		case <-deadline:
 			t.Fatal("events channel did not close after stop")
 		}
+	}
+}
+
+// A windowed query passes since/until to the daemon, stamps each line with its
+// time and ends cleanly when the daemon closes the stream (io.EOF on errCh)
+// instead of reporting an error line.
+func TestMockEventsWindow(t *testing.T) {
+	var query url.Values
+	b := newMockBackend(t, func(w http.ResponseWriter, r *http.Request) {
+		if m, p := route(r); m == "GET" && p == "/events" {
+			query = r.URL.Query()
+			jsonOK(w, `{"Type":"container","Action":"die","Actor":{"ID":"abcdefabcdefabcdef","Attributes":{"name":"web"}},"scope":"local","timeNano":1793102400000000000}`)
+			return
+		}
+		jsonErr(w, http.StatusNotFound, "unexpected")
+	})
+
+	ch, stop, err := b.Events(EventOptions{Since: "1793100000", Until: "1793103000"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stop()
+	var got []string
+	timeout := time.After(5 * time.Second)
+	for done := false; !done; {
+		select {
+		case l, ok := <-ch:
+			if !ok {
+				done = true
+				break
+			}
+			got = append(got, l)
+		case <-timeout:
+			t.Fatal("windowed stream did not end")
+		}
+	}
+	want := []string{"2026-10-27T12:00:00Z container die web (local)"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("events = %q, want %q", got, want)
+	}
+	if query.Get("since") != "1793100000" || query.Get("until") != "1793103000" {
+		t.Errorf("query = %v, want since/until passed through", query)
+	}
+}
+
+// NoFollow turns the daemon's follow mode off; the zero value keeps it on.
+func TestMockLogsFollowFlag(t *testing.T) {
+	var follow []string
+	b := newMockBackend(t, func(w http.ResponseWriter, r *http.Request) {
+		switch m, p := route(r); {
+		case m == "GET" && strings.HasSuffix(p, "/json"):
+			jsonOK(w, mockContainerInspect)
+		case m == "GET" && strings.HasSuffix(p, "/logs"):
+			follow = append(follow, r.URL.Query().Get("follow"))
+			muxLogs(w, "line")
+		default:
+			jsonErr(w, http.StatusNotFound, "unexpected "+m+" "+p)
+		}
+	})
+	for _, opts := range []LogOptions{{NoFollow: true}, {}} {
+		ch, stop, err := b.ContainerLogs("abc", opts)
+		collect(t, ch, stop, err)
+	}
+	if !reflect.DeepEqual(follow, []string{"", "1"}) { // the SDK omits follow=false
+		t.Errorf("follow params = %q, want [\"\" 1]", follow)
 	}
 }
 

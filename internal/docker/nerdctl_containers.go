@@ -256,9 +256,13 @@ func (b *nerdctlBackend) ContainerLogs(id string, opts LogOptions) (<-chan strin
 	return b.runner.stream(b.args(buildLogsArgs(id, opts)...))
 }
 
-// buildLogsArgs assembles `logs -f --timestamps [--tail N] [--since] [--until] id`.
+// buildLogsArgs assembles `logs [-f] --timestamps [--tail N] [--since] [--until] id`.
 func buildLogsArgs(id string, opts LogOptions) []string {
-	args := []string{"logs", "-f", "--timestamps"}
+	args := []string{"logs"}
+	if !opts.NoFollow {
+		args = append(args, "-f")
+	}
+	args = append(args, "--timestamps")
 	if opts.Tail > 0 {
 		args = append(args, "--tail", strconv.Itoa(opts.Tail))
 	}

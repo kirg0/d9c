@@ -8,7 +8,12 @@ import (
 // every frontend (CLI, MCP) serves.
 func Builtin() *Registry {
 	r := NewRegistry()
-	r.MustRegister(hostsLsOp(), infoOp())
+	r.MustRegister(
+		hostsLsOp(), infoOp(),
+		psOp(), inspectOp(), logsOp(), statsOp(),
+		imagesOp(), networksOp(), volumesOp(), systemDFOp(), eventsOp(),
+		composeLsOp(), composePsOp(), composeConfigOp(), composeLogsOp(),
+	)
 	return r
 }
 
@@ -59,7 +64,7 @@ func infoOp() Op {
 		Tier:    TierRead,
 		Handler: func(_ context.Context, env *Env, _ Args) (Result, error) {
 			if env.Backend == nil {
-				return Result{}, Errorf(CodeInternal, "info: no engine connection")
+				return Result{}, errNoBackend("info")
 			}
 			s, err := env.Backend.Info()
 			if err != nil {

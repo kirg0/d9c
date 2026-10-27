@@ -129,6 +129,12 @@ func TestSchemaCheck(t *testing.T) {
 		{"bad default", Object(map[string]*Schema{"a": Integer("d").WithDefault("many")}), "bad default"},
 		{"default off enum", Object(map[string]*Schema{"a": String("d").WithEnum("x").WithDefault("y")}), "bad default"},
 		{"undeclared required", Object(map[string]*Schema{"a": String("d")}, "b"), `"b" is not declared`},
+		{"short alias", Object(map[string]*Schema{"all": Boolean("d").WithShort("a")}), ""},
+		{"short too long", Object(map[string]*Schema{"all": Boolean("d").WithShort("al")}), "one letter"},
+		{"short digit", Object(map[string]*Schema{"all": Boolean("d").WithShort("1")}), "one letter"},
+		{"short help", Object(map[string]*Schema{"all": Boolean("d").WithShort("h")}), "other than h/H"},
+		{"short host", Object(map[string]*Schema{"all": Boolean("d").WithShort("H")}), "other than h/H"},
+		{"short dup", Object(map[string]*Schema{"all": Boolean("d").WithShort("a"), "any": Boolean("d").WithShort("a")}), "already used"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -152,7 +158,7 @@ func TestSchemaJSON(t *testing.T) {
 		"id":   String("container ID or name"),
 		"tail": Integer("lines").WithDefault(200).WithMin(0),
 		"mode": String("m").WithEnum("a", "b"),
-		"keys": StringArray("k"),
+		"keys": StringArray("k").WithShort("k"), // CLI-only: absent from the JSON
 	}, "id")
 	b, err := json.Marshal(s)
 	if err != nil {

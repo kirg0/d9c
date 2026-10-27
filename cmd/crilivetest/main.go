@@ -329,7 +329,7 @@ func main() {
 
 	// ── events ──────────────────────────────────────────────────────────────
 	step("Events", func() error {
-		lines, stop, err := b.Events()
+		lines, stop, err := b.Events(docker.EventOptions{})
 		if err != nil {
 			return err
 		}

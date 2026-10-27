@@ -63,8 +63,12 @@ func (b *nerdctlBackend) SystemPrune() (string, error) {
 	return strings.TrimSpace(out), nil
 }
 
-// Events streams containerd daemon events (`nerdctl events`).
-func (b *nerdctlBackend) Events() (<-chan string, func(), error) {
+// Events streams containerd daemon events (`nerdctl events`). The feed is live
+// only, so a windowed query is refused.
+func (b *nerdctlBackend) Events(opts EventOptions) (<-chan string, func(), error) {
+	if opts.Windowed() {
+		return nil, nil, errEventWindowUnsupported("containerd (nerdctl)")
+	}
 	return b.runner.stream(b.args("events"))
 }
 

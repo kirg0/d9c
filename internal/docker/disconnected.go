@@ -113,17 +113,19 @@ func (b *disconnectedBackend) BackupComposeProject(string) (string, error) {
 func (b *disconnectedBackend) RestoreComposeProject(string, string) (<-chan string, func(), error) {
 	return nil, nil, b.err()
 }
-func (b *disconnectedBackend) SystemDF() (*InspectResult, error)      { return nil, b.err() }
-func (b *disconnectedBackend) SystemPrune() (string, error)           { return "", b.err() }
-func (b *disconnectedBackend) Ping() error                            { return b.err() }
-func (b *disconnectedBackend) Runtime() Runtime                       { return RuntimeUnknown }
-func (b *disconnectedBackend) Info() (HostSummary, error)             { return HostSummary{}, b.err() }
-func (b *disconnectedBackend) ComposeStart(string) error              { return b.err() }
-func (b *disconnectedBackend) ComposeStop(string) error               { return b.err() }
-func (b *disconnectedBackend) ComposeRestart(string) error            { return b.err() }
-func (b *disconnectedBackend) ComposePause(string) error              { return b.err() }
-func (b *disconnectedBackend) ComposeUnpause(string) error            { return b.err() }
-func (b *disconnectedBackend) ComposeRemove(string) error             { return b.err() }
-func (b *disconnectedBackend) Events() (<-chan string, func(), error) { return nil, nil, b.err() }
-func (b *disconnectedBackend) SupportsHostCompose() bool              { return false }
-func (b *disconnectedBackend) Close()                                 {}
+func (b *disconnectedBackend) SystemDF() (*InspectResult, error) { return nil, b.err() }
+func (b *disconnectedBackend) SystemPrune() (string, error)      { return "", b.err() }
+func (b *disconnectedBackend) Ping() error                       { return b.err() }
+func (b *disconnectedBackend) Runtime() Runtime                  { return RuntimeUnknown }
+func (b *disconnectedBackend) Info() (HostSummary, error)        { return HostSummary{}, b.err() }
+func (b *disconnectedBackend) ComposeStart(string) error         { return b.err() }
+func (b *disconnectedBackend) ComposeStop(string) error          { return b.err() }
+func (b *disconnectedBackend) ComposeRestart(string) error       { return b.err() }
+func (b *disconnectedBackend) ComposePause(string) error         { return b.err() }
+func (b *disconnectedBackend) ComposeUnpause(string) error       { return b.err() }
+func (b *disconnectedBackend) ComposeRemove(string) error        { return b.err() }
+func (b *disconnectedBackend) Events(EventOptions) (<-chan string, func(), error) {
+	return nil, nil, b.err()
+}
+func (b *disconnectedBackend) SupportsHostCompose() bool { return false }
+func (b *disconnectedBackend) Close()                    {}
