@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -97,9 +96,11 @@ func friendlyImageRemoveErr(err error) error {
 	msg := strings.ToLower(err.Error())
 	switch {
 	case strings.Contains(msg, "dependent child"):
-		return errors.New(i18n.T("у образа есть зависимые образы — удалите их сначала или выполните prune", "the image has dependent images — remove them first or run prune"))
+		return friendly(err, i18n.T("у образа есть зависимые образы", "the image has dependent images"),
+			i18n.T("удалите их сначала или выполните prune", "remove them first or run prune"))
 	case strings.Contains(msg, "must force"):
-		return errors.New(i18n.T("образ используется контейнером — выполните rm -f или сначала удалите контейнер", "the image is used by a container — run rm -f or remove the container first"))
+		return friendly(err, i18n.T("образ используется контейнером", "the image is used by a container"),
+			i18n.T("выполните rm -f или сначала удалите контейнер", "run rm -f or remove the container first"))
 	}
 	return err
 }

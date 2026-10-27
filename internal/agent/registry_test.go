@@ -139,6 +139,15 @@ func TestInvoke(t *testing.T) {
 				return Result{}, errors.New("Error response from daemon: No such container: web")
 			},
 		},
+		Op{
+			Name:    "boom",
+			Summary: "panics",
+			Args:    NoArgs(),
+			Tier:    TierRead,
+			Handler: func(context.Context, *Env, Args) (Result, error) {
+				panic("nil map")
+			},
+		},
 		testOp("rm", TierDestructive),
 	)
 	ctx := context.Background()
@@ -159,6 +168,7 @@ func TestInvoke(t *testing.T) {
 		{"bad args", "echo", Args{"n": "x"}, TierRead, CodeUsage},
 		{"over ceiling", "rm", nil, TierSafe, CodeForbidden},
 		{"handler error classified", "fail", nil, TierRead, CodeNotFound},
+		{"handler panic", "boom", nil, TierRead, CodeInternal},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
