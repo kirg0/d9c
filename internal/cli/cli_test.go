@@ -151,6 +151,10 @@ func TestParseErrors(t *testing.T) {
 		{"missing value", []string{"logs", "api", "--tail"}, "flag --tail needs a value", "[--tail int]"},
 		{"global missing value", []string{"info", "-H"}, "flag -H needs a value", ""},
 		{"bad global bool", []string{"info", "--demo=maybe"}, "want true or false", ""},
+		{"unknown format", []string{"info", "-o", "xml"}, `unknown format "xml"`, "json, text, ndjson"},
+		{"format missing value", []string{"info", "--output"}, "flag --output needs a value", ""},
+		{"bad limit", []string{"info", "--limit", "-1"}, "want a whole number", ""},
+		{"limit not a number", []string{"info", "--limit=ten"}, "want a whole number", ""},
 		{"help unknown", []string{"help", "nope"}, `unknown command "nope"`, ""},
 		{"help extra", []string{"help", "info", "x"}, `unexpected argument "x"`, ""},
 	}
@@ -218,7 +222,7 @@ func TestWriteHelp(t *testing.T) {
 func TestWriteResult(t *testing.T) {
 	var buf bytes.Buffer
 	env := agent.NewEnvelope("prod", docker.RuntimePodman, agent.Result{Data: map[string]string{"ports": "8080->80/tcp"}})
-	if err := WriteResult(&buf, env); err != nil {
+	if err := WriteResult(&buf, &buf, env, Output{}); err != nil {
 		t.Fatal(err)
 	}
 	want := `{"schema":1,"host":"prod","runtime":"podman","data":{"ports":"8080->80/tcp"},"truncated":false}` + "\n"

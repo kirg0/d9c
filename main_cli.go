@@ -68,7 +68,7 @@ func runCLI(cfg *config.Config, reg *agent.Registry, args []string, stdout, stde
 	if inv.Op.Local {
 		out.Runtime = "" // no engine involved
 	}
-	if err := cli.WriteResult(stdout, out); err != nil {
+	if err := cli.WriteResult(stdout, stderr, out, inv.Output); err != nil {
 		return cli.WriteError(stderr, err)
 	}
 	return 0

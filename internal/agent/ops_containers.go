@@ -202,6 +202,9 @@ type LogsData struct {
 	Lines  []string `json:"lines"`
 }
 
+// ItemsKey implements Lister: the log lines are the items.
+func (LogsData) ItemsKey() string { return "lines" }
+
 func logsOp() Op {
 	return Op{
 		Name:    "logs",

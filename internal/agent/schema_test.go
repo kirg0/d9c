@@ -15,7 +15,7 @@ func logsSchema() *Schema {
 		"tail":   Integer("lines from the end").WithDefault(200).WithMin(0),
 		"follow": Boolean("stream new lines"),
 		"format": String("output format").WithEnum("json", "text").WithDefault("json"),
-		"fields": StringArray("fields to keep"),
+		"names":  StringArray("names to keep"),
 	}, "id")
 }
 
@@ -33,8 +33,8 @@ func TestSchemaNormalize(t *testing.T) {
 		},
 		{
 			name: "json decoded values",
-			in:   Args{"id": "web", "tail": float64(50), "follow": true, "fields": []any{"a", "b"}},
-			want: Args{"id": "web", "tail": 50, "follow": true, "format": "json", "fields": []string{"a", "b"}},
+			in:   Args{"id": "web", "tail": float64(50), "follow": true, "names": []any{"a", "b"}},
+			want: Args{"id": "web", "tail": 50, "follow": true, "format": "json", "names": []string{"a", "b"}},
 		},
 		{
 			name: "cli string values",
@@ -54,8 +54,8 @@ func TestSchemaNormalize(t *testing.T) {
 		{name: "enum violation", in: Args{"id": "x", "format": "yaml"}, wantErr: "is not one of"},
 		{name: "wrong string type", in: Args{"id": 3}, wantErr: "want a string"},
 		{name: "wrong bool", in: Args{"id": "x", "follow": "maybe"}, wantErr: "want a boolean"},
-		{name: "array item type", in: Args{"id": "x", "fields": []any{"a", 1}}, wantErr: "item 1"},
-		{name: "array type", in: Args{"id": "x", "fields": "a"}, wantErr: "want a list of strings"},
+		{name: "array item type", in: Args{"id": "x", "names": []any{"a", 1}}, wantErr: "item 1"},
+		{name: "array type", in: Args{"id": "x", "names": "a"}, wantErr: "want a list of strings"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -80,7 +80,7 @@ func TestSchemaNormalize(t *testing.T) {
 func TestNormalizeUnknownArgHint(t *testing.T) {
 	_, err := logsSchema().Normalize(Args{"x": 1})
 	var ae *Error
-	if !errors.As(err, &ae) || ae.Hint != "valid arguments: fields, follow, format, id, tail" {
+	if !errors.As(err, &ae) || ae.Hint != "valid arguments: follow, format, id, names, tail" {
 		t.Fatalf("hint = %v", err)
 	}
 	_, err = NoArgs().Normalize(Args{"x": 1})
@@ -91,20 +91,20 @@ func TestNormalizeUnknownArgHint(t *testing.T) {
 	if !errors.As(err, &ae) || ae.Hint != "id (string): container ID or name" {
 		t.Fatalf("missing-arg hint = %v", err)
 	}
-	_, err = logsSchema().Normalize(Args{"id": "x", "fields": 1})
-	if !errors.As(err, &ae) || ae.Hint != "fields (list of strings): fields to keep" {
+	_, err = logsSchema().Normalize(Args{"id": "x", "names": 1})
+	if !errors.As(err, &ae) || ae.Hint != "names (list of strings): names to keep" {
 		t.Fatalf("bad-type hint = %v", err)
 	}
 }
 
 func TestNormalizeDoesNotAliasInput(t *testing.T) {
-	in := Args{"id": "x", "fields": []string{"a"}}
+	in := Args{"id": "x", "names": []string{"a"}}
 	out, err := logsSchema().Normalize(in)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out.Strings("fields")[0] = "changed"
-	if in["fields"].([]string)[0] != "a" {
+	out.Strings("names")[0] = "changed"
+	if in["names"].([]string)[0] != "a" {
 		t.Error("Normalize returned a slice aliasing the input")
 	}
 }
@@ -132,8 +132,11 @@ func TestSchemaCheck(t *testing.T) {
 		{"short alias", Object(map[string]*Schema{"all": Boolean("d").WithShort("a")}), ""},
 		{"short too long", Object(map[string]*Schema{"all": Boolean("d").WithShort("al")}), "one letter"},
 		{"short digit", Object(map[string]*Schema{"all": Boolean("d").WithShort("1")}), "one letter"},
-		{"short help", Object(map[string]*Schema{"all": Boolean("d").WithShort("h")}), "other than h/H"},
-		{"short host", Object(map[string]*Schema{"all": Boolean("d").WithShort("H")}), "other than h/H"},
+		{"short help", Object(map[string]*Schema{"all": Boolean("d").WithShort("h")}), "other than h/H/o"},
+		{"short host", Object(map[string]*Schema{"all": Boolean("d").WithShort("H")}), "other than h/H/o"},
+		{"short output", Object(map[string]*Schema{"all": Boolean("d").WithShort("o")}), "other than h/H/o"},
+		{"reserved limit", Object(map[string]*Schema{"limit": Integer("d")}), "reserved for the output options"},
+		{"reserved output", Object(map[string]*Schema{"output": String("d")}), "reserved for the output options"},
 		{"short dup", Object(map[string]*Schema{"all": Boolean("d").WithShort("a"), "any": Boolean("d").WithShort("a")}), "already used"},
 	}
 	for _, tt := range tests {
