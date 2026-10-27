@@ -199,11 +199,12 @@ func TestWriteHelp(t *testing.T) {
 	}
 	out = buf.String()
 	for _, want := range []string{
-		"usage: d9c logs <id> [--all] [--format value] [--grep value (repeatable)] [--no_redact] [--tail int]",
+		"usage: d9c logs <id> [--all] [--format value] [--grep value (repeatable)] [--no-redact] [--tail int]",
 		"-a, --all (boolean): Every line.",
 		agent.UntrustedNote,
 		"--tail (integer): Lines. (default 200)",
 		"--format (string): Format. (one of json, text)",
+		"--no-redact (boolean): Show secrets.",
 		"Global flags:",
 	} {
 		if !strings.Contains(out, want) {

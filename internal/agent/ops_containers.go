@@ -111,6 +111,8 @@ func inspectOp() Op {
 			"type": String("Kind of object to inspect.").
 				WithEnum(kindContainer, kindImage, kindNetwork, kindVolume, kindCompose).
 				WithDefault(kindContainer).WithShort("t"),
+			"no_redact": Boolean("Show the values of environment variables whose names contain " +
+				"PASS, TOKEN, SECRET or KEY (masked by default)."),
 		}, "target"),
 		Tier:      TierRead,
 		Untrusted: true,
@@ -139,7 +141,14 @@ func inspectOp() Op {
 			if err != nil {
 				return Result{}, err
 			}
-			return Result{Data: InspectData{Type: kind, Name: res.Name, Object: decodeYAML(res.RawYAML)}}, nil
+			obj := decodeYAML(res.RawYAML)
+			r := Result{Data: InspectData{Type: kind, Name: res.Name, Object: obj}}
+			if !args.Bool("no_redact") {
+				if n := redactEnv(obj); n > 0 {
+					r.Hint = redactHint(n)
+				}
+			}
+			return r, nil
 		},
 	}
 }

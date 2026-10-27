@@ -112,7 +112,9 @@ func (f *FakeBackend) ListContainers(showAll bool) ([]Container, error) {
 func (f *FakeBackend) InspectContainer(id string) (*InspectResult, error) {
 	for _, c := range f.Containers {
 		if c.ID == id || c.Name == id {
-			return &InspectResult{Name: c.Name, RawYAML: fmt.Sprintf("Id: %s\nName: %s\nImage: %s\nState: %s\nStatus: %s\n", c.ID, c.Name, c.Image, c.State, c.Status)}, nil
+			return &InspectResult{Name: c.Name, RawYAML: fmt.Sprintf("Id: %s\nName: %s\nImage: %s\nState: %s\nStatus: %s\n"+
+				"Config:\n  Env:\n    - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin\n    - API_TOKEN=demo-token-%s\n",
+				c.ID, c.Name, c.Image, c.State, c.Status, c.ID)}, nil
 		}
 	}
 	return nil, fmt.Errorf("no such container: %s", id)

@@ -293,13 +293,19 @@ func usageLine(op agent.Op) string {
 		b.WriteString(" <" + name + ">")
 	}
 	for _, name := range optionalProps(op.Args) {
-		b.WriteString(" [--" + name)
+		b.WriteString(" [" + flagName(name))
 		if t := op.Args.Properties[name].Type; t != agent.TypeBoolean {
 			b.WriteString(" " + typeWord(t))
 		}
 		b.WriteString("]")
 	}
 	return b.String()
+}
+
+// flagName spells an argument property as a CLI flag: snake_case schema
+// names (kept for MCP) read as kebab-case, so no_redact is --no-redact.
+func flagName(prop string) string {
+	return "--" + strings.ReplaceAll(prop, "_", "-")
 }
 
 // optionalProps returns the non-required property names, sorted.
@@ -368,7 +374,7 @@ func WriteHelp(w io.Writer, reg *agent.Registry, inv Invocation, ceiling agent.T
 				if typ == agent.TypeArray {
 					typ = "list of strings"
 				}
-				flag := "--" + name
+				flag := flagName(name)
 				if p.Short != "" {
 					flag = "-" + p.Short + ", " + flag
 				}
