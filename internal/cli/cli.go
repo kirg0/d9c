@@ -229,7 +229,8 @@ func resolveOp(reg *agent.Registry, args []string) (agent.Op, []string, error) {
 }
 
 // lookupProp finds the argument property for a flag name; `--no-redact`
-// matches a property spelled either "no-redact" or "no_redact".
+// matches a property spelled either "no-redact" or "no_redact", and a single
+// letter also matches a property's Short alias (`-a` for "all").
 func lookupProp(s *agent.Schema, name string) (string, *agent.Schema, bool) {
 	if s == nil {
 		return "", nil, false
@@ -237,6 +238,13 @@ func lookupProp(s *agent.Schema, name string) (string, *agent.Schema, bool) {
 	for _, cand := range []string{name, strings.ReplaceAll(name, "-", "_")} {
 		if p, ok := s.Properties[cand]; ok {
 			return cand, p, true
+		}
+	}
+	if len(name) == 1 {
+		for prop, p := range s.Properties {
+			if p.Short == name {
+				return prop, p, true
+			}
 		}
 	}
 	return "", nil, false
@@ -348,7 +356,11 @@ func WriteHelp(w io.Writer, reg *agent.Registry, inv Invocation, ceiling agent.T
 				if typ == agent.TypeArray {
 					typ = "list of strings"
 				}
-				fmt.Fprintf(&b, "  --%s (%s): %s", name, typ, p.Description)
+				flag := "--" + name
+				if p.Short != "" {
+					flag = "-" + p.Short + ", " + flag
+				}
+				fmt.Fprintf(&b, "  %s (%s): %s", flag, typ, p.Description)
 				if p.Default != nil {
 					fmt.Fprintf(&b, " (default %v)", p.Default)
 				}

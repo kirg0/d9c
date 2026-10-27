@@ -214,6 +214,10 @@ func TestBuildCRILogsArgs(t *testing.T) {
 	if strings.Join(got, " ") != "logs -f --timestamps abc" {
 		t.Errorf("buildCRILogsArgs default = %v", got)
 	}
+	got = buildCRILogsArgs("abc", LogOptions{Tail: 5, NoFollow: true})
+	if strings.Join(got, " ") != "logs --timestamps --tail 5 abc" {
+		t.Errorf("buildCRILogsArgs no follow = %v", got)
+	}
 }
 
 func TestCRIKillContainer(t *testing.T) {

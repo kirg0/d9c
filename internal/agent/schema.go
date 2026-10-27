@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // JSON Schema type names supported by Schema.
@@ -33,6 +34,9 @@ type Schema struct {
 	Enum        []string           `json:"enum,omitempty"`
 	Default     any                `json:"default,omitempty"`
 	Minimum     *int               `json:"minimum,omitempty"`
+	// Short is a one-letter CLI alias of a property (`-a` for "all"). It is a
+	// command-line convenience only and stays out of the JSON Schema.
+	Short string `json:"-"`
 	// AdditionalProperties is always false for argument objects: an unknown
 	// argument is a usage error, not something to ignore silently.
 	AdditionalProperties *bool `json:"additionalProperties,omitempty"`
@@ -74,6 +78,12 @@ func (s *Schema) WithEnum(values ...string) *Schema {
 	return s
 }
 
+// WithShort sets the one-letter CLI alias of the argument.
+func (s *Schema) WithShort(letter string) *Schema {
+	s.Short = letter
+	return s
+}
+
 // WithMin sets the inclusive lower bound of an integer argument.
 func (s *Schema) WithMin(n int) *Schema {
 	s.Minimum = &n
@@ -87,9 +97,20 @@ func (s *Schema) check() error {
 	if s == nil || s.Type != TypeObject {
 		return fmt.Errorf("argument schema must be an object")
 	}
+	shorts := map[string]string{}
 	for name, p := range s.Properties {
 		if p == nil {
 			return fmt.Errorf("property %q: nil schema", name)
+		}
+		if p.Short != "" {
+			// -h is help and -H the global host flag on every command.
+			if len(p.Short) != 1 || !unicode.IsLetter(rune(p.Short[0])) || strings.EqualFold(p.Short, "h") {
+				return fmt.Errorf("property %q: short alias must be one letter other than h/H, got %q", name, p.Short)
+			}
+			if other, dup := shorts[p.Short]; dup {
+				return fmt.Errorf("property %q: short alias -%s already used by %q", name, p.Short, other)
+			}
+			shorts[p.Short] = name
 		}
 		switch p.Type {
 		case TypeString, TypeInteger, TypeBoolean:

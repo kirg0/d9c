@@ -34,6 +34,7 @@ func testRegistry(t *testing.T) *agent.Registry {
 				"grep":      agent.StringArray("Filters."),
 				"no_redact": agent.Boolean("Show secrets."),
 				"format":    agent.String("Format.").WithEnum("json", "text"),
+				"all":       agent.Boolean("Every line.").WithShort("a"),
 			}, "id")},
 		agent.Op{Name: "rm", Summary: "Remove.", Tier: agent.TierDestructive, Handler: nop,
 			Args: agent.Object(map[string]*agent.Schema{"ids": agent.StringArray("Containers.")}, "ids")},
@@ -81,6 +82,7 @@ func TestParse(t *testing.T) {
 		{"required as flag", []string{"logs", "--id", "api"}, "logs", agent.Args{"id": "api"}, false, config.Config{}},
 		{"bool flag alone", []string{"logs", "api", "--no-redact"}, "logs", agent.Args{"id": "api", "no_redact": "true"}, false, config.Config{}},
 		{"bool flag value", []string{"logs", "api", "--no_redact=false"}, "logs", agent.Args{"id": "api", "no_redact": "false"}, false, config.Config{}},
+		{"short alias", []string{"logs", "api", "-a"}, "logs", agent.Args{"id": "api", "all": "true"}, false, config.Config{}},
 		{"double dash", []string{"logs", "--", "-weird-name"}, "logs", agent.Args{"id": "-weird-name"}, false, config.Config{}},
 		{"list swallows rest", []string{"rm", "a", "b", "c"}, "rm", agent.Args{"ids": []string{"a", "b", "c"}}, false, config.Config{}},
 		{"globals after command", []string{"info", "-H", "tcp://x:2375", "--demo", "-read-only", "--context=lab"}, "info", agent.Args{},
@@ -193,7 +195,8 @@ func TestWriteHelp(t *testing.T) {
 	}
 	out = buf.String()
 	for _, want := range []string{
-		"usage: d9c logs <id> [--format value] [--grep value (repeatable)] [--no_redact] [--tail int]",
+		"usage: d9c logs <id> [--all] [--format value] [--grep value (repeatable)] [--no_redact] [--tail int]",
+		"-a, --all (boolean): Every line.",
 		agent.UntrustedNote,
 		"--tail (integer): Lines. (default 200)",
 		"--format (string): Format. (one of json, text)",

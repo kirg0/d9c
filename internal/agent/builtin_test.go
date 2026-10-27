@@ -10,16 +10,31 @@ import (
 	"github.com/kirg0/d9c/internal/hosts"
 )
 
-// Every built-in operation is a read in 6.1, and only `hosts ls` may run
-// without a connection.
+// Every built-in operation is a read in 6.1, only `hosts ls` may run without
+// a connection, and the ops returning container-authored content carry the
+// prompt-injection note.
 func TestBuiltinDeclarations(t *testing.T) {
 	r := Builtin()
 	tests := []struct {
-		name  string
-		local bool
+		name      string
+		local     bool
+		untrusted bool
 	}{
-		{"hosts ls", true},
-		{"info", false},
+		{"hosts ls", true, false},
+		{"info", false, false},
+		{"ps", false, false},
+		{"inspect", false, true},
+		{"logs", false, true},
+		{"stats", false, false},
+		{"images", false, false},
+		{"networks", false, false},
+		{"volumes", false, false},
+		{"system df", false, false},
+		{"events", false, false},
+		{"compose ls", false, false},
+		{"compose ps", false, false},
+		{"compose config", false, true},
+		{"compose logs", false, true},
 	}
 	if got := len(r.Ops()); got != len(tests) {
 		t.Errorf("Builtin has %d ops, want %d", got, len(tests))
@@ -35,6 +50,9 @@ func TestBuiltinDeclarations(t *testing.T) {
 		}
 		if op.Local != tt.local {
 			t.Errorf("%q Local = %v, want %v", tt.name, op.Local, tt.local)
+		}
+		if op.Untrusted != tt.untrusted {
+			t.Errorf("%q Untrusted = %v, want %v", tt.name, op.Untrusted, tt.untrusted)
 		}
 	}
 }

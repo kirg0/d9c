@@ -47,8 +47,12 @@ func (b *criBackend) SystemPrune() (string, error) {
 }
 
 // Events streams CRI container events (`crictl events`, cri-tools ≥ 1.26; an
-// older crictl surfaces its "unknown command" error in the viewer).
-func (b *criBackend) Events() (<-chan string, func(), error) {
+// older crictl surfaces its "unknown command" error in the viewer). The feed is
+// live only, so a windowed query is refused.
+func (b *criBackend) Events(opts EventOptions) (<-chan string, func(), error) {
+	if opts.Windowed() {
+		return nil, nil, errEventWindowUnsupported("CRI (crictl)")
+	}
 	return b.runner.stream(b.args("events"))
 }
 

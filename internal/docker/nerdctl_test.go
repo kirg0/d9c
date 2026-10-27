@@ -87,6 +87,7 @@ func TestBuildLogsArgs(t *testing.T) {
 		{"defaults", LogOptions{}, []string{"logs", "-f", "--timestamps", "abc"}},
 		{"tail", LogOptions{Tail: 100}, []string{"logs", "-f", "--timestamps", "--tail", "100", "abc"}},
 		{"since+until", LogOptions{Since: "1h", Until: "10m"}, []string{"logs", "-f", "--timestamps", "--since", "1h", "--until", "10m", "abc"}},
+		{"no follow", LogOptions{Tail: 5, NoFollow: true}, []string{"logs", "--timestamps", "--tail", "5", "abc"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

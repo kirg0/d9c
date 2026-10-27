@@ -281,7 +281,7 @@ func TestFakeInfo(t *testing.T) {
 // a pending reader unblocks (the UI relies on this when the view closes).
 func TestFakeEventsStop(t *testing.T) {
 	f := NewFakeBackend()
-	ch, stop, err := f.Events()
+	ch, stop, err := f.Events(EventOptions{})
 	if err != nil {
 		t.Fatalf("events: %v", err)
 	}

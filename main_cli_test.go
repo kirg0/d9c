@@ -175,6 +175,28 @@ func TestRunCLI(t *testing.T) {
 		}
 	})
 
+	// Each read command runs end to end on the demo backend: exit 0, one JSON
+	// envelope on stdout, nothing on stderr.
+	t.Run("demo read commands", func(t *testing.T) {
+		for _, args := range [][]string{
+			{"ps", "-a"}, {"inspect", "web"}, {"inspect", "--type", "image", "a08c488a9779"},
+			{"logs", "web", "-n", "2"}, {"logs", "web", "--grep", "ERROR"},
+			{"images"}, {"networks"}, {"volumes"}, {"system", "df"}, {"events", "--since", "1h"},
+			{"compose", "ls"}, {"compose", "ps", "webapp"}, {"compose", "config", "webapp"},
+			{"compose", "logs", "webapp", "--tail", "1"},
+		} {
+			code, out, errOut := cliRun(t, &config.Config{ConfigFile: cfgPath}, append(args, "-demo")...)
+			var env agent.Envelope
+			if code != 0 || errOut != "" || json.Unmarshal([]byte(out), &env) != nil || env.Data == nil {
+				t.Errorf("%q: exit %d, stdout %q, stderr %q", args, code, out, errOut)
+			}
+		}
+		code, _, errOut := cliRun(t, &config.Config{ConfigFile: cfgPath}, "logs", "ghost", "-demo")
+		if code != agent.CodeNotFound.ExitCode() || !strings.Contains(errOut, `"not_found"`) {
+			t.Errorf("logs ghost: exit %d, stderr %q", code, errOut)
+		}
+	})
+
 	t.Run("help", func(t *testing.T) {
 		code, out, _ := cliRun(t, &config.Config{ConfigFile: cfgPath}, "help")
 		if code != 0 || !strings.Contains(out, "hosts ls") || !strings.Contains(out, "info") {

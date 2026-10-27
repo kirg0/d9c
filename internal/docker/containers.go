@@ -44,11 +44,14 @@ type InspectResult struct {
 
 // LogOptions controls how logs are fetched. Tail <= 0 means "all"; Since/Until
 // accept Docker's filter syntax (a duration like "1h"/"10m" or an RFC3339
-// timestamp); empty values disable that bound.
+// timestamp); empty values disable that bound. NoFollow returns the lines
+// logged so far and closes the stream instead of following new output (the
+// non-interactive CLI); the zero value follows, as the log viewer does.
 type LogOptions struct {
-	Tail  int
-	Since string
-	Until string
+	Tail     int
+	Since    string
+	Until    string
+	NoFollow bool
 }
 
 func (b *dockerBackend) ListContainers(showAll bool) ([]Container, error) {
@@ -274,7 +277,7 @@ func (b *dockerBackend) ContainerLogs(id string, opts LogOptions) (<-chan string
 	reader, err := b.cli.ContainerLogs(context.Background(), id, container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
-		Follow:     true,
+		Follow:     !opts.NoFollow,
 		Tail:       tailStr,
 		Timestamps: true,
 		Since:      opts.Since,

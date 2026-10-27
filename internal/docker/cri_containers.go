@@ -283,14 +283,19 @@ func (b *criBackend) KillContainer(id, signal string) error {
 }
 
 // ContainerLogs streams `crictl logs -f` (crictl reads the CRI log files on
-// the host). Until has no crictl equivalent and is ignored.
+// the host; without -f for NoFollow). Until has no crictl equivalent and is
+// ignored.
 func (b *criBackend) ContainerLogs(id string, opts LogOptions) (<-chan string, func(), error) {
 	return b.runner.stream(b.args(buildCRILogsArgs(id, opts)...))
 }
 
-// buildCRILogsArgs assembles `logs -f --timestamps [--tail N] [--since] id`.
+// buildCRILogsArgs assembles `logs [-f] --timestamps [--tail N] [--since] id`.
 func buildCRILogsArgs(id string, opts LogOptions) []string {
-	args := []string{"logs", "-f", "--timestamps"}
+	args := []string{"logs"}
+	if !opts.NoFollow {
+		args = append(args, "-f")
+	}
+	args = append(args, "--timestamps")
 	if opts.Tail > 0 {
 		args = append(args, "--tail", strconv.Itoa(opts.Tail))
 	}
