@@ -6,6 +6,10 @@
     "args": {
       "type": "object",
       "properties": {
+        "no_redact": {
+          "type": "boolean",
+          "description": "Show the values of environment variables whose names contain PASS, TOKEN, SECRET or KEY (masked by default)."
+        },
         "project": {
           "type": "string",
           "description": "Compose project name, or its working directory when several deployments share the name."

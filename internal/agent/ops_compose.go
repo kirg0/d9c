@@ -120,8 +120,11 @@ func composeConfigOp() Op {
 	return Op{
 		Name:    "compose config",
 		Summary: "Show the resolved compose file of a project (needs an SSH connection to the host).",
-		Args:    Object(projectArg(), "project"),
-		Tier:    TierRead,
+		Args: Object(map[string]*Schema{
+			"project":   projectArg()["project"],
+			"no_redact": noRedactArg(),
+		}, "project"),
+		Tier: TierRead,
 		// Compose files carry environment values and labels set by their authors.
 		Untrusted: true,
 		Handler: func(_ context.Context, env *Env, args Args) (Result, error) {
@@ -140,7 +143,18 @@ func composeConfigOp() Op {
 			if err != nil {
 				return Result{}, err
 			}
-			return Result{Data: ComposeConfigData{Project: p.Project, Config: cfg}}, nil
+			var r Result
+			if !args.Bool("no_redact") {
+				var n int
+				if cfg, n, err = redactComposeConfig(cfg); err != nil {
+					return Result{}, err
+				}
+				if n > 0 {
+					r.Hint = redactHint(n)
+				}
+			}
+			r.Data = ComposeConfigData{Project: p.Project, Config: cfg}
+			return r, nil
 		},
 	}
 }

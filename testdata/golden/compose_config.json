@@ -4,7 +4,8 @@
   "runtime": "docker",
   "data": {
     "project": "webapp",
-    "config": "name: /srv/webapp\nservices:\n  web:\n    image: nginx:1.25\n    ports:\n      - 8080:80\n"
+    "config": "name: /srv/webapp\nservices:\n  web:\n    image: nginx:1.25\n    environment:\n      DB_PASSWORD: <redacted>\n      TZ: UTC\n    ports:\n      - 8080:80\n"
   },
-  "truncated": false
+  "truncated": false,
+  "hint": "1 secret-looking env value(s) masked; pass --no-redact to show them"
 }

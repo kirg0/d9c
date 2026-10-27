@@ -769,7 +769,7 @@ func (f *FakeBackend) ComposeDown(project string) (<-chan string, func(), error)
 func (f *FakeBackend) ComposeConfig(project string) (string, error) {
 	for _, p := range f.Composes {
 		if composeIdentity(p.Project, p.WorkingDir) == project {
-			return fmt.Sprintf("name: %s\nservices:\n  web:\n    image: nginx:1.25\n    ports:\n      - 8080:80\n", project), nil
+			return fmt.Sprintf("name: %s\nservices:\n  web:\n    image: nginx:1.25\n    environment:\n      DB_PASSWORD: demo-secret\n      TZ: UTC\n    ports:\n      - 8080:80\n", project), nil
 		}
 	}
 	return "", fmt.Errorf("no such compose project: %s", project)

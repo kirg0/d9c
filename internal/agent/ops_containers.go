@@ -111,8 +111,7 @@ func inspectOp() Op {
 			"type": String("Kind of object to inspect.").
 				WithEnum(kindContainer, kindImage, kindNetwork, kindVolume, kindCompose).
 				WithDefault(kindContainer).WithShort("t"),
-			"no_redact": Boolean("Show the values of environment variables whose names contain " +
-				"PASS, TOKEN, SECRET or KEY (masked by default)."),
+			"no_redact": noRedactArg(),
 		}, "target"),
 		Tier:      TierRead,
 		Untrusted: true,
