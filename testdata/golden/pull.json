@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "image": "nginx:1.27"
+  },
+  "truncated": false
+}

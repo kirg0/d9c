@@ -41,6 +41,9 @@ func TestOpsWithoutBackend(t *testing.T) {
 		"compose ps": {"project": "x"}, "compose config": {"project": "x"}, "compose logs": {"project": "x"},
 		"start": {"targets": []string{"x"}}, "stop": {"targets": []string{"x"}}, "restart": {"targets": []string{"x"}},
 		"kill": {"targets": []string{"x"}}, "rm": {"targets": []string{"x"}},
+		"pull": {"image": "x"}, "compose up": {"project": "x"}, "compose down": {"project": "x"},
+		"compose pull": {"project": "x"}, "compose restart": {"project": "x"}, "compose backup": {"project": "x"},
+		"compose restore": {"project": "x", "file": "x"},
 	}
 	for _, op := range r.Ops() {
 		if op.Local {

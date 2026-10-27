@@ -135,9 +135,8 @@ func composeConfigOp() Op {
 			if err != nil {
 				return Result{}, err
 			}
-			if !env.Backend.SupportsHostCompose() {
-				return Result{}, Errorf(CodeUsage, "compose config needs shell access to the host").
-					WithHint("connect over SSH: --host <saved ssh host> or -H ssh://user@host")
+			if err := requireHostCompose(env.Backend, "compose config"); err != nil {
+				return Result{}, err
 			}
 			cfg, err := env.Backend.ComposeConfig(p.Identity())
 			if err != nil {

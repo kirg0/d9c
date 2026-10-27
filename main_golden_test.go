@@ -20,12 +20,23 @@ import (
 //	go test -run 'TestCLIGolden|TestOpCatalogGolden' -update .
 var updateGolden = flag.Bool("update", false, "rewrite testdata/golden from the current CLI output")
 
-const goldenDir = "testdata/golden"
+// goldenDir is absolute: some cases run in a temporary working directory.
+var goldenDir = func() string {
+	dir, err := filepath.Abs(filepath.Join("testdata", "golden"))
+	if err != nil {
+		panic(err)
+	}
+	return dir
+}()
 
 // timestampRE matches the RFC3339 times the demo backend derives from
 // time.Now (created fields, compose working state); golden files hold a
 // placeholder instead so they stay stable from run to run.
 var timestampRE = regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})`)
+
+// backupPathRE matches a backup archive path as a JSON string: it carries the
+// temporary directory and the time of the run.
+var backupPathRE = regexp.MustCompile(`"[^"]*-\d{8}-\d{6}\.tar\.gz"`)
 
 // goldenCase is one CLI invocation on the demo backend. The golden file holds
 // the stream the contract defines for the outcome — the stdout envelope on
@@ -70,6 +81,13 @@ var cliGoldenCases = []goldenCase{
 	{"kill_signal", []string{"kill", "web", "-s", "TERM"}, 0, true},
 	{"rm_force", []string{"rm", "-f", "web"}, 0, true},
 	{"partial_stop", []string{"stop", "web", "ghost"}, agent.ExitPartial, true},
+	{"pull", []string{"pull", "nginx:1.27"}, 0, true},
+	{"compose_up", []string{"compose", "up", "legacy"}, 0, true},
+	{"compose_down", []string{"compose", "down", "webapp"}, 0, true},
+	{"compose_pull", []string{"compose", "pull", "webapp"}, 0, true},
+	{"compose_restart", []string{"compose", "restart", "/srv/monitoring"}, 0, true},
+	{"compose_backup", []string{"compose", "backup", "webapp"}, 0, true},
+	{"compose_restore", []string{"compose", "restore", "webapp", "webapp.tar.gz"}, 0, true},
 
 	{"err_usage_flag", []string{"ps", "--bogus"}, 2, false},
 	{"err_usage_field", []string{"ps", "--fields", "bogus"}, 2, false},
@@ -81,6 +99,21 @@ var cliGoldenCases = []goldenCase{
 	{"err_forbidden", []string{"stop", "web"}, 5, false},
 	{"err_usage_no_targets", []string{"stop"}, 2, true},
 	{"err_not_found_target", []string{"start", "ghost"}, 3, true},
+	{"err_not_found_backup", []string{"compose", "restore", "webapp", "nope.tar.gz"}, 3, true},
+	{"err_forbidden_compose_down", []string{"compose", "down", "webapp"}, 5, false},
+}
+
+// goldenSetup prepares the working directory of cases that touch local files:
+// the demo backup lands in it, and restore reads an archive from it.
+var goldenSetup = map[string]func(t *testing.T){
+	"compose_backup": func(t *testing.T) { t.Chdir(t.TempDir()) },
+	"compose_restore": func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		if err := os.WriteFile("webapp.tar.gz", []byte("demo"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	},
+	"err_not_found_backup": func(t *testing.T) { t.Chdir(t.TempDir()) },
 }
 
 func TestCLIGolden(t *testing.T) {
@@ -91,6 +124,9 @@ func TestCLIGolden(t *testing.T) {
 			// -demo would win over --host; those cases fail before dialing.
 			if !slices.Contains(args, "--host") {
 				args = append(args, "-demo")
+			}
+			if setup := goldenSetup[tc.name]; setup != nil {
+				setup(t)
 			}
 			if tc.write {
 				cliCeiling = agent.TierDestructive
@@ -182,6 +218,7 @@ func TestOpCatalogGolden(t *testing.T) {
 func compareGolden(t *testing.T, name string, got []byte) {
 	t.Helper()
 	norm := timestampRE.ReplaceAll(bytes.TrimSpace(got), []byte("<time>"))
+	norm = backupPathRE.ReplaceAll(norm, []byte(`"<backup>"`))
 	var buf bytes.Buffer
 	if err := json.Indent(&buf, norm, "", "  "); err != nil {
 		t.Fatalf("output is not JSON: %v (%q)", err, got)

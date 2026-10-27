@@ -111,8 +111,21 @@ func (b *dockerBackend) PullImage(ref string) error {
 		return fmt.Errorf("pull image: %w", err)
 	}
 	defer func() { _ = reader.Close() }()
-	_, err = io.Copy(io.Discard, reader) // drain progress stream
-	return err
+	// The daemon answers 200 and reports a failed pull inside the progress
+	// stream, so it has to be decoded rather than discarded.
+	dec := json.NewDecoder(reader)
+	for {
+		var m jsonProgress
+		if err := dec.Decode(&m); err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return fmt.Errorf("pull image: %w", err)
+		}
+		if m.Error != "" {
+			return fmt.Errorf("pull image: %s", m.Error)
+		}
+	}
 }
 
 func (b *dockerBackend) PruneImages() (int, error) {

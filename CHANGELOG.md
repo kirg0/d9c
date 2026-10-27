@@ -14,6 +14,18 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   `health=`; exact matches, never substrings). The result lists one outcome per container; when
   only some of them fail, the envelope carries `"partial": true` and the exit status is `8`.
   The commands stay forbidden until the write policy (`allowWrite`/`maxTier`) lands.
+- **Image and compose deployment commands in command-line mode:** `pull <image>`, `compose up`,
+  `compose pull`, `compose restart`, `compose down` (containers and networks; volumes kept),
+  `compose backup` (archive saved to the current directory, absolute path returned) and
+  `compose restore <project> <archive>`. Streaming commands run to completion and return the
+  engine output (the newest 200 lines); a failure is an error that quotes the output leading to
+  it. `compose down` and `compose restore` are destructive; all of them stay forbidden until the
+  write policy lands.
+
+### Fixed
+
+- **Pull reported success on a failed pull** (Docker/Podman API): an error the daemon sends
+  inside the progress stream (unknown manifest, registry failure mid-download) is now reported.
 
 ## [1.32.0] - 2026-10-27
 
