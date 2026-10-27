@@ -107,6 +107,9 @@ func Classify(err error) *Error {
 		return &Error{Code: code, Message: err.Error(), Hint: hint, Err: err}
 	}
 	switch {
+	case docker.IsUnknownHostKeyError(err):
+		return wrap(CodeConnection, "the host is not in ~/.ssh/known_hosts; ask the user to verify its key "+
+			"(connect once with ssh or the d9c TUI) — agent mode never accepts host keys automatically")
 	case docker.IsHostKeyError(err):
 		return wrap(CodeConnection, "the host key does not match ~/.ssh/known_hosts; "+
 			"verify the host and fix known_hosts manually (agent mode never accepts host keys automatically)")

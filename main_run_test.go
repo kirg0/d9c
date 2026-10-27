@@ -226,7 +226,7 @@ func TestApplyDockerContext(t *testing.T) {
 
 	// -context points cfg at the endpoint and its TLS files.
 	cfg := &config.Config{Context: "prod", Host: config.DefaultHost}
-	h, err := applyDockerContext(cfg, dir, noEnv)
+	h, err := applyDockerContext(cfg, dir, noEnv, io.Discard)
 	if err != nil || h == nil {
 		t.Fatalf("applyDockerContext = %v, %v", h, err)
 	}
@@ -241,22 +241,22 @@ func TestApplyDockerContext(t *testing.T) {
 	// DOCKER_CONTEXT is honored when neither -H nor DOCKER_HOST is set.
 	cfg = &config.Config{Host: config.DefaultHost}
 	env := func(k string) string { return map[string]string{"DOCKER_CONTEXT": "lab"}[k] }
-	if h, err := applyDockerContext(cfg, dir, env); err != nil || h == nil || cfg.Host != "ssh://ops@lab" || cfg.Context != "lab" || cfg.TLSCACert != "" {
+	if h, err := applyDockerContext(cfg, dir, env, io.Discard); err != nil || h == nil || cfg.Host != "ssh://ops@lab" || cfg.Context != "lab" || cfg.TLSCACert != "" {
 		t.Errorf("DOCKER_CONTEXT: host=%v err=%v cfg=%+v", h, err, cfg)
 	}
 
 	// Nothing selected, or demo mode: cfg untouched.
 	for _, cfg := range []*config.Config{{Host: "tcp://x"}, {Demo: true, Context: "prod", Host: "tcp://x"}} {
-		if h, err := applyDockerContext(cfg, dir, noEnv); h != nil || err != nil || cfg.Host != "tcp://x" {
+		if h, err := applyDockerContext(cfg, dir, noEnv, io.Discard); h != nil || err != nil || cfg.Host != "tcp://x" {
 			t.Errorf("no-op case: host=%v err=%v cfg=%+v", h, err, cfg)
 		}
 	}
 
 	// Unknown context and -H/-context conflict are startup errors.
-	if _, err := applyDockerContext(&config.Config{Context: "nope"}, dir, noEnv); err == nil || !strings.Contains(err.Error(), `"nope"`) {
+	if _, err := applyDockerContext(&config.Config{Context: "nope"}, dir, noEnv, io.Discard); err == nil || !strings.Contains(err.Error(), `"nope"`) {
 		t.Errorf("unknown context err = %v", err)
 	}
-	if _, err := applyDockerContext(&config.Config{Context: "prod", HostFlagSet: true}, dir, noEnv); err == nil {
+	if _, err := applyDockerContext(&config.Config{Context: "prod", HostFlagSet: true}, dir, noEnv, io.Discard); err == nil {
 		t.Error("-H with -context must conflict")
 	}
 }

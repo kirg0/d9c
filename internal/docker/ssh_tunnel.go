@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -68,7 +69,49 @@ func buildSSHClient(host, keyFile, password string) (*ssh.Client, error) {
 // which the mismatch notice tells the user to do — would leave the host
 // "unknown" and every reconnect would keep failing.
 func hostKeyCallback() ssh.HostKeyCallback {
+	if strictHostKeys.Load() {
+		return strictHostKeyCallbackFor(KnownHostsPath())
+	}
 	return hostKeyCallbackFor(KnownHostsPath())
+}
+
+// strictHostKeys switches every SSH connection of the process to strict
+// host-key checking (see SetStrictHostKeys).
+var strictHostKeys atomic.Bool
+
+// SetStrictHostKeys makes every later SSH connection of the process verify the
+// host key against known_hosts WITHOUT trusting unknown hosts on first use
+// (OpenSSH StrictHostKeyChecking=yes). The non-interactive CLI enables it: an
+// agent must never silently accept a key nobody has looked at.
+func SetStrictHostKeys(on bool) { strictHostKeys.Store(on) }
+
+// ErrUnknownHostKey is wrapped by the strict host-key check when the host is
+// not in known_hosts at all (as opposed to a known host with a changed key).
+var ErrUnknownHostKey = errors.New("ssh: host key is not in known_hosts")
+
+// IsUnknownHostKeyError reports whether err is the strict-mode rejection of a
+// host missing from known_hosts.
+func IsUnknownHostKeyError(err error) bool { return errors.Is(err, ErrUnknownHostKey) }
+
+// strictHostKeyCallbackFor verifies against the known_hosts file at path and
+// rejects unknown hosts with ErrUnknownHostKey instead of recording them; a
+// changed key fails with the usual knownhosts mismatch error.
+func strictHostKeyCallbackFor(path string) ssh.HostKeyCallback {
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		if path == "" {
+			return fmt.Errorf("%w: %s (no home directory for known_hosts)", ErrUnknownHostKey, hostname)
+		}
+		verify, err := knownhosts.New(path)
+		if err != nil {
+			return fmt.Errorf("%w: %s (%w)", ErrUnknownHostKey, hostname, err)
+		}
+		err = verify(hostname, remote, key)
+		var keyErr *knownhosts.KeyError
+		if errors.As(err, &keyErr) && len(keyErr.Want) == 0 {
+			return fmt.Errorf("%w: %s", ErrUnknownHostKey, hostname)
+		}
+		return err
+	}
 }
 
 // hostKeyCallbackFor is the path-injectable core of hostKeyCallback, split out

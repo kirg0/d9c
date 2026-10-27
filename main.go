@@ -1,11 +1,15 @@
 package main
 
 import (
+	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
 
+	"github.com/kirg0/d9c/internal/agent"
 	"github.com/kirg0/d9c/internal/appdir"
+	"github.com/kirg0/d9c/internal/cli"
 	"github.com/kirg0/d9c/internal/config"
 	"github.com/kirg0/d9c/internal/docker"
 	"github.com/kirg0/d9c/internal/dockerctx"
@@ -20,10 +24,20 @@ import (
 
 func main() {
 	if err := run(); err != nil {
+		var code exitCode
+		if errors.As(err, &code) {
+			os.Exit(int(code))
+		}
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }
+
+// exitCode is returned by run when the CLI has already reported the outcome
+// on stdout/stderr and only the process exit status remains to be set.
+type exitCode int
+
+func (c exitCode) Error() string { return fmt.Sprintf("exit status %d", int(c)) }
 
 func run() error {
 	cfg := config.Load()
@@ -33,17 +47,20 @@ func run() error {
 		return nil
 	}
 
-	configPath := cfg.ConfigFile
-	if configPath == "" {
-		configPath = settings.DefaultPath()
-		migrateLegacyFile(configPath, appdir.LegacyPath(settings.FileName), os.Stderr)
+	// A known command word after the global flags selects the CLI; anything
+	// else (including no arguments) starts the TUI.
+	if args := flag.Args(); len(args) > 0 {
+		if reg := agent.Builtin(); cli.IsCommand(reg, args[0]) {
+			if code := runCLI(cfg, reg, args, os.Stdout, os.Stderr); code != 0 {
+				return exitCode(code)
+			}
+			return nil
+		}
 	}
-	set, err := settings.Load(configPath)
+
+	set, err := loadSettings(cfg, os.Stderr)
 	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
-	}
-	if err := migrateLegacyHosts(set, cfg); err != nil {
-		return fmt.Errorf("migrating saved hosts: %w", err)
+		return err
 	}
 	store := set.Hosts()
 
@@ -79,12 +96,18 @@ func run() error {
 		return fmt.Errorf("loading alerts: %w", err)
 	}
 
-	ctxHost, err := applyDockerContext(cfg, dockerctx.Dir(), os.Getenv)
-	if err != nil {
-		return err
-	}
-	if ctxHost == nil && !cfg.Demo {
-		applySavedHostTLS(cfg, store)
+	var ctxHost *hosts.Host
+	if cfg.SavedHost != "" && !cfg.Demo {
+		if _, err := applySavedHost(cfg, store); err != nil {
+			return err
+		}
+	} else {
+		if ctxHost, err = applyDockerContext(cfg, dockerctx.Dir(), os.Getenv, os.Stderr); err != nil {
+			return err
+		}
+		if ctxHost == nil && !cfg.Demo {
+			applySavedHostTLS(cfg, store)
+		}
 	}
 
 	var backend docker.Backend
@@ -96,7 +119,7 @@ func run() error {
 		fb.StatsJitter = true // live-looking CPU/MEM graphs in the stats view
 		backend = fb
 
-	case !hostConfigured(cfg.Host, cfg.HostFlagSet):
+	case !hostConfigured(cfg.Host, cfg.HostFlagSet || cfg.SavedHost != ""):
 		// No host specified: don't connect at all. Open the hosts view so the
 		// user can pick or add one; connecting happens on :connect / Enter.
 		backend = docker.NewDisconnected(nil)
@@ -122,6 +145,57 @@ func run() error {
 	defer backend.Close()
 
 	return ui.Run(cfg, backend, store, set, pluginSet, keys, alertThresholds, connectErr, startInHosts)
+}
+
+// loadSettings loads the unified config (migrating the pre-1.31 files on the
+// way, with notices written to notices) and imports legacy saved hosts.
+func loadSettings(cfg *config.Config, notices io.Writer) (*settings.Store, error) {
+	configPath := cfg.ConfigFile
+	if configPath == "" {
+		configPath = settings.DefaultPath()
+		migrateLegacyFile(configPath, appdir.LegacyPath(settings.FileName), notices)
+	}
+	set, err := settings.Load(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("loading config: %w", err)
+	}
+	if err := migrateLegacyHosts(set, cfg); err != nil {
+		return nil, fmt.Errorf("migrating saved hosts: %w", err)
+	}
+	return set, nil
+}
+
+// applySavedHost points cfg at the saved host named by -host: its URL, SSH
+// key and TLS files, as connecting from the hosts view does. The password of
+// a password-auth SSH host is left to the caller (-ssh-password in the TUI,
+// D9C_SSH_PASSWORD in the CLI). -host replaces -H and -context, so combining
+// them is a usage error.
+func applySavedHost(cfg *config.Config, store *hosts.Store) (hosts.Host, error) {
+	if cfg.HostFlagSet || cfg.Context != "" {
+		return hosts.Host{}, agent.Errorf(agent.CodeUsage, "-host cannot be combined with -H or -context").
+			WithHint("pass either a saved host name or a host URL")
+	}
+	h, ok := store.Find(cfg.SavedHost)
+	if !ok {
+		return hosts.Host{}, agent.Errorf(agent.CodeNotFound, "no saved host named %q", cfg.SavedHost).
+			WithHint("run `d9c hosts ls` to list the saved hosts")
+	}
+	cfg.Host = h.Host
+	if h.SSHKeyPath != "" {
+		cfg.SSHKeyFile = h.SSHKeyPath
+	}
+	if !isPasswordHost(h) {
+		cfg.SSHPassword = ""
+	}
+	if h.HasTLS() {
+		cfg.TLSCACert, cfg.TLSCert, cfg.TLSKey = h.TLSCACert, h.TLSCert, h.TLSKey
+	}
+	return h, nil
+}
+
+// isPasswordHost reports whether h is an SSH host set up for password auth.
+func isPasswordHost(h hosts.Host) bool {
+	return hosts.IsSSH(h.Host) && h.SSHAuth == hosts.SSHAuthPassword
 }
 
 // migrateLegacyFile copies a file that versions before 1.31 kept next to the
@@ -168,9 +242,10 @@ func migrateLegacyHosts(set *settings.Store, cfg *config.Config) error {
 
 // applyDockerContext resolves the Docker CLI context to start with (-context,
 // else DOCKER_CONTEXT unless -H/DOCKER_HOST is set) and points cfg at its
-// endpoint and TLS files. It returns the context as a saved-host entry to
+// endpoint and TLS files; warnings about unsupported context settings go to
+// warn. It returns the context as a saved-host entry to
 // remember, or nil when no context applies. Demo mode ignores contexts.
-func applyDockerContext(cfg *config.Config, dir string, getenv func(string) string) (*hosts.Host, error) {
+func applyDockerContext(cfg *config.Config, dir string, getenv func(string) string, warn io.Writer) (*hosts.Host, error) {
 	if cfg.Demo {
 		return nil, nil
 	}
@@ -188,7 +263,7 @@ func applyDockerContext(cfg *config.Config, dir string, getenv func(string) stri
 		cfg.TLSCACert, cfg.TLSCert, cfg.TLSKey = c.TLSCACert, c.TLSCert, c.TLSKey
 	}
 	if c.SkipTLSVerify {
-		fmt.Fprintf(os.Stderr, "warning: docker context %q sets SkipTLSVerify, which d9c does not support; the server certificate will be verified\n", c.Name)
+		_, _ = fmt.Fprintf(warn, "warning: docker context %q sets SkipTLSVerify, which d9c does not support; the server certificate will be verified\n", c.Name)
 	}
 	h := c.SavedHost()
 	return &h, nil

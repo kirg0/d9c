@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/kirg0/d9c/internal/docker"
@@ -42,6 +43,7 @@ func TestClassify(t *testing.T) {
 		{"own error", own, CodeForbidden, false},
 		{"wrapped own error", fmt.Errorf("ctx: %w", own), CodeForbidden, false},
 		{"host key mismatch", errors.New("ssh: handshake failed: knownhosts: key mismatch"), CodeConnection, true},
+		{"unknown host key", fmt.Errorf("SSH tunnel: ssh: handshake failed: %w: h:22", docker.ErrUnknownHostKey), CodeConnection, true},
 		{"ssh auth", errors.New("ssh: handshake failed: ssh: unable to authenticate, attempted methods [none publickey], no supported methods remain"), CodeAuthRequired, true},
 		{"socket path", fmt.Errorf("%w: /var/run/x.sock: no such file", docker.ErrSocketPath), CodeConnection, true},
 		{"dns", errors.New("dial tcp: lookup nohost: no such host"), CodeConnection, true},
@@ -55,6 +57,9 @@ func TestClassify(t *testing.T) {
 			got := Classify(tt.err)
 			if got.Code != tt.want {
 				t.Fatalf("Classify(%v).Code = %q, want %q", tt.err, got.Code, tt.want)
+			}
+			if docker.IsUnknownHostKeyError(tt.err) && !strings.Contains(got.Hint, "not in ~/.ssh/known_hosts") {
+				t.Errorf("unknown host key got the mismatch hint: %q", got.Hint)
 			}
 			if (got.Hint != "") != tt.wantHint {
 				t.Errorf("hint = %q, wantHint %v", got.Hint, tt.wantHint)
