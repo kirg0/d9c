@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "action": "stop",
+    "targets": [
+      {
+        "ref": "web",
+        "id": "9ae942fd8fbc",
+        "name": "web",
+        "result": "ok"
+      },
+      {
+        "ref": "ghost",
+        "result": "failed",
+        "code": "not_found",
+        "error": "no such container: ghost"
+      }
+    ],
+    "done": 1,
+    "failed": 1
+  },
+  "truncated": false,
+  "partial": true,
+  "hint": "1 of 2 containers failed; see the failed entries in data.targets"
+}

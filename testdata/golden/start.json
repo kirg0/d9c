@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "action": "start",
+    "targets": [
+      {
+        "ref": "db",
+        "id": "3f1ab77c9012",
+        "name": "db",
+        "result": "ok"
+      }
+    ],
+    "done": 1,
+    "failed": 0
+  },
+  "truncated": false
+}

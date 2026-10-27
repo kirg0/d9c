@@ -61,6 +61,10 @@ func envelope(data any, truncated bool, hint string) agent.Envelope {
 	return agent.NewEnvelope("prod", docker.RuntimeDocker, agent.Result{Data: data, Truncated: truncated, Hint: hint})
 }
 
+func partial(data any, hint string) agent.Envelope {
+	return agent.NewEnvelope("prod", docker.RuntimeDocker, agent.Result{Data: data, Partial: true, Hint: hint})
+}
+
 func TestWriteResultFormats(t *testing.T) {
 	rows := []row{
 		{ID: "c1", Name: "web", Ports: "8080->80/tcp", Nets: []string{"front", "back"}},
@@ -101,6 +105,14 @@ func TestWriteResultFormats(t *testing.T) {
 			`"a"` + "\n" + `"b"` + "\n" + `{"truncated":true,"hint":"showing the first 2 of 3 items; raise --limit (0 = no limit)"}` + "\n", ""},
 		{"ndjson object is one line", envelope(map[string]int{"n": 1}, false, ""), Output{Format: FormatNDJSON},
 			`{"n":1}` + "\n", ""},
+		{"text partial notice", partial(rows, "1 of 2 failed"), Output{Format: FormatText, Shape: agent.Shape{Fields: []string{"id"}}},
+			"ID\nc1\nc2\n", "partial failure: 1 of 2 failed\n"},
+		{"text partial and truncated", partial(rows, "1 of 2 failed"), Output{Format: FormatText, Shape: agent.Shape{Fields: []string{"id"}, Limit: 1}},
+			"ID\nc1\n", "partial failure, truncated: 1 of 2 failed; showing the first 1 of 2 items; raise --limit (0 = no limit)\n"},
+		{"ndjson partial trailer", partial(rows, "1 of 2 failed"), Output{Format: FormatNDJSON, Shape: agent.Shape{Fields: []string{"id"}}},
+			`{"id":"c1"}` + "\n" + `{"id":"c2"}` + "\n" + `{"truncated":false,"partial":true,"hint":"1 of 2 failed"}` + "\n", ""},
+		{"json partial", partial(rows[:1], "1 of 2 failed"), Output{Shape: agent.Shape{Fields: []string{"id"}}},
+			`{"schema":1,"host":"prod","runtime":"docker","data":[{"id":"c1"}],"truncated":false,"partial":true,"hint":"1 of 2 failed"}` + "\n", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

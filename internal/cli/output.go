@@ -83,8 +83,9 @@ func (o *Output) parseFlag(name, tok string, value func() (string, error)) (ok b
 
 // WriteResult renders env on w in out.Format after applying out.Shape. A
 // shaping error (unknown field, --limit on an object) is returned before
-// anything is written. In text mode the truncation notice goes to warn so
-// the table stays clean for pipes; JSON formats carry it in-band.
+// anything is written. In text mode the truncation/partial-failure notice
+// goes to warn so the table stays clean for pipes; JSON formats carry it
+// in-band.
 func WriteResult(w, warn io.Writer, env agent.Envelope, out Output) error {
 	key := agent.ItemsKey(env.Data)
 	cols := out.Shape.Fields
@@ -104,8 +105,15 @@ func WriteResult(w, warn io.Writer, env agent.Envelope, out Output) error {
 		if err := writeText(w, env.Data, key, cols); err != nil {
 			return err
 		}
+		var heads []string
+		if env.Partial {
+			heads = append(heads, "partial failure")
+		}
 		if env.Truncated {
-			_, err = fmt.Fprintln(warn, joinNotice("truncated", env.Hint))
+			heads = append(heads, "truncated")
+		}
+		if len(heads) > 0 {
+			_, err = fmt.Fprintln(warn, joinNotice(strings.Join(heads, ", "), env.Hint))
 		}
 		return err
 	default:
@@ -120,14 +128,17 @@ func joinNotice(head, hint string) string {
 	return head + ": " + hint
 }
 
-// truncatedRecord is the last NDJSON line of a cut list.
+// truncatedRecord is the last NDJSON line of a cut list or a partially
+// failed command.
 type truncatedRecord struct {
 	Truncated bool   `json:"truncated"`
+	Partial   bool   `json:"partial,omitempty"`
 	Hint      string `json:"hint,omitempty"`
 }
 
 // writeNDJSON writes list items one per line (a single line for an object)
-// and, when the output was cut, a final {"truncated":true,"hint":…} record.
+// and, when the output was cut or some targets failed, a final
+// {"truncated":…,"partial":…,"hint":…} record.
 func writeNDJSON(w io.Writer, env agent.Envelope, key string) error {
 	g, err := agent.Generic(env.Data)
 	if err != nil {
@@ -143,8 +154,8 @@ func writeNDJSON(w io.Writer, env agent.Envelope, key string) error {
 	} else if err := enc.Encode(g); err != nil {
 		return err
 	}
-	if env.Truncated {
-		return enc.Encode(truncatedRecord{Truncated: true, Hint: env.Hint})
+	if env.Truncated || env.Partial {
+		return enc.Encode(truncatedRecord{Truncated: env.Truncated, Partial: env.Partial, Hint: env.Hint})
 	}
 	return nil
 }

@@ -13,6 +13,7 @@ func Builtin() *Registry {
 		psOp(), inspectOp(), logsOp(), statsOp(),
 		imagesOp(), networksOp(), volumesOp(), systemDFOp(), eventsOp(),
 		composeLsOp(), composePsOp(), composeConfigOp(), composeLogsOp(),
+		startOp(), stopOp(), restartOp(), killOp(), rmOp(),
 	)
 	return r
 }

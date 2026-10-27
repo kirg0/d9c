@@ -70,7 +70,15 @@ type Result struct {
 	// Hint tells the agent how to get more or narrower data, typically set
 	// together with Truncated.
 	Hint string
+	// Partial reports that a multi-target operation failed on some targets
+	// but not all; Data lists the per-target outcomes. Frontends deliver Data
+	// as usual and signal the failure (the CLI exits with ExitPartial).
+	Partial bool
 }
+
+// ExitPartial is the CLI exit status of a Partial result: the envelope is on
+// stdout as on success, but at least one target failed.
+const ExitPartial = 8
 
 // SchemaVersion is the version of the JSON output contract; it changes only on
 // an incompatible change to Envelope or to an operation's Data shape.
@@ -84,6 +92,7 @@ type Envelope struct {
 	Runtime   string `json:"runtime"`
 	Data      any    `json:"data"`
 	Truncated bool   `json:"truncated"`
+	Partial   bool   `json:"partial,omitempty"`
 	Hint      string `json:"hint,omitempty"`
 }
 
@@ -96,6 +105,7 @@ func NewEnvelope(host string, rt docker.Runtime, r Result) Envelope {
 		Runtime:   rt.Label(),
 		Data:      r.Data,
 		Truncated: r.Truncated,
+		Partial:   r.Partial,
 		Hint:      r.Hint,
 	}
 }

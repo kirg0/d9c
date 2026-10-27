@@ -38,6 +38,12 @@ func testRegistry(t *testing.T) *agent.Registry {
 			}, "id")},
 		agent.Op{Name: "rm", Summary: "Remove.", Tier: agent.TierDestructive, Handler: nop,
 			Args: agent.Object(map[string]*agent.Schema{"ids": agent.StringArray("Containers.")}, "ids")},
+		agent.Op{Name: "stop", Summary: "Stop.", Tier: agent.TierSafe, Handler: nop,
+			Args: agent.Object(map[string]*agent.Schema{
+				"targets": agent.StringArray("Containers.").WithPositional(),
+				"filter":  agent.StringArray("Predicates."),
+				"force":   agent.Boolean("Force.").WithShort("f"),
+			})},
 	)
 	return r
 }
@@ -85,6 +91,11 @@ func TestParse(t *testing.T) {
 		{"short alias", []string{"logs", "api", "-a"}, "logs", agent.Args{"id": "api", "all": "true"}, false, config.Config{}},
 		{"double dash", []string{"logs", "--", "-weird-name"}, "logs", agent.Args{"id": "-weird-name"}, false, config.Config{}},
 		{"list swallows rest", []string{"rm", "a", "b", "c"}, "rm", agent.Args{"ids": []string{"a", "b", "c"}}, false, config.Config{}},
+		{"optional positional list", []string{"stop", "web", "-f", "db"}, "stop",
+			agent.Args{"targets": []string{"web", "db"}, "force": "true"}, false, config.Config{}},
+		{"positional after flag values", []string{"stop", "--targets", "a", "b"}, "stop", agent.Args{"targets": []string{"a", "b"}}, false, config.Config{}},
+		{"filter without positional", []string{"stop", "--filter", "status=running", "--filter=label=env"}, "stop",
+			agent.Args{"filter": []string{"status=running", "label=env"}}, false, config.Config{}},
 		{"globals after command", []string{"info", "-H", "tcp://x:2375", "--demo", "-read-only", "--context=lab"}, "info", agent.Args{},
 			false, config.Config{Host: "tcp://x:2375", HostFlagSet: true, Demo: true, ReadOnly: true, Context: "lab"}},
 		{"saved host", []string{"info", "--host", "prod"}, "info", agent.Args{}, false, config.Config{SavedHost: "prod"}},
@@ -210,6 +221,14 @@ func TestWriteHelp(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("op help lacks %q:\n%s", want, out)
 		}
+	}
+	buf.Reset()
+	op, _ = r.Lookup("stop")
+	if err := WriteHelp(&buf, r, Invocation{Op: op, Help: true}, agent.TierSafe); err != nil {
+		t.Fatal(err)
+	}
+	if want := "usage: d9c stop [<targets>...] [--filter value (repeatable)] [--force]\n"; !strings.Contains(buf.String(), want) {
+		t.Errorf("positional list usage lacks %q:\n%s", want, buf.String())
 	}
 	// Required arguments come first.
 	if !strings.Contains(out, "--grep (list of strings): Filters.") {

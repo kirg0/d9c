@@ -138,6 +138,10 @@ func TestSchemaCheck(t *testing.T) {
 		{"reserved limit", Object(map[string]*Schema{"limit": Integer("d")}), "reserved for the output options"},
 		{"reserved output", Object(map[string]*Schema{"output": String("d")}), "reserved for the output options"},
 		{"short dup", Object(map[string]*Schema{"all": Boolean("d").WithShort("a"), "any": Boolean("d").WithShort("a")}), "already used"},
+		{"positional", Object(map[string]*Schema{"ids": StringArray("d").WithPositional()}), ""},
+		{"positional string", Object(map[string]*Schema{"id": String("d").WithPositional()}), "only an optional string array"},
+		{"positional required", Object(map[string]*Schema{"ids": StringArray("d").WithPositional()}, "ids"), "only an optional string array"},
+		{"positional twice", Object(map[string]*Schema{"a": StringArray("d").WithPositional(), "b": StringArray("d").WithPositional()}), "already positional"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
