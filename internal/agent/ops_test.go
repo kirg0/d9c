@@ -437,12 +437,14 @@ func TestParseDF(t *testing.T) {
 	}
 }
 
-// eventsBackend records the window it was asked for and serves n lines.
+// eventsBackend records the window it was asked for and serves n lines,
+// then tail when set (an in-band stream error).
 type eventsBackend struct {
 	*docker.FakeBackend
-	got docker.EventOptions
-	n   int
-	err error
+	got  docker.EventOptions
+	n    int
+	tail string
+	err  error
 }
 
 func (b *eventsBackend) Events(opts docker.EventOptions) (<-chan string, func(), error) {
@@ -450,9 +452,12 @@ func (b *eventsBackend) Events(opts docker.EventOptions) (<-chan string, func(),
 	if b.err != nil {
 		return nil, nil, b.err
 	}
-	ch := make(chan string, b.n)
+	ch := make(chan string, b.n+1)
 	for i := 0; i < b.n; i++ {
 		ch <- fmt.Sprintf("event %d", i)
+	}
+	if b.tail != "" {
+		ch <- b.tail
 	}
 	close(ch)
 	return ch, func() {}, nil
@@ -480,6 +485,18 @@ func TestEvents(t *testing.T) {
 	if res := invoke(t, b, "events", nil); !res.Truncated || len(res.Data.(EventsData).Events) != maxEvents {
 		t.Errorf("capped events: truncated %v, %d events", res.Truncated, len(res.Data.(EventsData).Events))
 	}
+
+	// The daemon fails the stream in band: never a window without events.
+	b.n = 1
+	b.tail = docker.EventErrorPrefix + `failed to parse value as time or duration: "bad"`
+	if e := invokeErr(t, b, "events", Args{"until": "bad"}); e.Code != CodeUsage || e.Hint == "" || !strings.Contains(e.Message, `"bad"`) {
+		t.Errorf("bad window: %+v", e)
+	}
+	b.tail = docker.EventErrorPrefix + "unexpected EOF"
+	if e := invokeErr(t, b, "events", nil); e.Code != CodeConnection || !strings.Contains(e.Message, "unexpected EOF") {
+		t.Errorf("broken stream: %+v", e)
+	}
+	b.tail = ""
 
 	b.err = errors.New("event history (--since/--until) is not supported by containerd (nerdctl)")
 	if e := invokeErr(t, b, "events", nil); e.Code != CodeInternal || !strings.Contains(e.Message, "not supported") {
