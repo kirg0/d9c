@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -103,6 +104,65 @@ func TestRedactEnv(t *testing.T) {
 				t.Errorf("redacted = %#v\nwant %#v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestRedactComposeConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		in      string
+		want    string
+		count   int
+		wantErr bool
+	}{
+		{
+			name:  "environment map keeps order and comments",
+			in:    "services:\n  db:\n    # the database\n    image: postgres:16\n    environment:\n      POSTGRES_PASSWORD: \"hunter2\"\n      PGDATA: /data\n      API_KEY: 42\n      PASSTHROUGH_TOKEN:\n",
+			want:  "services:\n  db:\n    # the database\n    image: postgres:16\n    environment:\n      POSTGRES_PASSWORD: <redacted>\n      PGDATA: /data\n      API_KEY: <redacted>\n      PASSTHROUGH_TOKEN:\n",
+			count: 2,
+		},
+		{
+			name:  "environment list",
+			in:    "services:\n  web:\n    environment:\n      - TZ=UTC\n      - SECRET_X=s\n      - BARE_TOKEN\n",
+			want:  "services:\n  web:\n    environment:\n      - TZ=UTC\n      - SECRET_X=<redacted>\n      - BARE_TOKEN\n",
+			count: 1,
+		},
+		{
+			name:  "nothing to mask returns the text untouched",
+			in:    "services:\n  web:\n    image:   nginx   # spacing kept\n    labels:\n      api_key: visible\n",
+			want:  "services:\n  web:\n    image:   nginx   # spacing kept\n    labels:\n      api_key: visible\n",
+			count: 0,
+		},
+		{name: "empty", in: "", want: "", count: 0},
+		{name: "unparsable fails closed", in: "services: [\n  DB_PASSWORD=x", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, n, err := redactComposeConfig(tt.in)
+			if tt.wantErr {
+				var ae *Error
+				if !errors.As(err, &ae) || got != "" || !strings.Contains(ae.Hint, "--no-redact") {
+					t.Errorf("got %q, err %v; want an error with a --no-redact hint", got, err)
+				}
+				return
+			}
+			if err != nil || got != tt.want || n != tt.count {
+				t.Errorf("got %q (%d), err %v\nwant %q (%d)", got, n, err, tt.want, tt.count)
+			}
+		})
+	}
+}
+
+func TestComposeConfigRedacts(t *testing.T) {
+	fb := docker.NewFakeBackend()
+	res := invoke(t, fb, "compose config", Args{"project": "webapp"})
+	cfg := res.Data.(ComposeConfigData).Config
+	if !strings.Contains(cfg, "DB_PASSWORD: <redacted>") || !strings.Contains(cfg, "TZ: UTC") || !strings.Contains(res.Hint, "1 secret-looking") {
+		t.Errorf("default: config %q, hint %q", cfg, res.Hint)
+	}
+	res = invoke(t, fb, "compose config", Args{"project": "webapp", "no_redact": true})
+	if cfg := res.Data.(ComposeConfigData).Config; !strings.Contains(cfg, "DB_PASSWORD: demo-secret") || res.Hint != "" {
+		t.Errorf("--no-redact: config %q, hint %q", cfg, res.Hint)
 	}
 }
 

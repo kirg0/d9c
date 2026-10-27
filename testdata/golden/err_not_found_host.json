@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "not_found",
+    "message": "no saved host named \"nope\"",
+    "hint": "run `d9c hosts ls` to list the saved hosts"
+  }
+}

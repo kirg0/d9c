@@ -300,6 +300,11 @@ type EventOptions struct {
 // Windowed reports whether opts asks for past events rather than a live feed.
 func (o EventOptions) Windowed() bool { return o.Since != "" || o.Until != "" }
 
+// EventErrorPrefix starts the line Events sends when the daemon fails the
+// stream (a bad --since/--until, a dropped connection). Windowed lines start
+// with their timestamp, so the prefix is unambiguous there.
+const EventErrorPrefix = "[error] "
+
 // errEventWindowUnsupported is returned by engines whose event stream is live
 // only (nerdctl, crictl): they keep no history to query a window from.
 func errEventWindowUnsupported(engine string) error {
@@ -345,7 +350,7 @@ func (b *dockerBackend) Events(opts EventOptions) (<-chan string, func(), error)
 			case err, ok := <-errCh:
 				// The daemon ends a windowed query with io.EOF on errCh once
 				// Until is reached: that is the normal end, not an error line.
-				if !ok || errors.Is(err, io.EOF) || !send("[error] "+err.Error()) {
+				if !ok || errors.Is(err, io.EOF) || !send(EventErrorPrefix+err.Error()) {
 					return
 				}
 			}

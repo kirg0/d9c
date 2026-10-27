@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": [
+    {
+      "name": "web",
+      "state": "running"
+    }
+  ],
+  "truncated": true,
+  "hint": "showing the first 1 of 3 items; raise --limit (0 = no limit)"
+}

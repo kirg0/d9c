@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "target": "webapp",
+    "lines": [
+      "web | <time> ERROR failed to connect to upstream: timeout",
+      "web | <time> INFO  retrying connection (attempt 2)"
+    ]
+  },
+  "truncated": false
+}

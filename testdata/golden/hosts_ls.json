@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "host": "",
+  "runtime": "",
+  "data": [
+    {
+      "name": "prod",
+      "host": "tcp://127.0.0.1:1",
+      "read_only": true
+    },
+    {
+      "name": "pw",
+      "host": "ssh://u@pw.invalid",
+      "read_only": false
+    }
+  ],
+  "truncated": false
+}

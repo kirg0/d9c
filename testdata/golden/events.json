@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "since": "<time>",
+    "until": "<time>",
+    "events": [
+      "container create 9ae942fd8fbc (local)",
+      "container start 9ae942fd8fbc (local)",
+      "container die d2c94e258dcb (local)",
+      "container health_status: healthy 9ae942fd8fbc (local)",
+      "container oom 3f1ab77c9012 (local)"
+    ]
+  },
+  "truncated": false
+}

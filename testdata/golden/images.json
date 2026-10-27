@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": [
+    {
+      "id": "a08c488a9779",
+      "tags": "nginx:1.25",
+      "size": "187 MB",
+      "created": "<time>"
+    },
+    {
+      "id": "d2c94e258dcb",
+      "tags": "hello-world:latest",
+      "size": "13 kB",
+      "created": "<time>"
+    },
+    {
+      "id": "b1d3f9e7c4a2",
+      "tags": "<none>:<none>",
+      "size": "5 MB",
+      "created": "<time>"
+    },
+    {
+      "id": "c7e8a2b4d6f1",
+      "tags": "postgres:16",
+      "size": "431 MB",
+      "created": "<time>"
+    }
+  ],
+  "truncated": false
+}

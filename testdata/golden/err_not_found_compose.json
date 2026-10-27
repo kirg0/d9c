@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "not_found",
+    "message": "no compose project \"ghost\"",
+    "hint": "run `d9c compose ls` to list the compose projects"
+  }
+}

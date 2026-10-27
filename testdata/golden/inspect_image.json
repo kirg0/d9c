@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "type": "image",
+    "name": "nginx:1.25",
+    "object": {
+      "Id": "a08c488a9779",
+      "RepoTags": "nginx:1.25",
+      "Size": "187 MB"
+    }
+  },
+  "truncated": false
+}

@@ -6,6 +6,25 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.32.0] - 2026-10-27
+
+### Added
+
+- **Command-line mode for scripts and AI agents.** A known command as the first argument runs
+  d9c without the interface: `hosts ls`, `info`, `ps [-a]`, `inspect`, `logs`
+  (`--tail/--since/--until/--grep`), `stats`, `images`, `networks`, `volumes`, `system df`,
+  `events` (a past window only) and `compose ls/ps/config/logs`. All of them are read-only.
+- **Stable output contract.** stdout carries one JSON envelope
+  `{"schema":1,"host","runtime","data","truncated"}`; `-o text` prints a table, `-o ndjson` one
+  item per line; `--fields` and `--limit` shape the result, and a cut list says so with a hint.
+  Failures are JSON on stderr (`{"error":{"code","message","hint"}}`, daemon errors reworded)
+  with distinct exit codes: 2 usage, 3 not_found, 4 connection, 5 forbidden, 6 auth_required.
+- **`-host <name>`** picks a saved host by name, in the command-line mode and in the interface.
+- **Safe by default for unattended use.** No prompts: a password SSH host takes the password from
+  `D9C_SSH_PASSWORD` or fails with `auth_required`; an SSH host key not in `known_hosts` is never
+  accepted; `inspect` and `compose config` mask env values named like `*PASS*`, `*TOKEN*`,
+  `*SECRET*`, `*KEY*` (`--no-redact` shows them).
+
 ## [1.31.2] - 2026-10-27
 
 ### Fixed

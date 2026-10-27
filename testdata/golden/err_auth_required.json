@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "auth_required",
+    "message": "saved host \"pw\" uses SSH password authentication",
+    "hint": "set D9C_SSH_PASSWORD for this command; the CLI never prompts for a password"
+  }
+}

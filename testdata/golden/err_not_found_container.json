@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "not_found",
+    "message": "no such container: ghost",
+    "hint": "the object may have been removed by another client; list the resources again"
+  }
+}

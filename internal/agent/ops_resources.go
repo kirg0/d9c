@@ -195,6 +195,24 @@ type EventsData struct {
 // ItemsKey implements Lister: the events are the items.
 func (EventsData) ItemsKey() string { return "events" }
 
+// eventStreamError turns the in-band error line of a windowed event stream
+// into an error, so a failed query never passes for a window without events.
+// An unparsable --since/--until is the caller's mistake: usage.
+func eventStreamError(lines []string) error {
+	for _, l := range lines {
+		msg, ok := strings.CutPrefix(l, docker.EventErrorPrefix)
+		if !ok {
+			continue
+		}
+		if strings.Contains(msg, "failed to parse") {
+			return Errorf(CodeUsage, "events: %s", msg).
+				WithHint("since/until take a duration back from now (10m, 2h), an RFC3339 timestamp or Unix seconds")
+		}
+		return fmt.Errorf("events: %s", msg)
+	}
+	return nil
+}
+
 func eventsOp() Op {
 	return Op{
 		Name: "events",
@@ -221,6 +239,9 @@ func eventsOp() Op {
 			}
 			lines, capped, err := drain(ctx, ch, stop, maxEvents)
 			if err != nil {
+				return Result{}, err
+			}
+			if err := eventStreamError(lines); err != nil {
 				return Result{}, err
 			}
 			res := Result{Data: EventsData{Since: opts.Since, Until: opts.Until, Events: lines}}
