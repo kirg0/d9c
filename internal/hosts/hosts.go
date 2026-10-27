@@ -69,10 +69,14 @@ func NewStore(initial []Host, persist func([]Host) error) *Store {
 	return &Store{Hosts: append([]Host(nil), initial...), persist: persist}
 }
 
+// LegacyFileName is the name of the old standalone hosts file that predates the
+// hosts: section of the unified config.
+const LegacyFileName = "d9c-hosts.json"
+
 // LegacyDefaultPath returns the location of the old standalone hosts file next
 // to the running binary, used only for one-time migration into the config.
 func LegacyDefaultPath() string {
-	return appdir.LegacyPath("d9c-hosts.json")
+	return appdir.LegacyPath(LegacyFileName)
 }
 
 type legacyFile struct {

@@ -6,6 +6,15 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.31.2] - 2026-10-27
+
+### Fixed
+
+- **Stale `-help` texts for file flags.** `-plugins-file` now names its real default
+  `~/.d9c/d9c-plugins.yaml` instead of "next to the binary", and `-hosts-file` no longer claims the
+  plugins file as its default: it points at the legacy `d9c-hosts.json` next to the binary, which
+  is only read once to migrate into the config.
+
 ## [1.31.0] - 2026-10-01
 
 ### Changed
