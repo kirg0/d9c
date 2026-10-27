@@ -163,6 +163,23 @@ func TestRunCLI(t *testing.T) {
 		}
 	})
 
+	t.Run("lifecycle text output", func(t *testing.T) {
+		cliCeiling = agent.TierDestructive
+		t.Cleanup(func() { cliCeiling = agent.TierRead })
+		code, out, errOut := cliRun(t, &config.Config{ConfigFile: cfgPath}, "stop", "web", "ghost", "-o", "text", "-demo")
+		if code != agent.ExitPartial {
+			t.Fatalf("exit %d, want %d (stderr %q)", code, agent.ExitPartial, errOut)
+		}
+		for _, want := range []string{"REF", "RESULT", "web", "ok", "ghost", "failed", "not_found"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("text output lacks %q:\n%s", want, out)
+			}
+		}
+		if !strings.Contains(errOut, "partial failure: 1 of 2 containers failed") {
+			t.Errorf("stderr = %q, want the partial notice", errOut)
+		}
+	})
+
 	t.Run("hosts ls needs no connection", func(t *testing.T) {
 		// -H points nowhere: a local operation must not dial it.
 		code, out, errOut := cliRun(t, &config.Config{ConfigFile: cfgPath, Host: "tcp://127.0.0.1:1", HostFlagSet: true}, "hosts", "ls")

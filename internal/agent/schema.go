@@ -37,6 +37,10 @@ type Schema struct {
 	// Short is a one-letter CLI alias of a property (`-a` for "all"). It is a
 	// command-line convenience only and stays out of the JSON Schema.
 	Short string `json:"-"`
+	// Positional marks the optional string-array property that collects the
+	// CLI's positional arguments left over after the required ones (`d9c stop
+	// web db`). Like Short it is a command-line convenience only.
+	Positional bool `json:"-"`
 	// AdditionalProperties is always false for argument objects: an unknown
 	// argument is a usage error, not something to ignore silently.
 	AdditionalProperties *bool `json:"additionalProperties,omitempty"`
@@ -88,6 +92,13 @@ func (s *Schema) WithShort(letter string) *Schema {
 	return s
 }
 
+// WithPositional makes an optional string-array argument take the CLI's
+// leftover positional arguments.
+func (s *Schema) WithPositional() *Schema {
+	s.Positional = true
+	return s
+}
+
 // WithMin sets the inclusive lower bound of an integer argument.
 func (s *Schema) WithMin(n int) *Schema {
 	s.Minimum = &n
@@ -102,6 +113,7 @@ func (s *Schema) check() error {
 		return fmt.Errorf("argument schema must be an object")
 	}
 	shorts := map[string]string{}
+	positional := ""
 	for name, p := range s.Properties {
 		if p == nil {
 			return fmt.Errorf("property %q: nil schema", name)
@@ -137,6 +149,15 @@ func (s *Schema) check() error {
 		}
 		if p.Minimum != nil && p.Type != TypeInteger {
 			return fmt.Errorf("property %q: minimum is only supported on integers", name)
+		}
+		if p.Positional {
+			if p.Type != TypeArray || slices.Contains(s.Required, name) {
+				return fmt.Errorf("property %q: only an optional string array can be positional", name)
+			}
+			if positional != "" {
+				return fmt.Errorf("property %q: %q is already positional", name, positional)
+			}
+			positional = name
 		}
 		if p.Default != nil {
 			if _, err := p.coerce(p.Default); err != nil {

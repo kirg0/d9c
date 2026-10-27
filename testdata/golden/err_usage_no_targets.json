@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "usage",
+    "message": "stop: no containers given",
+    "hint": "pass container IDs or names, or --filter key=value; Select containers by key=value (repeatable, all must match): name=<glob>, image=<glob>, status=<state>, label=<key>[=<value>], network=<name>, health=<healthy|unhealthy|starting|none>."
+  }
+}

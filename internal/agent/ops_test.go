@@ -39,12 +39,14 @@ func TestOpsWithoutBackend(t *testing.T) {
 	args := map[string]Args{
 		"inspect": {"target": "x"}, "logs": {"container": "x"},
 		"compose ps": {"project": "x"}, "compose config": {"project": "x"}, "compose logs": {"project": "x"},
+		"start": {"targets": []string{"x"}}, "stop": {"targets": []string{"x"}}, "restart": {"targets": []string{"x"}},
+		"kill": {"targets": []string{"x"}}, "rm": {"targets": []string{"x"}},
 	}
 	for _, op := range r.Ops() {
 		if op.Local {
 			continue
 		}
-		_, err := r.Invoke(context.Background(), &Env{}, op.Name, args[op.Name], TierRead)
+		_, err := r.Invoke(context.Background(), &Env{}, op.Name, args[op.Name], TierDestructive)
 		if e := Classify(err); e.Code != CodeInternal {
 			t.Errorf("%s without backend: err = %v, want internal", op.Name, err)
 		}

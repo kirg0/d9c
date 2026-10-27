@@ -17,9 +17,10 @@ import (
 // prompts, so a password-auth host without it fails with auth_required.
 const passwordEnv = "D9C_SSH_PASSWORD"
 
-// cliCeiling is the tier ceiling of the CLI. Phase 6.1 ships read operations
-// only; the allowWrite/maxTier policy arrives with the write commands.
-const cliCeiling = agent.TierRead
+// cliCeiling is the tier ceiling of the CLI. It stays at read until the
+// allowWrite/maxTier policy lands, so the write commands answer forbidden;
+// tests raise it to exercise them.
+var cliCeiling = agent.TierRead
 
 // runCLI executes one CLI command (args starts at the command word) and
 // returns the process exit status. The result goes to stdout as a JSON
@@ -70,6 +71,9 @@ func runCLI(cfg *config.Config, reg *agent.Registry, args []string, stdout, stde
 	}
 	if err := cli.WriteResult(stdout, stderr, out, inv.Output); err != nil {
 		return cli.WriteError(stderr, err)
+	}
+	if res.Partial {
+		return agent.ExitPartial
 	}
 	return 0
 }

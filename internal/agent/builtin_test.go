@@ -10,31 +10,37 @@ import (
 	"github.com/kirg0/d9c/internal/hosts"
 )
 
-// Every built-in operation is a read in 6.1, only `hosts ls` may run without
-// a connection, and the ops returning container-authored content carry the
-// prompt-injection note.
+// Each built-in operation has its declared tier, only `hosts ls` may run
+// without a connection, and the ops returning container-authored content
+// carry the prompt-injection note.
 func TestBuiltinDeclarations(t *testing.T) {
 	r := Builtin()
 	tests := []struct {
 		name      string
+		tier      Tier
 		local     bool
 		untrusted bool
 	}{
-		{"hosts ls", true, false},
-		{"info", false, false},
-		{"ps", false, false},
-		{"inspect", false, true},
-		{"logs", false, true},
-		{"stats", false, false},
-		{"images", false, false},
-		{"networks", false, false},
-		{"volumes", false, false},
-		{"system df", false, false},
-		{"events", false, false},
-		{"compose ls", false, false},
-		{"compose ps", false, false},
-		{"compose config", false, true},
-		{"compose logs", false, true},
+		{"hosts ls", TierRead, true, false},
+		{"info", TierRead, false, false},
+		{"ps", TierRead, false, false},
+		{"inspect", TierRead, false, true},
+		{"logs", TierRead, false, true},
+		{"stats", TierRead, false, false},
+		{"images", TierRead, false, false},
+		{"networks", TierRead, false, false},
+		{"volumes", TierRead, false, false},
+		{"system df", TierRead, false, false},
+		{"events", TierRead, false, false},
+		{"compose ls", TierRead, false, false},
+		{"compose ps", TierRead, false, false},
+		{"compose config", TierRead, false, true},
+		{"compose logs", TierRead, false, true},
+		{"start", TierSafe, false, false},
+		{"stop", TierSafe, false, false},
+		{"restart", TierSafe, false, false},
+		{"kill", TierDestructive, false, false},
+		{"rm", TierDestructive, false, false},
 	}
 	if got := len(r.Ops()); got != len(tests) {
 		t.Errorf("Builtin has %d ops, want %d", got, len(tests))
@@ -45,8 +51,8 @@ func TestBuiltinDeclarations(t *testing.T) {
 			t.Errorf("%q not registered", tt.name)
 			continue
 		}
-		if op.Tier != TierRead {
-			t.Errorf("%q tier = %s, want read", tt.name, op.Tier)
+		if op.Tier != tt.tier {
+			t.Errorf("%q tier = %s, want %s", tt.name, op.Tier, tt.tier)
 		}
 		if op.Local != tt.local {
 			t.Errorf("%q Local = %v, want %v", tt.name, op.Local, tt.local)

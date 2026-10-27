@@ -260,7 +260,8 @@ func lookupProp(s *agent.Schema, name string) (string, *agent.Schema, bool) {
 }
 
 // assignPositional maps positional arguments onto the required properties of
-// op that were not given as flags, in declaration order.
+// op that were not given as flags, in declaration order; what is left goes to
+// the op's Positional list property, after any values given as flags.
 func assignPositional(op agent.Op, args agent.Args, positional []string) error {
 	for _, name := range op.Args.Required {
 		if len(positional) == 0 {
@@ -277,6 +278,11 @@ func assignPositional(op agent.Op, args agent.Args, positional []string) error {
 		args[name] = positional[0]
 		positional = positional[1:]
 	}
+	if name := positionalProp(op.Args); name != "" && len(positional) > 0 {
+		list, _ := args[name].([]string)
+		args[name] = append(list, positional...)
+		positional = nil
+	}
 	if len(positional) > 0 {
 		return agent.Errorf(agent.CodeUsage, "unexpected argument %q for %q", positional[0], op.Name).
 			WithHint(usageLine(op))
@@ -284,7 +290,17 @@ func assignPositional(op agent.Op, args agent.Args, positional []string) error {
 	return nil
 }
 
-// usageLine renders `usage: d9c <op> <required…> [--flag …]`.
+// positionalProp returns the name of the schema's Positional property, or "".
+func positionalProp(s *agent.Schema) string {
+	for name, p := range s.Properties {
+		if p.Positional {
+			return name
+		}
+	}
+	return ""
+}
+
+// usageLine renders `usage: d9c <op> <required…> [<positional>...] [--flag …]`.
 func usageLine(op agent.Op) string {
 	var b strings.Builder
 	b.WriteString("usage: d9c ")
@@ -292,7 +308,14 @@ func usageLine(op agent.Op) string {
 	for _, name := range op.Args.Required {
 		b.WriteString(" <" + name + ">")
 	}
+	pos := positionalProp(op.Args)
+	if pos != "" {
+		b.WriteString(" [<" + pos + ">...]")
+	}
 	for _, name := range optionalProps(op.Args) {
+		if name == pos {
+			continue
+		}
 		b.WriteString(" [" + flagName(name))
 		if t := op.Args.Properties[name].Type; t != agent.TypeBoolean {
 			b.WriteString(" " + typeWord(t))

@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "not_found",
+    "message": "no such container: ghost",
+    "hint": "list the containers with `d9c ps -a`"
+  }
+}

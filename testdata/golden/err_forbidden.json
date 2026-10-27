@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "forbidden",
+    "message": "operation \"stop\" is safe, above the allowed tier read",
+    "hint": "ask the user to raise the agent tier ceiling for this host"
+  }
+}

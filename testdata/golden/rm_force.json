@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "action": "rm",
+    "targets": [
+      {
+        "ref": "web",
+        "id": "9ae942fd8fbc",
+        "name": "web",
+        "result": "ok"
+      }
+    ],
+    "done": 1,
+    "failed": 0
+  },
+  "truncated": false
+}

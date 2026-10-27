@@ -35,39 +35,52 @@ type goldenCase struct {
 	name string
 	args []string // -demo is appended unless --host picks a saved host
 	exit int
+	// write raises the CLI tier ceiling to destructive for the case; without
+	// it a write command answers forbidden, as it does for users today.
+	write bool
 }
 
 // cliGoldenCases covers every built-in operation at least once (checked by
 // TestCLIGoldenCoversRegistry) plus each error code the demo backend can
 // produce.
 var cliGoldenCases = []goldenCase{
-	{"hosts_ls", []string{"hosts", "ls"}, 0},
-	{"info", []string{"info"}, 0},
-	{"ps", []string{"ps"}, 0},
-	{"ps_all", []string{"ps", "-a"}, 0},
-	{"ps_fields_limit", []string{"ps", "-a", "--fields", "name,state", "--limit", "1"}, 0},
-	{"inspect_container", []string{"inspect", "web"}, 0},
-	{"inspect_image", []string{"inspect", "--type", "image", "a08c488a9779"}, 0},
-	{"logs_tail", []string{"logs", "web", "-n", "3"}, 0},
-	{"logs_grep", []string{"logs", "web", "--grep", "ERROR"}, 0},
-	{"stats", []string{"stats"}, 0},
-	{"images", []string{"images"}, 0},
-	{"networks", []string{"networks"}, 0},
-	{"volumes", []string{"volumes"}, 0},
-	{"system_df", []string{"system", "df"}, 0},
-	{"events", []string{"events", "--since", "2026-01-01T00:00:00Z", "--until", "2026-01-01T01:00:00Z"}, 0},
-	{"compose_ls", []string{"compose", "ls"}, 0},
-	{"compose_ps", []string{"compose", "ps", "webapp"}, 0},
-	{"compose_config", []string{"compose", "config", "webapp"}, 0},
-	{"compose_logs", []string{"compose", "logs", "webapp", "--tail", "2"}, 0},
+	{"hosts_ls", []string{"hosts", "ls"}, 0, false},
+	{"info", []string{"info"}, 0, false},
+	{"ps", []string{"ps"}, 0, false},
+	{"ps_all", []string{"ps", "-a"}, 0, false},
+	{"ps_fields_limit", []string{"ps", "-a", "--fields", "name,state", "--limit", "1"}, 0, false},
+	{"inspect_container", []string{"inspect", "web"}, 0, false},
+	{"inspect_image", []string{"inspect", "--type", "image", "a08c488a9779"}, 0, false},
+	{"logs_tail", []string{"logs", "web", "-n", "3"}, 0, false},
+	{"logs_grep", []string{"logs", "web", "--grep", "ERROR"}, 0, false},
+	{"stats", []string{"stats"}, 0, false},
+	{"images", []string{"images"}, 0, false},
+	{"networks", []string{"networks"}, 0, false},
+	{"volumes", []string{"volumes"}, 0, false},
+	{"system_df", []string{"system", "df"}, 0, false},
+	{"events", []string{"events", "--since", "2026-01-01T00:00:00Z", "--until", "2026-01-01T01:00:00Z"}, 0, false},
+	{"compose_ls", []string{"compose", "ls"}, 0, false},
+	{"compose_ps", []string{"compose", "ps", "webapp"}, 0, false},
+	{"compose_config", []string{"compose", "config", "webapp"}, 0, false},
+	{"compose_logs", []string{"compose", "logs", "webapp", "--tail", "2"}, 0, false},
+	{"start", []string{"start", "db"}, 0, true},
+	{"stop_targets", []string{"stop", "web", "api"}, 0, true},
+	{"stop_filter", []string{"stop", "--filter", "label=env=prod"}, 0, true},
+	{"restart_prefix", []string{"restart", "9ae"}, 0, true},
+	{"kill_signal", []string{"kill", "web", "-s", "TERM"}, 0, true},
+	{"rm_force", []string{"rm", "-f", "web"}, 0, true},
+	{"partial_stop", []string{"stop", "web", "ghost"}, agent.ExitPartial, true},
 
-	{"err_usage_flag", []string{"ps", "--bogus"}, 2},
-	{"err_usage_field", []string{"ps", "--fields", "bogus"}, 2},
-	{"err_usage_missing_arg", []string{"inspect"}, 2},
-	{"err_not_found_container", []string{"inspect", "ghost"}, 3},
-	{"err_not_found_compose", []string{"compose", "ps", "ghost"}, 3},
-	{"err_not_found_host", []string{"info", "--host", "nope"}, 3},
-	{"err_auth_required", []string{"info", "--host", "pw"}, 6},
+	{"err_usage_flag", []string{"ps", "--bogus"}, 2, false},
+	{"err_usage_field", []string{"ps", "--fields", "bogus"}, 2, false},
+	{"err_usage_missing_arg", []string{"inspect"}, 2, false},
+	{"err_not_found_container", []string{"inspect", "ghost"}, 3, false},
+	{"err_not_found_compose", []string{"compose", "ps", "ghost"}, 3, false},
+	{"err_not_found_host", []string{"info", "--host", "nope"}, 3, false},
+	{"err_auth_required", []string{"info", "--host", "pw"}, 6, false},
+	{"err_forbidden", []string{"stop", "web"}, 5, false},
+	{"err_usage_no_targets", []string{"stop"}, 2, true},
+	{"err_not_found_target", []string{"start", "ghost"}, 3, true},
 }
 
 func TestCLIGolden(t *testing.T) {
@@ -79,12 +92,17 @@ func TestCLIGolden(t *testing.T) {
 			if !slices.Contains(args, "--host") {
 				args = append(args, "-demo")
 			}
+			if tc.write {
+				cliCeiling = agent.TierDestructive
+				t.Cleanup(func() { cliCeiling = agent.TierRead })
+			}
 			code, out, errOut := cliRun(t, &config.Config{ConfigFile: cfgPath}, args...)
 			if code != tc.exit {
 				t.Fatalf("exit %d, want %d (stdout %q, stderr %q)", code, tc.exit, out, errOut)
 			}
 			got, other := out, errOut
-			if tc.exit != 0 {
+			// A partial result is still an envelope on stdout.
+			if tc.exit != 0 && tc.exit != agent.ExitPartial {
 				got, other = errOut, out
 			}
 			if other != "" {

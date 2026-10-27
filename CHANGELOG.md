@@ -6,6 +6,15 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Container lifecycle commands in command-line mode:** `start`, `stop`, `restart`, `kill [-s SIG]`
+  and `rm [-f]` take several container IDs, unique ID prefixes or names, and/or repeatable
+  `--filter key=value` predicates (`name=`/`image=` globs, `status=`, `label=k[=v]`, `network=`,
+  `health=`; exact matches, never substrings). The result lists one outcome per container; when
+  only some of them fail, the envelope carries `"partial": true` and the exit status is `8`.
+  The commands stay forbidden until the write policy (`allowWrite`/`maxTier`) lands.
+
 ## [1.32.0] - 2026-10-27
 
 ### Added

@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "action": "stop",
+    "targets": [
+      {
+        "id": "9ae942fd8fbc",
+        "name": "web",
+        "result": "ok"
+      },
+      {
+        "id": "d2c94e258dcb",
+        "name": "api",
+        "result": "ok"
+      }
+    ],
+    "done": 2,
+    "failed": 0
+  },
+  "truncated": false
+}
