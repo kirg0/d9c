@@ -85,6 +85,74 @@ func TestHostKeyCallbackNoPath(t *testing.T) {
 	}
 }
 
+// The strict callback (agent CLI) verifies known hosts like accept-new does but
+// never records an unknown one: it fails with ErrUnknownHostKey and leaves
+// known_hosts untouched, while a changed key stays a plain mismatch.
+func TestStrictHostKeyCallback(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "known_hosts")
+	remote := &net.TCPAddr{IP: net.IPv4(10, 0, 0, 1), Port: 22}
+	const host = "example.com:22"
+	keyA, keyB := testPublicKey(t), testPublicKey(t)
+
+	// No known_hosts file at all.
+	err := strictHostKeyCallbackFor(path)(host, remote, keyA)
+	if !IsUnknownHostKeyError(err) {
+		t.Fatalf("missing file: err = %v, want ErrUnknownHostKey", err)
+	}
+	if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("strict callback created known_hosts (stat err %v)", statErr)
+	}
+
+	// Empty file: host unknown, still rejected and not appended.
+	if err := os.WriteFile(path, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := strictHostKeyCallbackFor(path)(host, remote, keyA); !IsUnknownHostKeyError(err) {
+		t.Fatalf("unknown host: err = %v, want ErrUnknownHostKey", err)
+	}
+	if data, _ := os.ReadFile(path); len(data) != 0 {
+		t.Fatalf("strict callback appended to known_hosts: %q", data)
+	}
+
+	// Recorded (by the TOFU callback, as the TUI would): verifies cleanly.
+	if err := hostKeyCallbackFor(path)(host, remote, keyA); err != nil {
+		t.Fatal(err)
+	}
+	if err := strictHostKeyCallbackFor(path)(host, remote, keyA); err != nil {
+		t.Errorf("known host: err = %v, want nil", err)
+	}
+
+	// Changed key: mismatch, not "unknown".
+	err = strictHostKeyCallbackFor(path)(host, remote, keyB)
+	if err == nil || IsUnknownHostKeyError(err) || !IsHostKeyError(err) {
+		t.Errorf("changed key: err = %v, want a host-key mismatch", err)
+	}
+
+	// No known_hosts location: reject instead of disabling verification.
+	if err := strictHostKeyCallbackFor("")(host, remote, keyA); !IsUnknownHostKeyError(err) {
+		t.Errorf("empty path: err = %v, want ErrUnknownHostKey", err)
+	}
+}
+
+// SetStrictHostKeys selects which callback hostKeyCallback hands to SSH.
+func TestSetStrictHostKeys(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Cleanup(func() { SetStrictHostKeys(false) })
+	remote := &net.TCPAddr{IP: net.IPv4(10, 0, 0, 1), Port: 22}
+
+	SetStrictHostKeys(true)
+	if err := hostKeyCallback()("strict.example:22", remote, testPublicKey(t)); !IsUnknownHostKeyError(err) {
+		t.Errorf("strict: err = %v, want ErrUnknownHostKey", err)
+	}
+	SetStrictHostKeys(false)
+	if err := hostKeyCallback()("tofu.example:22", remote, testPublicKey(t)); err != nil {
+		t.Errorf("accept-new: err = %v, want nil", err)
+	}
+}
+
 // pickDialStdioCmd must fall through to sudo when the SSH user can't reach the
 // daemon directly, and fail loudly when neither prefix works — the original bug
 // was that the fallback never advanced past the first (failing) command.

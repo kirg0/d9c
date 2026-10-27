@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/kirg0/d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/hosts"
 )
 
 // UntrustedNote is appended to the description of every operation whose
@@ -22,6 +23,8 @@ type Env struct {
 	// Backend is the connected engine; operations that only read local
 	// configuration (e.g. the host list) may run with a nil Backend.
 	Backend docker.Backend
+	// Hosts is the saved-host store (read-only for operations).
+	Hosts *hosts.Store
 }
 
 // Handler executes an operation with already-normalized arguments.
@@ -41,6 +44,9 @@ type Op struct {
 	// Untrusted marks operations whose output includes container-controlled
 	// content; Description then carries UntrustedNote.
 	Untrusted bool
+	// Local marks operations that only read local configuration: frontends
+	// run them without connecting, with a nil Env.Backend.
+	Local bool
 	// Handler runs the operation.
 	Handler Handler
 }

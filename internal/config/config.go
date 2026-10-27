@@ -32,6 +32,10 @@ type Config struct {
 	// Context names the Docker CLI context to start with (-context). Empty
 	// means none; DOCKER_CONTEXT is resolved later, honoring DOCKER_HOST.
 	Context string
+	// SavedHost names a host from the saved-host store (-host) to connect to
+	// with its stored SSH key and TLS files; it cannot be combined with
+	// -H/-context.
+	SavedHost string
 	// HostFlagSet records whether -H was given explicitly on the command line
 	// (as opposed to the DOCKER_HOST / default fallback), so -H and -context
 	// can be reported as conflicting like the Docker CLI does.
@@ -56,6 +60,7 @@ func Load() *Config {
 	flag.DurationVar(&cfg.RefreshInterval, "interval", DefaultRefreshInterval, "Auto-refresh interval (e.g. 1s, 5s); toggle pause at runtime with 'p'")
 	flag.BoolVar(&cfg.ReadOnly, "read-only", false, "Read-only mode: forbid every mutating action (stop/kill/rm/prune/run/exec/cp/compose/build/push/create)")
 	flag.StringVar(&cfg.Context, "context", "", "Docker CLI context to connect with (from ~/.docker/contexts; overrides DOCKER_HOST and DOCKER_CONTEXT)")
+	flag.StringVar(&cfg.SavedHost, "host", "", "Saved host to connect to, by name, with its stored SSH key and TLS files (list them with: d9c hosts ls)")
 	flag.Parse()
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "H" {

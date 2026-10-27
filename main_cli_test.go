@@ -1,0 +1,296 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/kirg0/d9c/internal/agent"
+	"github.com/kirg0/d9c/internal/config"
+	"github.com/kirg0/d9c/internal/docker"
+	"github.com/kirg0/d9c/internal/hosts"
+)
+
+func TestResolveCLITarget(t *testing.T) {
+	ctxDir := t.TempDir()
+	writeDockerContext(t, ctxDir, "lab", "ssh://ops@lab")
+	store := func() *hosts.Store {
+		return hosts.NewStore([]hosts.Host{
+			{Name: "prod", Host: "ssh://root@prod", SSHKeyPath: "/k/id_prod"},
+			{Name: "pw", Host: "ssh://u@pw", SSHAuth: hosts.SSHAuthPassword},
+			{Name: "secure", Host: "tcp://secure:2376", TLSCACert: "ca", TLSCert: "cert", TLSKey: "key"},
+		}, nil)
+	}
+	env := func(kv ...string) func(string) string {
+		m := map[string]string{}
+		for i := 0; i+1 < len(kv); i += 2 {
+			m[kv[i]] = kv[i+1]
+		}
+		return func(k string) string { return m[k] }
+	}
+
+	tests := []struct {
+		name      string
+		cfg       config.Config
+		getenv    func(string) string
+		wantLabel string
+		wantCode  agent.Code // "" = success
+		check     func(t *testing.T, cfg config.Config)
+	}{
+		{"saved key host", config.Config{SavedHost: "prod", Host: config.DefaultHost, SSHPassword: "stale"}, env(), "prod", "",
+			func(t *testing.T, c config.Config) {
+				if c.Host != "ssh://root@prod" || c.SSHKeyFile != "/k/id_prod" || c.SSHPassword != "" {
+					t.Errorf("cfg = %+v", c)
+				}
+			}},
+		{"saved TLS host", config.Config{SavedHost: "secure", TLSCACert: "flag-ca"}, env(), "secure", "",
+			func(t *testing.T, c config.Config) {
+				if c.Host != "tcp://secure:2376" || c.TLSCACert != "ca" || c.TLSCert != "cert" || c.TLSKey != "key" {
+					t.Errorf("cfg = %+v", c)
+				}
+			}},
+		{"saved password host without env", config.Config{SavedHost: "pw"}, env(), "", agent.CodeAuthRequired, nil},
+		{"saved password host with env", config.Config{SavedHost: "pw", SSHPassword: "from-flag"}, env(passwordEnv, "s3cret"), "pw", "",
+			func(t *testing.T, c config.Config) {
+				if c.Host != "ssh://u@pw" || c.SSHPassword != "s3cret" {
+					t.Errorf("cfg = %+v", c)
+				}
+			}},
+		{"unknown saved host", config.Config{SavedHost: "nope"}, env(), "", agent.CodeNotFound, nil},
+		{"saved host with -H", config.Config{SavedHost: "prod", Host: "tcp://x", HostFlagSet: true}, env(), "", agent.CodeUsage, nil},
+		{"saved host with -context", config.Config{SavedHost: "prod", Context: "lab"}, env(), "", agent.CodeUsage, nil},
+		{"saved host ignores DOCKER_CONTEXT", config.Config{SavedHost: "prod"}, env("DOCKER_CONTEXT", "lab"), "prod", "",
+			func(t *testing.T, c config.Config) {
+				if c.Host != "ssh://root@prod" {
+					t.Errorf("cfg = %+v", c)
+				}
+			}},
+		{"-H matching a saved host", config.Config{Host: "tcp://secure:2376", HostFlagSet: true}, env(), "secure", "",
+			func(t *testing.T, c config.Config) {
+				if c.TLSCACert != "ca" {
+					t.Errorf("saved TLS not reused: %+v", c)
+				}
+			}},
+		{"-H unknown URL", config.Config{Host: "tcp://other:2375", HostFlagSet: true}, env(passwordEnv, "pw1"), "tcp://other:2375", "",
+			func(t *testing.T, c config.Config) {
+				if c.SSHPassword != "pw1" {
+					t.Errorf("D9C_SSH_PASSWORD not applied: %+v", c)
+				}
+			}},
+		{"-context", config.Config{Context: "lab", Host: config.DefaultHost}, env(), "lab", "",
+			func(t *testing.T, c config.Config) {
+				if c.Host != "ssh://ops@lab" {
+					t.Errorf("cfg = %+v", c)
+				}
+			}},
+		{"DOCKER_CONTEXT", config.Config{Host: config.DefaultHost}, env("DOCKER_CONTEXT", "lab"), "lab", "", nil},
+		{"unknown context", config.Config{Context: "nope"}, env(), "", agent.CodeUsage, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := tt.cfg
+			label, err := resolveCLITarget(&cfg, store(), tt.getenv, ctxDir)
+			if tt.wantCode != "" {
+				var ae *agent.Error
+				if !errors.As(err, &ae) || ae.Code != tt.wantCode {
+					t.Fatalf("err = %v, want code %s", err, tt.wantCode)
+				}
+				if ae.Hint == "" {
+					t.Errorf("error %q has no hint", ae.Message)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("err = %v", err)
+			}
+			if label != tt.wantLabel {
+				t.Errorf("label = %q, want %q", label, tt.wantLabel)
+			}
+			if tt.check != nil {
+				tt.check(t, cfg)
+			}
+		})
+	}
+}
+
+// writeCLIConfig writes a unified config with the given saved hosts YAML
+// (the `hosts:` list body) and returns its path.
+func writeCLIConfig(t *testing.T, hostsYAML string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "d9c-config.yaml")
+	if err := os.WriteFile(path, []byte("hosts:\n"+hostsYAML), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// cliRun runs runCLI on a fresh config and returns the exit status and output.
+func cliRun(t *testing.T, cfg *config.Config, args ...string) (int, string, string) {
+	t.Helper()
+	t.Cleanup(func() { docker.SetStrictHostKeys(false) })
+	t.Setenv("DOCKER_CONTEXT", "")
+	t.Setenv("DOCKER_CONFIG", t.TempDir())
+	t.Setenv(passwordEnv, "")
+	var stdout, stderr bytes.Buffer
+	code := runCLI(cfg, agent.Builtin(), args, &stdout, &stderr)
+	return code, stdout.String(), stderr.String()
+}
+
+func TestRunCLI(t *testing.T) {
+	cfgPath := writeCLIConfig(t, "  - name: prod\n    host: tcp://127.0.0.1:1\n    read_only: true\n  - name: pw\n    host: ssh://u@pw.invalid\n    ssh_auth: password\n")
+
+	t.Run("demo info", func(t *testing.T) {
+		code, out, errOut := cliRun(t, &config.Config{ConfigFile: cfgPath, Host: config.DefaultHost}, "info", "-demo")
+		if code != 0 || errOut != "" {
+			t.Fatalf("exit %d, stderr %q", code, errOut)
+		}
+		var env struct {
+			Schema  int
+			Host    string
+			Runtime string
+			Data    agent.InfoData
+		}
+		if err := json.Unmarshal([]byte(out), &env); err != nil {
+			t.Fatalf("stdout is not JSON: %v (%q)", err, out)
+		}
+		want, _ := docker.NewFakeBackend().Info()
+		if env.Schema != agent.SchemaVersion || env.Host != "demo" || env.Runtime != "docker" || env.Data.Containers != want.Containers {
+			t.Errorf("envelope = %+v", env)
+		}
+	})
+
+	t.Run("hosts ls needs no connection", func(t *testing.T) {
+		// -H points nowhere: a local operation must not dial it.
+		code, out, errOut := cliRun(t, &config.Config{ConfigFile: cfgPath, Host: "tcp://127.0.0.1:1", HostFlagSet: true}, "hosts", "ls")
+		if code != 0 || errOut != "" {
+			t.Fatalf("exit %d, stderr %q", code, errOut)
+		}
+		want := `{"schema":1,"host":"","runtime":"","data":[{"name":"prod","host":"tcp://127.0.0.1:1","read_only":true},{"name":"pw","host":"ssh://u@pw.invalid","read_only":false}],"truncated":false}` + "\n"
+		if out != want {
+			t.Errorf("stdout = %q, want %q", out, want)
+		}
+	})
+
+	t.Run("help", func(t *testing.T) {
+		code, out, _ := cliRun(t, &config.Config{ConfigFile: cfgPath}, "help")
+		if code != 0 || !strings.Contains(out, "hosts ls") || !strings.Contains(out, "info") {
+			t.Errorf("exit %d, stdout %q", code, out)
+		}
+	})
+
+	errorCases := []struct {
+		name     string
+		cfg      config.Config
+		args     []string
+		wantCode agent.Code
+	}{
+		{"usage", config.Config{ConfigFile: cfgPath}, []string{"info", "--bogus"}, agent.CodeUsage},
+		{"unknown saved host", config.Config{ConfigFile: cfgPath}, []string{"info", "--host", "nope"}, agent.CodeNotFound},
+		{"password host without env", config.Config{ConfigFile: cfgPath}, []string{"info", "--host", "pw"}, agent.CodeAuthRequired},
+		{"unreachable saved host", config.Config{ConfigFile: cfgPath}, []string{"info", "--host", "prod"}, agent.CodeConnection},
+		{"broken config", config.Config{ConfigFile: writeCLIConfig(t, "  - [")}, []string{"info", "-demo"}, agent.CodeInternal},
+	}
+	for _, tt := range errorCases {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := tt.cfg
+			code, out, errOut := cliRun(t, &cfg, tt.args...)
+			if out != "" {
+				t.Errorf("stdout = %q on failure, want empty", out)
+			}
+			var doc agent.ErrorEnvelope
+			if err := json.Unmarshal([]byte(errOut), &doc); err != nil || doc.Error == nil {
+				t.Fatalf("stderr is not an error envelope: %v (%q)", err, errOut)
+			}
+			if doc.Error.Code != tt.wantCode || code != tt.wantCode.ExitCode() {
+				t.Errorf("code = %s exit %d, want %s exit %d", doc.Error.Code, code, tt.wantCode, tt.wantCode.ExitCode())
+			}
+		})
+	}
+}
+
+// With no host at all the CLI tries the default socket (like the docker CLI)
+// and, failing that, says how to pick a host.
+func TestRunCLIDefaultHostHint(t *testing.T) {
+	if _, err := os.Stat(strings.TrimPrefix(config.DefaultHost, "unix://")); err == nil {
+		t.Skip("a local Docker socket exists; the default host would answer")
+	}
+	cfg := &config.Config{ConfigFile: writeCLIConfig(t, ""), Host: config.DefaultHost}
+	code, _, errOut := cliRun(t, cfg, "info")
+	if code != agent.CodeConnection.ExitCode() || !strings.Contains(errOut, "no host was given") {
+		t.Errorf("exit %d, stderr %q", code, errOut)
+	}
+}
+
+// run() hands a known command to the CLI and turns its status into exitCode;
+// an unknown first word keeps the TUI path (here failing on a broken config
+// before any terminal is touched).
+func TestRunDispatch(t *testing.T) {
+	cfgPath := writeCLIConfig(t, "  - name: prod\n    host: tcp://127.0.0.1:1\n")
+	t.Cleanup(func() { docker.SetStrictHostKeys(false) })
+
+	// Silence the CLI's stdout/stderr.
+	devnull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldOut, oldErr := os.Stdout, os.Stderr
+	os.Stdout, os.Stderr = devnull, devnull
+	t.Cleanup(func() { os.Stdout, os.Stderr = oldOut, oldErr; _ = devnull.Close() })
+
+	if err := runWithArgs(t, "-config", cfgPath, "hosts", "ls"); err != nil {
+		t.Errorf("hosts ls: err = %v, want nil", err)
+	}
+	if err := runWithArgs(t, "-demo", "-config", cfgPath, "info"); err != nil {
+		t.Errorf("-demo info: err = %v, want nil", err)
+	}
+	var code exitCode
+	if err := runWithArgs(t, "-config", cfgPath, "info", "--bogus"); !errors.As(err, &code) || int(code) != 2 {
+		t.Errorf("usage error: err = %v, want exitCode(2)", err)
+	}
+	if err := runWithArgs(t, "-config", cfgPath, "info", "--host", "nope"); !errors.As(err, &code) || int(code) != 3 {
+		t.Errorf("unknown host: err = %v, want exitCode(3)", err)
+	}
+	if got := exitCode(4).Error(); got != "exit status 4" {
+		t.Errorf("exitCode.Error() = %q", got)
+	}
+
+	// Not a command: the TUI path runs and reports the broken config itself.
+	broken := writeCLIConfig(t, "  - [")
+	if err := runWithArgs(t, "-config", broken, "not-a-command"); err == nil || errors.As(err, &code) || !strings.Contains(err.Error(), "loading config") {
+		t.Errorf("TUI path: err = %v, want a plain loading-config error", err)
+	}
+}
+
+// -host also works in TUI mode: the saved host is applied before connecting,
+// and conflicts or unknown names stop startup with the same messages.
+func TestRunSavedHostTUIErrors(t *testing.T) {
+	cfgPath := writeCLIConfig(t, "  - name: prod\n    host: tcp://127.0.0.1:1\n")
+	if err := runWithArgs(t, "-config", cfgPath, "-host", "nope"); err == nil || !strings.Contains(err.Error(), `no saved host named "nope"`) {
+		t.Errorf("unknown host: err = %v", err)
+	}
+	if err := runWithArgs(t, "-config", cfgPath, "-host", "prod", "-H", "tcp://x:1"); err == nil || !strings.Contains(err.Error(), "cannot be combined") {
+		t.Errorf("conflict: err = %v", err)
+	}
+}
+
+func TestApplySavedHost(t *testing.T) {
+	store := hosts.NewStore([]hosts.Host{
+		{Name: "pw", Host: "ssh://u@pw", SSHAuth: hosts.SSHAuthPassword},
+		{Name: "plain", Host: "ssh://u@plain"},
+	}, nil)
+
+	// Password hosts keep the password the caller supplied (-ssh-password).
+	cfg := &config.Config{SavedHost: "pw", SSHPassword: "flag", SSHKeyFile: "/flag/key"}
+	if _, err := applySavedHost(cfg, store); err != nil || cfg.SSHPassword != "flag" || cfg.Host != "ssh://u@pw" {
+		t.Errorf("password host: err=%v cfg=%+v", err, cfg)
+	}
+	// A host without a stored key keeps -ssh-key; key auth drops the password.
+	cfg = &config.Config{SavedHost: "plain", SSHPassword: "flag", SSHKeyFile: "/flag/key"}
+	if _, err := applySavedHost(cfg, store); err != nil || cfg.SSHPassword != "" || cfg.SSHKeyFile != "/flag/key" {
+		t.Errorf("key host: err=%v cfg=%+v", err, cfg)
+	}
+}
