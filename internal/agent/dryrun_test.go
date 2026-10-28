@@ -135,6 +135,12 @@ func TestDryRunNeverMutates(t *testing.T) {
 	if err := os.WriteFile("webapp.tar.gz", []byte("demo"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Mkdir("app", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join("app", "Dockerfile"), []byte("FROM alpine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	args := map[string]Args{
 		"start": {"targets": []string{"db"}}, "stop": {"targets": []string{"web"}},
 		"restart": {"targets": []string{"web"}}, "kill": {"targets": []string{"web"}},
@@ -144,7 +150,10 @@ func TestDryRunNeverMutates(t *testing.T) {
 		"compose restart": {"project": "webapp"}, "compose backup": {"project": "webapp"},
 		"compose restore": {"project": "webapp", "file": "webapp.tar.gz"},
 		"network create":  {"name": "edge"}, "volume create": {"name": "uploads"},
-		"exec": {"container": "web", "cmd": []string{"rm", "-rf", "/data"}},
+		"exec":       {"container": "web", "cmd": []string{"rm", "-rf", "/data"}},
+		"image tag":  {"source": "nginx:1.25", "target": "registry.example.com/web:1"},
+		"image push": {"image": "nginx:1.25"}, "image build": {"dir": "app", "tag": "app:dev"},
+		"image rm": {"image": "postgres:16"},
 	}
 	r := Builtin()
 	for _, op := range r.Ops() {
@@ -165,7 +174,7 @@ func TestDryRunNeverMutates(t *testing.T) {
 			if after := fakeState(t, fb); !reflect.DeepEqual(before, after) {
 				t.Errorf("dry run changed the engine")
 			}
-			if entries, _ := os.ReadDir("."); len(entries) != 1 {
+			if entries, _ := os.ReadDir("."); len(entries) != 2 {
 				t.Errorf("dry run wrote files: %v", entries)
 			}
 		})

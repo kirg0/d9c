@@ -93,6 +93,13 @@ var cliGoldenCases = []goldenCase{
 	{"network_create", []string{"network", "create", "edge", "--subnet", "172.30.0.0/16", "--gateway", "172.30.0.1"}, 0, true},
 	{"volume_create", []string{"volume", "create", "uploads"}, 0, true},
 	{"image_prune", []string{"image", "prune", "--yes"}, 0, true},
+	{"image_history", []string{"image", "history", "nginx:1.25"}, 0, false},
+	{"image_tag", []string{"image", "tag", "nginx:1.25", "registry.example.com/web:1"}, 0, true},
+	{"image_push", []string{"image", "push", "nginx:1.25"}, 0, true},
+	{"image_build", []string{"image", "build", "app", "-t", "app:dev"}, 0, true},
+	{"image_rm", []string{"image", "rm", "postgres:16", "--yes"}, 0, true},
+	{"err_confirm_image_rm", []string{"image", "rm", "nginx:1.25"}, 7, true},
+	{"err_not_found_image", []string{"image", "history", "redis:7"}, 3, false},
 	{"volume_prune", []string{"volume", "prune", "--yes"}, 0, true},
 	{"system_prune", []string{"system", "prune", "--yes"}, 0, true},
 
@@ -150,6 +157,15 @@ var goldenSetup = map[string]func(t *testing.T){
 		}
 	},
 	"err_not_found_backup": func(t *testing.T) { t.Chdir(t.TempDir()) },
+	"image_build": func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		if err := os.Mkdir("app", 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join("app", "Dockerfile"), []byte("FROM alpine:3.20"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	},
 }
 
 func TestCLIGolden(t *testing.T) {

@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "action": "image push",
+    "image": "nginx:1.25",
+    "output": [
+      "The push refers to repository [nginx:1.25]",
+      "auth: anonymous@docker.io",
+      "5f70bf18a086: Pushed",
+      "a08c488a9779: Pushed",
+      "latest: digest: sha256:demo size: 1234"
+    ]
+  },
+  "truncated": false
+}

@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "not_found",
+    "message": "no such image: redis:7",
+    "hint": "list the images with `d9c images`"
+  }
+}

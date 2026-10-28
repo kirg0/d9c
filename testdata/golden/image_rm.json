@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "image": "postgres:16",
+    "id": "c7e8a2b4d6f1"
+  },
+  "truncated": false
+}
