@@ -1,0 +1,22 @@
+{
+  "name": "d9c",
+  "displayName": "d9c",
+  "version": "1.34.0",
+  "description": "Manage containers on saved Docker, Podman, nerdctl and CRI-O hosts through the d9c CLI and MCP server, with a read-only default and explicit write policy.",
+  "author": {
+    "name": "kirg0",
+    "url": "https://github.com/kirg0"
+  },
+  "homepage": "https://github.com/kirg0/d9c",
+  "repository": "https://github.com/kirg0/d9c",
+  "license": "MIT",
+  "keywords": ["docker", "podman", "nerdctl", "cri-o", "containers", "compose", "mcp"],
+  "userConfig": {
+    "host": {
+      "type": "string",
+      "title": "d9c host",
+      "description": "Saved d9c host the MCP server connects to (see `d9c hosts ls`). Leave empty to use DOCKER_HOST, the Docker context or the local socket.",
+      "default": ""
+    }
+  }
+}
