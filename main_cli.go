@@ -51,6 +51,12 @@ func runCLI(cfg *config.Config, reg *agent.Registry, args []string, stdout, stde
 		return 0
 	}
 
+	if names, err := fanoutHosts(cfg, inv.Op, store); err != nil {
+		return cli.WriteError(stderr, err)
+	} else if names != nil {
+		return runFanout(cfg, reg, inv, store, names, stdout, stderr)
+	}
+
 	// Every write command leaves a line in the audit log, refused ones
 	// included; without a log it does not run at all.
 	if inv.Op.Tier > agent.TierRead {

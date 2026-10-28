@@ -505,3 +505,71 @@ func TestRunCLIAudit(t *testing.T) {
 		t.Errorf("read command with a blocked log: exit %d", code)
 	}
 }
+
+func TestFanoutHosts(t *testing.T) {
+	store := hosts.NewStore(nil, nil)
+	for _, n := range []string{"prod", "lab"} {
+		if err := store.Add(n, "tcp://"+n+":2375"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reg := agent.Builtin()
+	ps, _ := reg.Lookup("ps")
+	stop, _ := reg.Lookup("stop")
+	hostsLs, _ := reg.Lookup("hosts ls")
+	tests := []struct {
+		name    string
+		cfg     config.Config
+		op      agent.Op
+		want    []string
+		wantErr string
+		wantCfg string // SavedHost afterwards
+	}{
+		{"single host", config.Config{SavedHost: "prod"}, ps, nil, "", "prod"},
+		{"trailing comma", config.Config{SavedHost: "prod,"}, ps, nil, "", "prod"},
+		{"list", config.Config{SavedHost: "prod, lab,prod"}, ps, []string{"prod", "lab"}, "", "prod, lab,prod"},
+		{"all hosts", config.Config{AllHosts: true}, ps, []string{"prod", "lab"}, "", ""},
+		{"all hosts with host", config.Config{AllHosts: true, SavedHost: "prod"}, ps, nil, "cannot be combined with --host", "prod"},
+		{"write op", config.Config{SavedHost: "prod,lab"}, stop, nil, "only read commands", "prod,lab"},
+		{"local op", config.Config{AllHosts: true}, hostsLs, nil, "needs no host", ""},
+		{"with -H", config.Config{SavedHost: "prod,lab", HostFlagSet: true}, ps, nil, "-H or -context", "prod,lab"},
+		{"with context", config.Config{AllHosts: true, Context: "x"}, ps, nil, "-H or -context", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := tt.cfg
+			got, err := fanoutHosts(&cfg, tt.op, store)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("err = %v, want %q", err, tt.wantErr)
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, tt.want) || cfg.SavedHost != tt.wantCfg {
+				t.Errorf("hosts = %q (SavedHost %q), want %q (%q)", got, cfg.SavedHost, tt.want, tt.wantCfg)
+			}
+		})
+	}
+	if _, err := fanoutHosts(&config.Config{AllHosts: true}, ps, hosts.NewStore(nil, nil)); err == nil ||
+		!strings.Contains(err.Error(), "no saved hosts") {
+		t.Errorf("no hosts: err = %v", err)
+	}
+}
+
+// A fan-out in text mode prints one section per host and exits 8 when some
+// hosts failed; the demo backend serves every saved host.
+func TestRunCLIFanoutText(t *testing.T) {
+	cfgPath := writeCLIConfig(t, "  - name: prod\n    host: tcp://127.0.0.1:1\n  - name: lab\n    host: tcp://127.0.0.1:2\n")
+	code, out, errOut := cliRun(t, &config.Config{ConfigFile: cfgPath}, "ps", "--host", "lab,ghost,prod", "-demo", "-o", "text", "--fields", "name")
+	if code != agent.ExitPartial {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
+	}
+	want := "# lab (docker)\nNAME\nweb\napi\n\n# ghost: not_found: no saved host named \"ghost\"\n\n# prod (docker)\nNAME\nweb\napi\n"
+	if out != want {
+		t.Errorf("stdout =\n%s\nwant\n%s", out, want)
+	}
+	if !strings.HasPrefix(errOut, "partial failure: 1 of 3 hosts failed") {
+		t.Errorf("stderr = %q", errOut)
+	}
+}

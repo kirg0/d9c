@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "not_found",
+    "message": "info failed on all 2 hosts: ghost: no saved host named \"ghost\"; pw: saved host \"pw\" uses SSH password authentication",
+    "hint": "run `d9c hosts ls` to list the saved hosts"
+  }
+}

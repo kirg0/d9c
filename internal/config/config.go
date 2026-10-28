@@ -39,6 +39,9 @@ type Config struct {
 	// with its stored SSH key and TLS files; it cannot be combined with
 	// -H/-context.
 	SavedHost string
+	// AllHosts runs a CLI read command on every saved host (--all-hosts); a
+	// comma-separated SavedHost list does the same for the named ones.
+	AllHosts bool
 	// HostFlagSet records whether -H was given explicitly on the command line
 	// (as opposed to the DOCKER_HOST / default fallback), so -H and -context
 	// can be reported as conflicting like the Docker CLI does.
@@ -64,7 +67,8 @@ func Load() *Config {
 	flag.BoolVar(&cfg.ReadOnly, "read-only", false, "Read-only mode: forbid every mutating action (stop/kill/rm/prune/run/exec/cp/compose/build/push/create)")
 	flag.BoolVar(&cfg.AllowWrite, "allow-write", false, "CLI commands only: allow state-changing commands for this invocation (up to agent.maxTier in the config, default safe)")
 	flag.StringVar(&cfg.Context, "context", "", "Docker CLI context to connect with (from ~/.docker/contexts; overrides DOCKER_HOST and DOCKER_CONTEXT)")
-	flag.StringVar(&cfg.SavedHost, "host", "", "Saved host to connect to, by name, with its stored SSH key and TLS files (list them with: d9c hosts ls)")
+	flag.StringVar(&cfg.SavedHost, "host", "", "Saved host to connect to, by name, with its stored SSH key and TLS files (list them with: d9c hosts ls); CLI read commands take a comma-separated list")
+	flag.BoolVar(&cfg.AllHosts, "all-hosts", false, "CLI read commands only: run on every saved host")
 	flag.Parse()
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "H" {
