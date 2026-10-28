@@ -6,6 +6,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.33.0] - 2026-10-28
+
 ### Added
 
 - **Container lifecycle commands in command-line mode:** `start`, `stop`, `restart`, `kill [-s SIG]`
