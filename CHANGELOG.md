@@ -6,6 +6,19 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.35.2] - 2026-10-28
+
+### Fixed
+
+- **Demo scenarios:** a scenario's `compose backup` writes a real tar.gz of the project files
+  (it was a 20-byte placeholder), and compose pull/up/down report the project's own services and
+  images instead of a canned nginx line — the first eval run showed an agent rightly refusing to
+  deploy on that data.
+- **Skill evals:** the trigger-discipline case no longer counts the tool list in the trace as a call;
+  the overview rubric does not demand stopped containers for a question about running ones; the
+  compose case no longer requires a `wait` when the health is already final. The base `d9c` skill
+  says to read it before the first d9c command or tool call.
+
 ## [1.35.1] - 2026-10-28
 
 ### Fixed

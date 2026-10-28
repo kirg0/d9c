@@ -1,6 +1,9 @@
 package docker
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -8,6 +11,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -877,6 +881,14 @@ func (f *FakeBackend) ComposeUp(project string) (<-chan string, func(), error) {
 		return nil, nil, err
 	}
 	name := f.composeName(project)
+	if ctrs, ok := f.labelledContainers(name); ok {
+		lines := []string{fmt.Sprintf("[+] Running %d/%d", len(ctrs), len(ctrs))}
+		for _, c := range ctrs {
+			lines = append(lines, " ⠿ Container "+c.Name+"  Running")
+		}
+		ch, stop := fakeProgress(lines)
+		return ch, stop, nil
+	}
 	ch, stop := fakeProgress([]string{
 		"[+] Running 2/2",
 		" ⠿ Container " + name + "-web-1  Created",
@@ -885,9 +897,31 @@ func (f *FakeBackend) ComposeUp(project string) (<-chan string, func(), error) {
 	return ch, stop, nil
 }
 
+// labelledContainers returns the containers carrying compose project name's
+// label; ok is false when no container is labelled (the plain demo data), so
+// the canned progress lines stay as they were.
+func (f *FakeBackend) labelledContainers(name string) ([]Container, bool) {
+	var out []Container
+	for _, c := range f.Containers {
+		if c.Labels[composeProjectLabel] == name {
+			out = append(out, c)
+		}
+	}
+	return out, len(out) > 0
+}
+
 func (f *FakeBackend) ComposePull(project string) (<-chan string, func(), error) {
 	for _, p := range f.Composes {
 		if composeIdentity(p.Project, p.WorkingDir) == project {
+			if ctrs, ok := f.labelledContainers(p.Project); ok {
+				lines := []string{fmt.Sprintf("[+] Pulling %d/%d", len(ctrs), len(ctrs))}
+				for _, c := range ctrs {
+					svc := c.Labels[composeServiceLabel]
+					lines = append(lines, " ⠿ "+svc+" Pulling", " ⠿ "+c.Image+" Image is up to date", " ⠿ "+svc+" Pulled")
+				}
+				ch, stop := fakeProgress(lines)
+				return ch, stop, nil
+			}
 			ch, stop := fakeProgress([]string{
 				"[+] Pulling 1/1",
 				" ⠿ web Pulling",
@@ -905,6 +939,14 @@ func (f *FakeBackend) ComposeDown(project string) (<-chan string, func(), error)
 		return nil, nil, err
 	}
 	name := f.composeName(project)
+	if ctrs, ok := f.labelledContainers(name); ok {
+		lines := []string{fmt.Sprintf("[+] Running %d/%d", len(ctrs)+1, len(ctrs)+1)}
+		for _, c := range ctrs {
+			lines = append(lines, " ⠿ Container "+c.Name+"  Removed")
+		}
+		ch, stop := fakeProgress(append(lines, " ⠿ Network "+name+"_default  Removed"))
+		return ch, stop, nil
+	}
 	ch, stop := fakeProgress([]string{
 		"[+] Running 2/2",
 		" ⠿ Container " + name + "-web-1  Stopping",
@@ -984,7 +1026,12 @@ func (f *FakeBackend) BackupComposeProject(project string) (string, error) {
 	for _, p := range f.Composes {
 		if composeIdentity(p.Project, p.WorkingDir) == project {
 			path := backupFileName(composeDisplayName(p.Project, p.WorkingDir))
-			// Demo: write a small placeholder so the saved path actually exists.
+			// A scenario project gets a real archive of its files (an agent
+			// checks the size); the plain demo a small placeholder.
+			if cfg, ok := f.ComposeConfigs[p.Project]; ok {
+				return path, writeFakeBackup(path, map[string]string{
+					"compose.yaml": cfg, ".env": "COMPOSE_PROJECT_NAME=" + p.Project + "\nTAG=2.0\n"})
+			}
 			if err := os.WriteFile(path, []byte("demo backup of "+p.Name+"\n"), 0o644); err != nil {
 				return "", err
 			}
@@ -992,6 +1039,34 @@ func (f *FakeBackend) BackupComposeProject(project string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no such compose project: %s", project)
+}
+
+// writeFakeBackup writes files as a gzip-compressed tar, like a real backup.
+func writeFakeBackup(path string, files map[string]string) error {
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	names := make([]string, 0, len(files))
+	for n := range files {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		body := files[n]
+		if err := tw.WriteHeader(&tar.Header{Name: n, Mode: 0o644, Size: int64(len(body)), ModTime: time.Now()}); err != nil {
+			return err
+		}
+		if _, err := tw.Write([]byte(body)); err != nil {
+			return err
+		}
+	}
+	if err := tw.Close(); err != nil {
+		return err
+	}
+	if err := gz.Close(); err != nil {
+		return err
+	}
+	return os.WriteFile(path, buf.Bytes(), 0o644)
 }
 
 func (f *FakeBackend) RestoreComposeProject(project, backupPath string) (<-chan string, func(), error) {

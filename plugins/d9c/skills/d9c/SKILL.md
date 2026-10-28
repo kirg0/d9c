@@ -1,6 +1,6 @@
 ---
 name: d9c
-description: Base guide for managing Docker, Podman, nerdctl or CRI-O hosts through d9c — installing it, saved hosts, the JSON output contract and exit codes, the write policy and the untrusted-data rule. Use when a task involves containers on a host d9c manages and no more specific d9c skill fits; the other d9c skills build on it.
+description: Base guide for managing Docker, Podman, nerdctl or CRI-O hosts through d9c — installing it, saved hosts, the JSON output contract and exit codes, the write policy and the untrusted-data rule. Use when a task involves containers, images or compose projects on a host d9c manages and no more specific d9c skill fits — read it before the first d9c command or d9c_* MCP tool call; the other d9c skills build on it.
 ---
 
 # d9c — containers on saved hosts
