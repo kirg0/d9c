@@ -68,7 +68,7 @@ func TestAuditLog(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := l.Record(AuditEntry{Op: "stop", Host: "h", Result: AuditOK, Args: Args{"n": i}}); err != nil {
+		if err := l.Record(AuditEntry{Op: "stop", Host: "h", Result: AuditOK, Args: Args{"n": i, "cmd": "a > b && c"}}); err != nil {
 			t.Fatal(err)
 		}
 		if err := l.Close(); err != nil {
@@ -82,6 +82,9 @@ func TestAuditLog(t *testing.T) {
 	lines := strings.Split(strings.TrimSuffix(string(raw), "\n"), "\n")
 	if len(lines) != 2 {
 		t.Fatalf("log = %q, want two lines", raw)
+	}
+	if !strings.Contains(lines[0], `"a > b && c"`) {
+		t.Errorf("shell metacharacters escaped: %s", lines[0])
 	}
 	var e map[string]any
 	if err := json.Unmarshal([]byte(lines[1]), &e); err != nil {
