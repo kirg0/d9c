@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"strings"
 	"time"
@@ -48,6 +49,9 @@ type Options struct {
 	Audit *agent.AuditLog
 	// Version is the d9c version reported to the client.
 	Version string
+	// Scenarios holds the agent skills (<name>/SKILL.md) served as prompts;
+	// nil serves none.
+	Scenarios fs.FS
 	// Log receives the SDK's diagnostics (stderr in `d9c mcp`); nil
 	// discards them.
 	Log io.Writer
@@ -78,6 +82,12 @@ func New(opts Options) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	var scenarios []scenario
+	if opts.Scenarios != nil {
+		if scenarios, err = loadScenarios(opts.Scenarios); err != nil {
+			return nil, fmt.Errorf("mcpserver: loading the prompts: %w", err)
+		}
+	}
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
@@ -96,6 +106,8 @@ func New(opts Options) (*Server, error) {
 			s.mcp.AddTool(t.mcpTool(), s.toolHandler(t))
 		}
 	}
+	s.addPrompts(scenarios)
+	s.addResources()
 	return s, nil
 }
 

@@ -19,6 +19,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 - **MCP progress and cancellation:** long tool calls (compose up/pull/down/restore, `pull`, compose
   backup, `wait`) report each step as `notifications/progress` when the client passes a progress
   token; cancelling a call stops the operation and its engine stream.
+- **MCP prompts and resources:** the agent skills shipped in `plugins/d9c/skills` (`d9c`,
+  `d9c-troubleshoot`, `d9c-logs`, `d9c-cleanup`) are served as prompts with an optional `focus`
+  argument, from the same text; resources `d9c://hosts` and `d9c://containers/{id}/logs` return
+  the same envelope as the matching tool.
 
 ## [1.33.0] - 2026-10-28
 
