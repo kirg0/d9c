@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "host": "prod,ghost",
+  "runtime": "",
+  "data": [
+    {
+      "host": "prod",
+      "runtime": "docker",
+      "data": {
+        "name": "demo",
+        "version": "27.4.0",
+        "containers": 3,
+        "running": 2,
+        "paused": 0,
+        "stopped": 1,
+        "images": 4,
+        "ncpu": 4,
+        "mem_total": 8589934592
+      }
+    },
+    {
+      "host": "ghost",
+      "error": {
+        "code": "not_found",
+        "message": "no saved host named \"ghost\"",
+        "hint": "run `d9c hosts ls` to list the saved hosts"
+      }
+    }
+  ],
+  "truncated": false,
+  "partial": true,
+  "hint": "1 of 2 hosts failed; see data[].error"
+}

@@ -48,6 +48,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   container until it gets there and returns its state; `--timeout` (60 s, `0` = check once) ends
   with `timeout` (exit `9`) naming the state it was left in. Waiting for `healthy` on a container
   without a healthcheck is a usage error at once.
+- **Read commands on several hosts:** `--host a,b` or `--all-hosts` runs a read command on those
+  saved hosts concurrently; `data` lists each host's result or error, a failing host does not stop
+  the others, and some failures make the result partial (exit `8`). With `-demo` every host is
+  served by the demo backend.
 
 ### Fixed
 

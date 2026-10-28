@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "host": "prod,pw",
+  "runtime": "",
+  "data": [
+    {
+      "host": "prod",
+      "runtime": "docker",
+      "data": [
+        {
+          "name": "web",
+          "state": "running"
+        },
+        {
+          "name": "api",
+          "state": "running"
+        }
+      ]
+    },
+    {
+      "host": "pw",
+      "runtime": "docker",
+      "data": [
+        {
+          "name": "web",
+          "state": "running"
+        },
+        {
+          "name": "api",
+          "state": "running"
+        }
+      ]
+    }
+  ],
+  "truncated": false
+}

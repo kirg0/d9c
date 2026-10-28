@@ -98,9 +98,14 @@ var globals = []global{
 		c.Host, c.HostFlagSet = v, true
 		return nil
 	}},
-	{name: "host", usage: "--host <saved name>", set: func(c *config.Config, v string) error {
+	{name: "host", usage: "--host <saved name>[,<name>...]", set: func(c *config.Config, v string) error {
 		c.SavedHost = v
 		return nil
+	}},
+	{name: "all-hosts", usage: "--all-hosts", isBool: true, set: func(c *config.Config, v string) error {
+		b, err := strconv.ParseBool(v)
+		c.AllHosts = b
+		return err
 	}},
 	{name: "context", usage: "-context <docker context>", set: func(c *config.Config, v string) error {
 		c.Context = v
@@ -430,6 +435,8 @@ func WriteHelp(w io.Writer, reg *agent.Registry, inv Invocation, ceiling agent.T
 		b.WriteString("Write flags: " + writeUsage + ";\n" +
 			"a destructive command without --yes changes nothing and fails with confirmation_required (exit 7),\n" +
 			"carrying the plan: show it to the user and rerun with --yes only after they approve it.\n")
+		b.WriteString("Several hosts: read commands take --host a,b or --all-hosts and return\n" +
+			"data: [{\"host\",\"runtime\",\"data\"|\"error\"}] (exit 8 when some hosts failed).\n")
 		b.WriteString("Output: one JSON envelope {\"schema\",\"host\",\"runtime\",\"data\",\"truncated\"} on stdout by default;\n" +
 			"-o ndjson writes list items one per line, -o text a compact table;\n" +
 			"errors as JSON on stderr with a non-zero exit status.\n")

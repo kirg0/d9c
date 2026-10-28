@@ -1070,6 +1070,18 @@ or name given), `args`, `dry_run`, `yes`, `result` (`ok`, `partial`, `planned` o
 for a failure, `code` and `error`. Read commands are not logged. When the log cannot be opened, a
 write command fails before it connects: writes always leave a trail.
 
+**Several hosts.** A read command takes a list of saved hosts, `--host prod,staging`, or
+`--all-hosts`, and queries them concurrently: `data` is then `[{"host","runtime","data"}, …]`, a
+host that fails carries `"error":{"code","message","hint"}` instead of `data` without stopping the
+others, and the envelope is `"partial": true` (exit `8`) when some hosts failed — an error when all
+did. `--fields`/`--limit` apply per host; `-o text` prints a section per host, `-o ndjson` a line
+per host. Write commands always target one host.
+
+```sh
+d9c ps --all-hosts --fields name,state -o text
+d9c system df --host prod,staging
+```
+
 **Output.** By default stdout gets one JSON envelope
 `{"schema":1,"host","runtime","data","truncated","hint"}`. `-o text` prints a compact table,
 `-o ndjson` one list item per line. `--fields name,state` keeps only those fields, `--limit N`

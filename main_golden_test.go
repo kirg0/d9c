@@ -133,6 +133,10 @@ var cliGoldenCases = []goldenCase{
 	{"wait_exited", []string{"wait", "db", "--until", "exited", "--timeout", "5"}, 0, false},
 	{"err_timeout_wait", []string{"wait", "api", "--until", "healthy", "--timeout", "0"}, 9, false},
 	{"err_usage_wait_until", []string{"wait", "web", "--until", "paused"}, 2, false},
+	{"fanout_ps", []string{"ps", "--all-hosts", "--fields", "name,state"}, 0, false},
+	{"fanout_partial", []string{"info", "--host", "prod,ghost", "-demo"}, agent.ExitPartial, false},
+	{"err_fanout_all_failed", []string{"info", "--host", "ghost,pw"}, 3, false},
+	{"err_usage_fanout_write", []string{"stop", "web", "--host", "prod,pw", "--allow-write"}, 2, false},
 }
 
 // goldenSetup prepares the working directory of cases that touch local files:

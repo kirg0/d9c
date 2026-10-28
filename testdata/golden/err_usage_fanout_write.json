@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "usage",
+    "message": "\"stop\" changes state; only read commands run on several hosts at once",
+    "hint": "run it on one host at a time with --host <name>"
+  }
+}
