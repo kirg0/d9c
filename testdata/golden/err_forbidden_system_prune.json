@@ -1,7 +1,7 @@
 {
   "error": {
     "code": "forbidden",
-    "message": "operation \"system prune\" is destructive, above the allowed tier read",
-    "hint": "ask the user to raise the agent tier ceiling for this host"
+    "message": "operation \"system prune\" is destructive; write operations are off by default",
+    "hint": "this needs the user's consent: they can set agent: {allowWrite: true, maxTier: destructive} in <config>, globally or under the saved host (maxTier is now safe, the default)"
   }
 }

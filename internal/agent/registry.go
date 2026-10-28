@@ -25,6 +25,9 @@ type Env struct {
 	Backend docker.Backend
 	// Hosts is the saved-host store (read-only for operations).
 	Hosts *hosts.Store
+	// Policy is the write policy of the invocation without a target host;
+	// `hosts ls` resolves it per saved host to report each host's ceiling.
+	Policy Policy
 }
 
 // Handler executes an operation with already-normalized arguments.

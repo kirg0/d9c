@@ -1,7 +1,7 @@
 {
   "error": {
     "code": "forbidden",
-    "message": "operation \"stop\" is safe, above the allowed tier read",
-    "hint": "ask the user to raise the agent tier ceiling for this host"
+    "message": "operation \"stop\" is safe; write operations are off by default",
+    "hint": "confirm with the user first, then retry with --allow-write (allows up to tier safe), or have the user set agent: {allowWrite: true} in <config>, globally or under the saved host"
   }
 }

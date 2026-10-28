@@ -40,6 +40,9 @@ type File struct {
 	// ReadOnly forbids every mutating action on every host (see also the
 	// per-host read_only flag and the -read-only command-line flag).
 	ReadOnly bool `yaml:"readOnly,omitempty"`
+	// Agent is the global write policy of the agent CLI/MCP (allowWrite,
+	// maxTier); a saved host's own agent: block overrides it.
+	Agent *hosts.AgentPolicy `yaml:"agent,omitempty"`
 	// Columns sets the visible columns and their order per table section
 	// (containers/stats/images/networks/volumes/compose/hosts).
 	Columns map[string][]string `yaml:"columns,omitempty"`

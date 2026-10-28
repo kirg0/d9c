@@ -273,6 +273,42 @@ func TestReadOnlyParsing(t *testing.T) {
 	}
 }
 
+// The agent: blocks (global and per host) survive a load/save cycle caused by
+// an unrelated change, including an explicit allowWrite: false.
+func TestAgentPolicyRoundTrip(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "d9c-config.yaml")
+	content := "agent:\n  allowWrite: true\n  maxTier: safe\nhosts:\n  - name: prod\n    host: ssh://root@prod\n    agent:\n      allowWrite: false\n  - name: dev\n    host: tcp://dev:2375\n"
+	if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetTheme("dracula"); err != nil {
+		t.Fatal(err)
+	}
+	again, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := again.File.Agent
+	if g == nil || g.AllowWrite == nil || !*g.AllowWrite || g.MaxTier != "safe" {
+		t.Errorf("global agent block = %+v", g)
+	}
+	prod, _ := again.Hosts().Find("prod")
+	if prod.Agent == nil || prod.Agent.AllowWrite == nil || *prod.Agent.AllowWrite || prod.Agent.MaxTier != "" {
+		t.Errorf("prod agent block = %+v", prod.Agent)
+	}
+	if dev, _ := again.Hosts().Find("dev"); dev.Agent != nil {
+		t.Errorf("dev gained an agent block: %+v", dev.Agent)
+	}
+	data, _ := os.ReadFile(p)
+	if strings.Count(string(data), "agent:") != 2 {
+		t.Errorf("saved file:\n%s", data)
+	}
+}
+
 func TestColumnsSection(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "d9c-config.yaml")
 	data := "columns:\n  containers: [name, status, cpu, id]\n  images: [bogus]\n"

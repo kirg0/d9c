@@ -62,7 +62,7 @@ Docker **по TCP или SSH**. Один бинарник, без агентов
 - **Все основные ресурсы** — Containers / Images / Networks / Volumes / Compose / Hosts.
 - **Режим командной строки для скриптов и агентов** — `d9c ps`, `logs`, `inspect`, `stats`,
   `events`, compose и другое в JSON/NDJSON/тексте со стабильными кодами выхода; без вопросов,
-  секреты замаскированы.
+  секреты замаскированы; команды записи — только если их разрешает политика `allowWrite`/`maxTier`.
 - **Управление, а не только просмотр** — start/stop/restart/kill/rm, массовые операции
   (множественный выбор `Space` — bulk-операции над контейнерами и удаление образов),
   `run`-мастер, создание сетей/томов, `build`/`tag`/`push`
@@ -984,7 +984,8 @@ plugins:
 ## Режим командной строки
 
 Известная команда первым аргументом запускает d9c без интерфейса — для скриптов, cron и
-ИИ-агентов. Команды только читают:
+ИИ-агентов. Чтение разрешено всегда; команды, меняющие состояние, выключены, пока их не разрешит
+[политика записи](#политика-записи):
 
 ```sh
 d9c ps -a --host prod                    # сохранённый хост; -H <url> и -context тоже работают
@@ -993,6 +994,7 @@ d9c inspect web                          # похожие на секреты з
 d9c stats -o text                        # один замер, около секунды
 d9c events --since 1h --until 30m
 d9c compose config webapp                # нужен SSH-хост
+d9c restart web --allow-write            # команда записи, разрешённая на этот вызов
 d9c help logs                            # аргументы одной команды
 ```
 
@@ -1008,6 +1010,56 @@ d9c help logs                            # аргументы одной ком�
 | `events [--since 10m] [--until now]` | события прошедшего окна (без live-режима) |
 | `compose ls`, `compose ps/config/logs <project>` | compose-проекты |
 
+Команды записи и их уровень (см. [политику записи](#политика-записи)):
+
+| Команда | Уровень | Что делает |
+|---------|---------|------------|
+| `start`, `stop`, `restart <containers…> [--filter k=v]` | safe | жизненный цикл контейнеров по ID, уникальному префиксу ID или имени и/или точным фильтрам (`name=`/`image=` — glob, `status=`, `label=k[=v]`, `network=`, `health=`) |
+| `kill [-s SIG]`, `rm [-f]` (те же цели) | destructive | убить или удалить контейнеры |
+| `pull <image>` | safe | скачать образ |
+| `compose up/pull/restart <project>`, `compose backup <project>` | safe | развернуть проект; архив бэкапа сохраняется в текущий каталог |
+| `compose down <project>`, `compose restore <project> <archive>` | destructive | остановить и удалить проект (тома сохраняются) или восстановить его из бэкапа |
+| `network create <name> [--driver --subnet --gateway]`, `volume create <name> [--driver]` | safe | создать сеть или том |
+| `image prune`, `volume prune`, `system prune` | destructive | удалить неиспользуемое (`system prune` тома не трогает) |
+
+Команда с несколькими целями возвращает итог по каждому контейнеру; если упала только часть, в
+конверте `"partial": true`, а код выхода — `8`. Операции compose с файлами проекта (`up`, `pull`,
+`down`, `backup`, `restore`) требуют SSH-хост.
+
+### Политика записи
+
+По умолчанию режим командной строки только читает: команда записи отвечает `forbidden` (код `5`)
+с подсказкой, что её разрешит. Запись включается ключом `allowWrite` в блоке `agent:` файла
+`d9c-config.yaml` — глобально и/или у сохранённого хоста — до потолка `maxTier`
+(`read` < `safe` < `destructive`; без ключа — `safe`, так что разрушающие команды всегда требуют
+явного `maxTier: destructive`):
+
+```yaml
+agent:                     # все хосты
+  allowWrite: true
+  maxTier: safe
+hosts:
+  - name: staging
+    host: ssh://deploy@staging
+    agent:                 # только этот хост; перекрывает глобальный блок по ключам
+      maxTier: destructive
+  - name: prod
+    host: ssh://deploy@prod
+    agent:
+      allowWrite: false    # никогда, даже с --allow-write
+```
+
+- `--allow-write` разрешает запись на одну команду (до `maxTier`), если `allowWrite` в конфиге
+  не задан; явный `allowWrite: false` — замок, который флаг не открывает.
+- Read-only режим главнее всего: `-read-only`, `readOnly: true` или `read_only: true` у хоста
+  держат любые агентные команды на уровне `read`.
+- Политика берётся для хоста, к которому обращается команда: по имени из `--host` или
+  сохранённый хост, URL которого совпадает с `-H`. `hosts ls` показывает итоговый потолок
+  каждого хоста в `agent_tier`, а `d9c help` перечисляет только разрешённые для цели команды.
+
+Политика защищает от случайностей, а не от решительного пользователя машины: кто может
+править конфиг, тот может её изменить.
+
 **Вывод.** По умолчанию в stdout — один JSON-конверт
 `{"schema":1,"host","runtime","data","truncated","hint"}`. `-o text` — компактная таблица,
 `-o ndjson` — элемент списка на строку. `--fields name,state` оставляет только эти поля,
@@ -1016,7 +1068,8 @@ d9c help logs                            # аргументы одной ком�
 
 **Ошибки** пишутся в stderr как `{"error":{"code","message","hint"}}`, класс различается по коду
 выхода: `0` ok, `1` internal, `2` usage, `3` not_found, `4` connection, `5` forbidden,
-`6` auth_required, `7` confirmation_required.
+`6` auth_required, `7` confirmation_required, `8` partial (часть целей упала; результат — в
+stdout).
 
 **Безопасность.** Режим командной строки ничего не спрашивает. Для SSH-хоста с паролем пароль
 берётся только из `D9C_SSH_PASSWORD`, иначе команда завершается с `auth_required`. Ключ

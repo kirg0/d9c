@@ -48,6 +48,19 @@ type Host struct {
 	TLSCACert string `json:"tls_ca_cert,omitempty" yaml:"tls_ca_cert,omitempty"`
 	TLSCert   string `json:"tls_cert,omitempty" yaml:"tls_cert,omitempty"`
 	TLSKey    string `json:"tls_key,omitempty" yaml:"tls_key,omitempty"`
+	// Agent overrides the global agent write policy for this host. Like
+	// ReadOnly it is set only in the config file, so UI edits keep it.
+	Agent *AgentPolicy `json:"agent,omitempty" yaml:"agent,omitempty"`
+}
+
+// AgentPolicy is an `agent:` block of the config — the write policy of the
+// agent CLI/MCP, set globally and per saved host (the host block wins field by
+// field). Nil fields are unset: writes stay off and the tier ceiling falls back
+// to its default. MaxTier is validated where the policy is resolved
+// (agent.ParseTier), since this package cannot depend on the agent registry.
+type AgentPolicy struct {
+	AllowWrite *bool  `json:"allowWrite,omitempty" yaml:"allowWrite,omitempty"`
+	MaxTier    string `json:"maxTier,omitempty" yaml:"maxTier,omitempty"`
 }
 
 // HasTLS reports whether the host carries any client TLS material.
@@ -185,6 +198,7 @@ func (s *Store) EditHost(name string, h Host) error {
 	}
 	old := s.Hosts[idx]
 	h.ReadOnly = old.ReadOnly
+	h.Agent = old.Agent
 	if !h.HasTLS() {
 		h.TLSCACert, h.TLSCert, h.TLSKey = old.TLSCACert, old.TLSCert, old.TLSKey
 		h = h.normalized() // drop the carried TLS if the URL is no longer tcp://

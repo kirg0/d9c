@@ -13,20 +13,24 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   `--filter key=value` predicates (`name=`/`image=` globs, `status=`, `label=k[=v]`, `network=`,
   `health=`; exact matches, never substrings). The result lists one outcome per container; when
   only some of them fail, the envelope carries `"partial": true` and the exit status is `8`.
-  The commands stay forbidden until the write policy (`allowWrite`/`maxTier`) lands.
 - **Image and compose deployment commands in command-line mode:** `pull <image>`, `compose up`,
   `compose pull`, `compose restart`, `compose down` (containers and networks; volumes kept),
   `compose backup` (archive saved to the current directory, absolute path returned) and
   `compose restore <project> <archive>`. Streaming commands run to completion and return the
   engine output (the newest 200 lines); a failure is an error that quotes the output leading to
-  it. `compose down` and `compose restore` are destructive; all of them stay forbidden until the
-  write policy lands.
+  it. `compose down` and `compose restore` are destructive.
 - **Network, volume and prune commands in command-line mode:** `network create <name>`
   (`--driver`, `--subnet`, `--gateway`) and `volume create <name>` (`--driver`) return the new
   object; an existing name or a gateway outside the subnet is a usage error. `image prune`
   (dangling images), `volume prune` and `system prune` (stopped containers, unused networks,
-  dangling images, build cache; volumes kept) are destructive. All of them stay forbidden until
-  the write policy lands.
+  dangling images, build cache; volumes kept) are destructive.
+- **Agent write policy:** command-line mode is read-only by default. `agent: {allowWrite, maxTier}`
+  in the config — globally and per saved host, the host block overriding key by key — turns write
+  commands on up to a tier ceiling (`read` < `safe` < `destructive`; `safe` when unset).
+  `--allow-write` allows writes for one command unless the config says `allowWrite: false`;
+  read-only mode (`-read-only`, `readOnly:`, a host's `read_only`) always wins. A refused command
+  fails with `forbidden` before connecting, with a hint naming the setting that blocks it;
+  `d9c help` lists only the allowed commands and `hosts ls` reports each host's `agent_tier`.
 
 ### Fixed
 

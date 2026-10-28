@@ -28,6 +28,9 @@ type HostEntry struct {
 	Name     string `json:"name"`
 	Host     string `json:"host"`
 	ReadOnly bool   `json:"read_only"`
+	// AgentTier is the highest operation tier the write policy admits on
+	// the host for this invocation (read unless writes are allowed).
+	AgentTier Tier `json:"agent_tier"`
 }
 
 func hostsLsOp() Op {
@@ -41,7 +44,13 @@ func hostsLsOp() Op {
 			out := []HostEntry{}
 			if env.Hosts != nil {
 				for _, h := range env.Hosts.List() {
-					out = append(out, HostEntry{Name: h.Name, Host: h.Host, ReadOnly: h.ReadOnly})
+					pol := env.Policy
+					pol.Host = &h
+					tier, err := pol.Ceiling()
+					if err != nil {
+						return Result{}, err
+					}
+					out = append(out, HostEntry{Name: h.Name, Host: h.Host, ReadOnly: h.ReadOnly, AgentTier: tier})
 				}
 			}
 			return Result{Data: out}, nil

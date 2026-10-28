@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "forbidden",
+    "message": "operation \"start\" is safe, but read-only mode is on (-read-only flag)",
+    "hint": "only the user can turn read-only mode off; agents cannot override it"
+  }
+}

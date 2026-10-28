@@ -11,16 +11,12 @@ import (
 	"github.com/kirg0/d9c/internal/docker"
 	"github.com/kirg0/d9c/internal/dockerctx"
 	"github.com/kirg0/d9c/internal/hosts"
+	"github.com/kirg0/d9c/internal/settings"
 )
 
 // passwordEnv is the only source of an SSH password in CLI mode: the CLI never
 // prompts, so a password-auth host without it fails with auth_required.
 const passwordEnv = "D9C_SSH_PASSWORD"
-
-// cliCeiling is the tier ceiling of the CLI. It stays at read until the
-// allowWrite/maxTier policy lands, so the write commands answer forbidden;
-// tests raise it to exercise them.
-var cliCeiling = agent.TierRead
 
 // runCLI executes one CLI command (args starts at the command word) and
 // returns the process exit status. The result goes to stdout as a JSON
@@ -30,12 +26,6 @@ func runCLI(cfg *config.Config, reg *agent.Registry, args []string, stdout, stde
 	if err != nil {
 		return cli.WriteError(stderr, err)
 	}
-	if inv.Help {
-		if err := cli.WriteHelp(stdout, reg, inv, cliCeiling); err != nil {
-			return cli.WriteError(stderr, err)
-		}
-		return 0
-	}
 
 	// Migration notices would break the stderr contract; the TUI prints them.
 	set, err := loadSettings(cfg, io.Discard)
@@ -43,22 +33,55 @@ func runCLI(cfg *config.Config, reg *agent.Registry, args []string, stdout, stde
 		return cli.WriteError(stderr, err)
 	}
 	store := set.Hosts()
+	pol := cliPolicy(cfg, set)
+
+	if inv.Help {
+		// The host is not resolved for help: a saved host or -H URL is enough
+		// to show the commands its policy admits.
+		pol.Host = policyHost(cfg, store)
+		ceiling, err := pol.Ceiling()
+		if err == nil {
+			err = cli.WriteHelp(stdout, reg, inv, ceiling)
+		}
+		if err != nil {
+			return cli.WriteError(stderr, err)
+		}
+		return 0
+	}
 
 	// An agent must never trust an SSH host key nobody has verified.
 	docker.SetStrictHostKeys(true)
 
-	env := &agent.Env{Hosts: store}
+	env := &agent.Env{Hosts: store, Policy: pol}
 	label, rt := "", docker.RuntimeUnknown
+	switch {
+	case inv.Op.Local:
+	case cfg.Demo:
+		label = "demo"
+	default:
+		if label, err = resolveCLITarget(cfg, store, os.Getenv, dockerctx.Dir()); err != nil {
+			return cli.WriteError(stderr, err)
+		}
+		pol.Host = policyHost(cfg, store)
+	}
+	// Refuse before dialing: a forbidden command never touches the host.
+	ceiling, err := pol.Ceiling()
+	if err == nil {
+		err = pol.Check(inv.Op)
+	}
+	if err != nil {
+		return cli.WriteError(stderr, err)
+	}
 	if !inv.Op.Local {
-		b, l, err := connectCLI(cfg, store, os.Getenv)
+		b, err := connectCLI(cfg)
 		if err != nil {
 			return cli.WriteError(stderr, err)
 		}
 		defer b.Close()
-		env.Backend, label = b, l
+		env.Backend = b
 	}
 
-	res, err := reg.Invoke(context.Background(), env, inv.Op.Name, inv.Args, cliCeiling)
+	res, err := reg.Invoke(context.Background(), env, inv.Op.Name, inv.Args, ceiling)
 	if err != nil {
 		return cli.WriteError(stderr, err)
 	}
@@ -78,16 +101,38 @@ func runCLI(cfg *config.Config, reg *agent.Registry, args []string, stdout, stde
 	return 0
 }
 
-// connectCLI builds the backend for a CLI command and returns it with the
-// host label for the output envelope (saved-host or context name when known,
-// else the URL; "demo" for -demo).
-func connectCLI(cfg *config.Config, store *hosts.Store, getenv func(string) string) (docker.Backend, string, error) {
-	if cfg.Demo {
-		return docker.NewFakeBackend(), "demo", nil
+// cliPolicy assembles the agent write policy of a CLI command from the flags
+// and the config; the caller sets its Host once the target is known.
+func cliPolicy(cfg *config.Config, set *settings.Store) agent.Policy {
+	p := agent.Policy{Global: set.File.Agent, AllowWriteFlag: cfg.AllowWrite, ConfigPath: set.Path()}
+	switch {
+	case cfg.ReadOnly:
+		p.ReadOnly = "-read-only flag"
+	case set.ReadOnly():
+		p.ReadOnly = "readOnly: true in " + set.Path()
 	}
-	label, err := resolveCLITarget(cfg, store, getenv, dockerctx.Dir())
-	if err != nil {
-		return nil, "", err
+	return p
+}
+
+// policyHost returns the saved host whose policy applies to the command: the
+// one named by --host, else the one with the URL cfg points at (as the TUI
+// matches per-host read_only), else nil.
+func policyHost(cfg *config.Config, store *hosts.Store) *hosts.Host {
+	h, ok := store.Find(cfg.SavedHost)
+	if cfg.SavedHost == "" {
+		h, ok = store.FindByURL(cfg.Host)
+	}
+	if !ok {
+		return nil
+	}
+	return &h
+}
+
+// connectCLI builds the backend for a CLI command whose target
+// resolveCLITarget has already applied to cfg (the demo backend for -demo).
+func connectCLI(cfg *config.Config) (docker.Backend, error) {
+	if cfg.Demo {
+		return docker.NewFakeBackend(), nil
 	}
 	b, err := docker.New(cfg)
 	if err != nil {
@@ -96,9 +141,9 @@ func connectCLI(cfg *config.Config, store *hosts.Store, getenv func(string) stri
 			e = e.WithHint("no host was given, so the default socket was tried; " +
 				"pass --host <saved name> (see `d9c hosts ls`), -H <url> or -context <name>")
 		}
-		return nil, "", e
+		return nil, e
 	}
-	return b, label, nil
+	return b, nil
 }
 
 // resolveCLITarget points cfg at the host a CLI command addresses — the saved

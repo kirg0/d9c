@@ -86,6 +86,11 @@ var globals = []global{
 		c.ReadOnly = b
 		return err
 	}},
+	{name: "allow-write", usage: "--allow-write", isBool: true, set: func(c *config.Config, v string) error {
+		b, err := strconv.ParseBool(v)
+		c.AllowWrite = b
+		return err
+	}},
 }
 
 func findGlobal(name string) (global, bool) {
@@ -378,6 +383,11 @@ func WriteHelp(w io.Writer, reg *agent.Registry, inv Invocation, ceiling agent.T
 		b.WriteString("Run d9c without a command to open the interactive interface.\n\nCommands:\n")
 		for _, op := range ops {
 			fmt.Fprintf(&b, "  %-*s  %s\n", width, op.Name, op.Summary)
+		}
+		if hidden := len(reg.Ops()) - len(ops); hidden > 0 {
+			fmt.Fprintf(&b, "\n%d commands that change state are hidden (allowed tier: %s). Write commands are off\n"+
+				"by default: with the user's consent pass --allow-write, or set agent: {allowWrite: true,\n"+
+				"maxTier: safe|destructive} in the config, globally or under a saved host.\n", hidden, ceiling)
 		}
 		b.WriteString("\nGlobal flags: " + globalUsage() + "\n")
 		b.WriteString("Output flags: " + outputUsage + "\n")
