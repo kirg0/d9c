@@ -21,7 +21,7 @@ var mcpToolRE = regexp.MustCompile("`d9c_[a-z_]+`")
 
 // nonRegistryCommands are the d9c commands outside the agent registry that
 // skills may name, by their first word.
-var nonRegistryCommands = map[string]bool{"-version": true, mcpCommand: true, "skills": true, cli.HelpCommand: true}
+var nonRegistryCommands = map[string]bool{"-version": true, mcpCommand: true, skillsCommand: true, cli.HelpCommand: true}
 
 // shellWords splits a command line on spaces, keeping single- or
 // double-quoted words together (without the quotes).

@@ -6,7 +6,9 @@ import (
 )
 
 // skillFiles holds the agent skills of this repository's plugin. The MCP
-// server serves them as prompts, so a scenario has one text in both places.
+// server serves them as prompts and `d9c skills install` copies them into an
+// agent's skills directory, so a scenario has one text, versioned with the
+// binary, everywhere.
 //
 //go:embed plugins/d9c/skills/*/SKILL.md
 var skillFiles embed.FS

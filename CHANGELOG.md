@@ -18,6 +18,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   `d9c-cleanup`, `d9c-fleet`, `d9c-security-audit` (read-only) and `d9c-net-storage`. The MCP
   server serves all of them as prompts. Tests parse every CLI command a skill names with the real
   CLI parser and check every MCP tool, action and argument against the tool schemas.
+- **`d9c skills install`:** the skills are embedded in the binary; `d9c skills install --target <agent>`
+  writes them into an agent's user-level skills directory (`claude` → `~/.claude/skills`, `agents`/`codex`
+  → `~/.agents/skills`, `gemini`, `cursor`, `copilot`, `opencode`) or `--dir <path>` (e.g. a project's
+  `.claude/skills`), stamped with the binary version in `metadata.d9c-version`; `--dry-run` reports
+  created/updated/unchanged without writing, other skills in the directory are left alone.
+  `d9c skills ls` lists the skills and targets.
 - **Image commands for agents:** `image history <image>` (read), `image tag <source> <target>`,
   `image push <image>`, `image build <dir> [-t tag]` (safe) and `image rm <image> [-f]` (destructive),
   in the CLI and the MCP tools (`d9c_resources` image_history, `d9c_deploy` image_build/image_tag/
