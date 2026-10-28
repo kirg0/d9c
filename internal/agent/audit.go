@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -137,13 +138,16 @@ func auditError(path string, err error) *Error {
 }
 
 // Record appends e as one line. The line goes out in a single write, so
-// entries of concurrent d9c processes do not interleave.
+// entries of concurrent d9c processes do not interleave. Shell metacharacters
+// in commands stay literal (no > for >), so the log reads as typed.
 func (l *AuditLog) Record(e AuditEntry) error {
-	b, err := json.Marshal(e)
-	if err != nil {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(e); err != nil {
 		return err
 	}
-	_, err = l.f.Write(append(b, '\n'))
+	_, err := l.f.Write(buf.Bytes())
 	return err
 }
 
