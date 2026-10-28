@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "source": "nginx:1.25",
+    "id": "a08c488a9779",
+    "target": "registry.example.com/web:1"
+  },
+  "truncated": false
+}

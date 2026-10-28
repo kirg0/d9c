@@ -45,8 +45,10 @@ func TestOpsWithoutBackend(t *testing.T) {
 		"compose pull": {"project": "x"}, "compose restart": {"project": "x"}, "compose backup": {"project": "x"},
 		"compose restore": {"project": "x", "file": "x"},
 		"network create":  {"name": "x"}, "volume create": {"name": "x"},
-		"exec": {"container": "x", "cmd": []string{"x"}},
-		"wait": {"container": "x"},
+		"exec":          {"container": "x", "cmd": []string{"x"}},
+		"wait":          {"container": "x"},
+		"image history": {"image": "x"}, "image tag": {"source": "x", "target": "y"},
+		"image push": {"image": "x"}, "image build": {"dir": "."}, "image rm": {"image": "x"},
 	}
 	for _, op := range r.Ops() {
 		if op.Local {
@@ -68,7 +70,7 @@ func TestOpsMarshal(t *testing.T) {
 		"ps": nil, "inspect": {"target": "web"}, "logs": {"container": "web"}, "stats": nil,
 		"images": nil, "networks": nil, "volumes": nil, "system df": nil, "events": nil,
 		"compose ls": nil, "compose ps": {"project": "webapp"}, "compose config": {"project": "webapp"},
-		"compose logs": {"project": "webapp"}, "info": nil,
+		"compose logs": {"project": "webapp"}, "info": nil, "image history": {"image": "nginx:1.25"},
 	}
 	for name, args := range calls {
 		res := invoke(t, fb, name, args)

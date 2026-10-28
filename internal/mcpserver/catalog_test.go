@@ -49,40 +49,45 @@ func TestToolCatalogGolden(t *testing.T) {
 // actionCases holds working arguments for every tool action on the demo
 // backend; TestEveryActionRuns fails for an action without a case.
 var actionCases = map[string]map[string]any{
-	"d9c_hosts":                  {},
-	"d9c_system/info":            {},
-	"d9c_system/df":              {},
-	"d9c_system/events":          {"since": "5m"},
-	"d9c_system/stats":           {"container": []string{"web"}},
-	"d9c_containers/ps":          {"all": true},
-	"d9c_containers/inspect":     {"target": "web"},
-	"d9c_containers/wait":        {"container": "web", "until": "running", "timeout": 0},
-	"d9c_logs/container":         {"container": "web", "tail": 5},
-	"d9c_logs/compose":           {"project": "webapp", "tail": 5},
-	"d9c_resources/images":       {},
-	"d9c_resources/networks":     {},
-	"d9c_resources/volumes":      {},
-	"d9c_compose/ls":             {},
-	"d9c_compose/ps":             {"project": "webapp"},
-	"d9c_compose/config":         {"project": "webapp"},
-	"d9c_lifecycle/start":        {"targets": []string{"db"}},
-	"d9c_lifecycle/stop":         {"targets": []string{"web"}},
-	"d9c_lifecycle/restart":      {"filter": []string{"label=env=prod"}},
-	"d9c_deploy/pull":            {"image": "nginx:1.27"},
-	"d9c_deploy/compose_up":      {"project": "webapp"},
-	"d9c_deploy/compose_pull":    {"project": "webapp"},
-	"d9c_deploy/compose_restart": {"project": "webapp"},
-	"d9c_deploy/compose_backup":  {"project": "webapp"},
-	"d9c_create/network":         {"name": "mcp-net", "subnet": "10.42.0.0/24"},
-	"d9c_create/volume":          {"name": "mcp-vol"},
-	"d9c_remove/kill":            {"targets": []string{"api"}, "signal": "TERM"},
-	"d9c_remove/rm":              {"targets": []string{"db"}, "force": true},
-	"d9c_remove/compose_down":    {"project": "monitoring"},
-	"d9c_remove/compose_restore": {"project": "webapp", "file": "backup.tar.gz"},
-	"d9c_prune/images":           {},
-	"d9c_prune/volumes":          {},
-	"d9c_prune/system":           {},
-	"d9c_exec":                   {"container": "web", "cmd": []string{"echo", "hi"}},
+	"d9c_hosts":                   {},
+	"d9c_system/info":             {},
+	"d9c_system/df":               {},
+	"d9c_system/events":           {"since": "5m"},
+	"d9c_system/stats":            {"container": []string{"web"}},
+	"d9c_containers/ps":           {"all": true},
+	"d9c_containers/inspect":      {"target": "web"},
+	"d9c_containers/wait":         {"container": "web", "until": "running", "timeout": 0},
+	"d9c_logs/container":          {"container": "web", "tail": 5},
+	"d9c_logs/compose":            {"project": "webapp", "tail": 5},
+	"d9c_resources/images":        {},
+	"d9c_resources/networks":      {},
+	"d9c_resources/volumes":       {},
+	"d9c_resources/image_history": {"image": "nginx:1.25"},
+	"d9c_compose/ls":              {},
+	"d9c_compose/ps":              {"project": "webapp"},
+	"d9c_compose/config":          {"project": "webapp"},
+	"d9c_lifecycle/start":         {"targets": []string{"db"}},
+	"d9c_lifecycle/stop":          {"targets": []string{"web"}},
+	"d9c_lifecycle/restart":       {"filter": []string{"label=env=prod"}},
+	"d9c_deploy/pull":             {"image": "nginx:1.27"},
+	"d9c_deploy/image_build":      {"dir": "app", "tag": "app:dev"},
+	"d9c_deploy/image_tag":        {"source": "nginx:1.25", "target": "registry.example.com/web:1"},
+	"d9c_deploy/image_push":       {"image": "nginx:1.25"},
+	"d9c_deploy/compose_up":       {"project": "webapp"},
+	"d9c_deploy/compose_pull":     {"project": "webapp"},
+	"d9c_deploy/compose_restart":  {"project": "webapp"},
+	"d9c_deploy/compose_backup":   {"project": "webapp"},
+	"d9c_create/network":          {"name": "mcp-net", "subnet": "10.42.0.0/24"},
+	"d9c_create/volume":           {"name": "mcp-vol"},
+	"d9c_remove/kill":             {"targets": []string{"api"}, "signal": "TERM"},
+	"d9c_remove/rm":               {"targets": []string{"db"}, "force": true},
+	"d9c_remove/image_rm":         {"image": "postgres:16"},
+	"d9c_remove/compose_down":     {"project": "monitoring"},
+	"d9c_remove/compose_restore":  {"project": "webapp", "file": "backup.tar.gz"},
+	"d9c_prune/images":            {},
+	"d9c_prune/volumes":           {},
+	"d9c_prune/system":            {},
+	"d9c_exec":                    {"container": "web", "cmd": []string{"echo", "hi"}},
 }
 
 // TestEveryActionRuns calls every action of every tool through the MCP client
@@ -90,6 +95,12 @@ var actionCases = map[string]map[string]any{
 func TestEveryActionRuns(t *testing.T) {
 	t.Chdir(t.TempDir()) // compose backup writes its archive here
 	if err := os.WriteFile("backup.tar.gz", []byte("archive"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll("app", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("app/Dockerfile", []byte("FROM alpine"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	s := startSession(t, Options{Policy: writePolicy()})

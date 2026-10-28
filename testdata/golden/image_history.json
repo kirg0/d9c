@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "image": "nginx:1.25",
+    "layers": [
+      {
+        "created": "2026-06-01 10:00",
+        "size": "42 MB",
+        "command": "CMD [\"/app/run\"]"
+      },
+      {
+        "created": "2026-06-01 10:00",
+        "size": "5.0 MB",
+        "command": "COPY . /app"
+      },
+      {
+        "created": "2026-05-20 08:30",
+        "size": "7.8 MB",
+        "command": "FROM alpine:3.20"
+      }
+    ]
+  },
+  "truncated": false
+}

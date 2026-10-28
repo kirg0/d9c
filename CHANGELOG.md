@@ -6,6 +6,18 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Claude Code marketplace:** the repository is a plugin marketplace (`.claude-plugin/marketplace.json`)
+  with the `d9c` plugin in `plugins/d9c`: its manifest, an optional saved-host option and `.mcp.json`,
+  which starts `d9c mcp`, so installing the plugin wires up the MCP server.
+- **Image commands for agents:** `image history <image>` (read), `image tag <source> <target>`,
+  `image push <image>`, `image build <dir> [-t tag]` (safe) and `image rm <image> [-f]` (destructive),
+  in the CLI and the MCP tools (`d9c_resources` image_history, `d9c_deploy` image_build/image_tag/
+  image_push, `d9c_remove` image_rm). Push credentials come only from `D9C_REGISTRY_USERNAME` /
+  `D9C_REGISTRY_PASSWORD`; the plans name the registry, the containers using an image and a tag that
+  moves.
+
 ## [1.34.0] - 2026-10-28
 
 ### Added
