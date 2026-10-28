@@ -45,3 +45,24 @@ jobs:
 
       - name: go test -race
         run: make race
+
+  # The marketplace, the plugin manifest, its MCP config and the skills,
+  # checked by Claude Code's own validator (no credentials needed). The
+  # skill/eval content checks run in `make check` (skills_test.go, evals_test.go).
+  plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: claude plugin validate
+        run: |
+          claude plugin validate . --strict
+          claude plugin validate plugins/d9c --strict

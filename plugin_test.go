@@ -70,6 +70,27 @@ func readJSON(t *testing.T, path string, v any) {
 	}
 }
 
+// knownKeys fails for a top-level key of the JSON object at path that is not
+// in keys: Claude Code strips unknown keys silently, so a typo would just
+// disappear.
+func knownKeys(t *testing.T, path string, keys ...string) {
+	t.Helper()
+	var m map[string]json.RawMessage
+	readJSON(t, path, &m)
+	for k := range m {
+		if !slices.Contains(keys, k) {
+			t.Errorf("%s: unknown key %q", path, k)
+		}
+	}
+}
+
+func TestManifestKeys(t *testing.T) {
+	knownKeys(t, ".claude-plugin/marketplace.json", "$schema", "name", "description", "owner", "metadata", "plugins")
+	knownKeys(t, filepath.Join(pluginDir, ".claude-plugin", "plugin.json"), "$schema", "name", "displayName", "version",
+		"description", "author", "homepage", "repository", "license", "keywords", "metadata", "icon", "userConfig")
+	knownKeys(t, filepath.Join(pluginDir, ".mcp.json"), "mcpServers")
+}
+
 func TestMarketplaceManifest(t *testing.T) {
 	var m marketplaceFile
 	readJSON(t, ".claude-plugin/marketplace.json", &m)
