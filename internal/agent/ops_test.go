@@ -16,7 +16,7 @@ import (
 // invoke runs a built-in op on b and fails the test on error.
 func invoke(t *testing.T, b docker.Backend, name string, args Args) Result {
 	t.Helper()
-	res, err := Builtin().Invoke(context.Background(), &Env{Backend: b}, name, args, TierRead)
+	res, err := Builtin().Invoke(context.Background(), &Env{Backend: b}, name, args, Call{Ceiling: TierRead})
 	if err != nil {
 		t.Fatalf("%s %v: %v", name, args, err)
 	}
@@ -26,7 +26,7 @@ func invoke(t *testing.T, b docker.Backend, name string, args Args) Result {
 // invokeErr runs a built-in op on b and returns its classified error code.
 func invokeErr(t *testing.T, b docker.Backend, name string, args Args) *Error {
 	t.Helper()
-	_, err := Builtin().Invoke(context.Background(), &Env{Backend: b}, name, args, TierRead)
+	_, err := Builtin().Invoke(context.Background(), &Env{Backend: b}, name, args, Call{Ceiling: TierRead})
 	if err == nil {
 		t.Fatalf("%s %v: want an error", name, args)
 	}
@@ -50,7 +50,7 @@ func TestOpsWithoutBackend(t *testing.T) {
 		if op.Local {
 			continue
 		}
-		_, err := r.Invoke(context.Background(), &Env{}, op.Name, args[op.Name], TierDestructive)
+		_, err := r.Invoke(context.Background(), &Env{}, op.Name, args[op.Name], Call{Ceiling: TierDestructive, Confirmed: true})
 		if e := Classify(err); e.Code != CodeInternal {
 			t.Errorf("%s without backend: err = %v, want internal", op.Name, err)
 		}
@@ -126,7 +126,7 @@ func TestInspect(t *testing.T) {
 	}
 	for _, kind := range []string{"network", "volume"} {
 		target := map[string]string{"network": "f0a1b2c3d4e5", "volume": "pgdata"}[kind]
-		if _, err := Builtin().Invoke(context.Background(), &Env{Backend: fb}, "inspect", Args{"target": target, "type": kind}, TierRead); err != nil {
+		if _, err := Builtin().Invoke(context.Background(), &Env{Backend: fb}, "inspect", Args{"target": target, "type": kind}, Call{Ceiling: TierRead}); err != nil {
 			t.Errorf("inspect %s: %v", kind, err)
 		}
 	}
@@ -345,7 +345,7 @@ func TestStats(t *testing.T) {
 	statsWindow = time.Hour
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := Builtin().Invoke(ctx, &Env{Backend: &statsBackend{FakeBackend: docker.NewFakeBackend()}}, "stats", nil, TierRead); err == nil {
+	if _, err := Builtin().Invoke(ctx, &Env{Backend: &statsBackend{FakeBackend: docker.NewFakeBackend()}}, "stats", nil, Call{Ceiling: TierRead}); err == nil {
 		t.Error("cancelled stats should fail")
 	}
 }

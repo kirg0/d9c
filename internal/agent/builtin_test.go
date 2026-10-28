@@ -80,7 +80,7 @@ func TestHostsLs(t *testing.T) {
 	ctx := context.Background()
 
 	// No store: an empty list, never null.
-	res, err := r.Invoke(ctx, &Env{}, "hosts ls", nil, TierRead)
+	res, err := r.Invoke(ctx, &Env{}, "hosts ls", nil, Call{Ceiling: TierRead})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestHostsLs(t *testing.T) {
 		{Name: "prod", Host: "ssh://root@prod", SSHKeyPath: "/k", ReadOnly: true},
 		{Name: "lab", Host: "tcp://10.0.0.2:2375"},
 	}, nil)
-	res, err = r.Invoke(ctx, &Env{Hosts: store}, "hosts ls", nil, TierRead)
+	res, err = r.Invoke(ctx, &Env{Hosts: store}, "hosts ls", nil, Call{Ceiling: TierRead})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestInfo(t *testing.T) {
 	ctx := context.Background()
 
 	fb := docker.NewFakeBackend()
-	res, err := r.Invoke(ctx, &Env{Backend: fb}, "info", nil, TierRead)
+	res, err := r.Invoke(ctx, &Env{Backend: fb}, "info", nil, Call{Ceiling: TierRead})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,13 +132,13 @@ func TestInfo(t *testing.T) {
 	}
 
 	// No backend is a frontend bug, reported as internal rather than a panic.
-	if _, err := r.Invoke(ctx, &Env{}, "info", nil, TierRead); Classify(err).Code != CodeInternal {
+	if _, err := r.Invoke(ctx, &Env{}, "info", nil, Call{Ceiling: TierRead}); Classify(err).Code != CodeInternal {
 		t.Errorf("nil backend: err = %v, want internal", err)
 	}
 
 	// Backend errors are classified.
 	refused := errors.New("dial tcp 10.0.0.1:2375: connect: connection refused")
-	_, err = r.Invoke(ctx, &Env{Backend: errInfoBackend{err: refused}}, "info", nil, TierRead)
+	_, err = r.Invoke(ctx, &Env{Backend: errInfoBackend{err: refused}}, "info", nil, Call{Ceiling: TierRead})
 	if Classify(err).Code != CodeConnection {
 		t.Errorf("refused: err = %v, want connection", err)
 	}

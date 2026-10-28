@@ -275,7 +275,7 @@ func composeStatus(t *testing.T, b docker.Backend, project string) string {
 
 // A destructive compose command is refused under a safe ceiling.
 func TestComposeDownNeedsDestructive(t *testing.T) {
-	_, err := Builtin().Invoke(context.Background(), &Env{Backend: docker.NewFakeBackend()}, "compose down", Args{"project": "webapp"}, TierSafe)
+	_, err := Builtin().Invoke(context.Background(), &Env{Backend: docker.NewFakeBackend()}, "compose down", Args{"project": "webapp"}, Call{Ceiling: TierSafe})
 	if Classify(err).Code != CodeForbidden {
 		t.Errorf("compose down under safe: %v, want forbidden", err)
 	}

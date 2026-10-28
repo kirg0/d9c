@@ -47,8 +47,9 @@ type Schema struct {
 }
 
 // ReservedArgs are the argument names frontends keep for the output options
-// (format, Shape fields and limit); no operation may declare them.
-var ReservedArgs = []string{"output", "fields", "limit"}
+// (format, Shape fields and limit) and for the Call options (dry run,
+// confirmation); no operation may declare them.
+var ReservedArgs = []string{"output", "fields", "limit", "dry_run", "dry-run", "yes"}
 
 // Object describes an argument object with the given properties; required
 // lists the properties that must be present.
@@ -119,13 +120,14 @@ func (s *Schema) check() error {
 			return fmt.Errorf("property %q: nil schema", name)
 		}
 		if slices.Contains(ReservedArgs, name) {
-			return fmt.Errorf("property %q: name is reserved for the output options", name)
+			return fmt.Errorf("property %q: name is reserved for the frontend options (output, dry run, confirmation)", name)
 		}
 		if p.Short != "" {
-			// -h is help, -H the global host flag and -o the output format on
-			// every command.
-			if len(p.Short) != 1 || !unicode.IsLetter(rune(p.Short[0])) || strings.EqualFold(p.Short, "h") || p.Short == "o" {
-				return fmt.Errorf("property %q: short alias must be one letter other than h/H/o, got %q", name, p.Short)
+			// -h is help, -H the global host flag, -o the output format and
+			// -y the confirmation on every command.
+			if len(p.Short) != 1 || !unicode.IsLetter(rune(p.Short[0])) || strings.EqualFold(p.Short, "h") ||
+				p.Short == "o" || p.Short == "y" {
+				return fmt.Errorf("property %q: short alias must be one letter other than h/H/o/y, got %q", name, p.Short)
 			}
 			if other, dup := shorts[p.Short]; dup {
 				return fmt.Errorf("property %q: short alias -%s already used by %q", name, p.Short, other)

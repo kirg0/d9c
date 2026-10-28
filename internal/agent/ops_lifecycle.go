@@ -50,6 +50,9 @@ type ActionTarget struct {
 // containerAction runs one lifecycle action on a container ID.
 type containerAction func(b docker.Backend, id string, args Args) error
 
+// actionStep phrases one lifecycle action on a container for the plan.
+type actionStep func(c docker.Container, args Args) string
+
 // filterHelp documents the --filter syntax in schemas and usage hints.
 const filterHelp = "Select containers by key=value (repeatable, all must match): " +
 	"name=<glob>, image=<glob>, status=<state>, label=<key>[=<value>], network=<name>, " +
@@ -57,8 +60,8 @@ const filterHelp = "Select containers by key=value (repeatable, all must match):
 
 // lifecycleOp declares a multi-target container command. Targets come as
 // IDs/ID prefixes/names (positional on the CLI) and/or --filter predicates;
-// extra adds action-specific arguments.
-func lifecycleOp(name, summary string, tier Tier, extra map[string]*Schema, act containerAction) Op {
+// extra adds action-specific arguments; step phrases the action for the plan.
+func lifecycleOp(name, summary string, tier Tier, extra map[string]*Schema, act containerAction, step actionStep) Op {
 	props := map[string]*Schema{
 		"targets": StringArray("Container IDs, unique ID prefixes or names.").WithPositional(),
 		"filter":  StringArray(filterHelp),
@@ -70,23 +73,11 @@ func lifecycleOp(name, summary string, tier Tier, extra map[string]*Schema, act 
 		Args:    Object(props),
 		Tier:    tier,
 		Handler: func(ctx context.Context, env *Env, args Args) (Result, error) {
-			if env.Backend == nil {
-				return Result{}, errNoBackend(name)
-			}
-			refs, filters := args.Strings("targets"), args.Strings("filter")
-			if len(refs) == 0 && len(filters) == 0 {
-				return Result{}, Errorf(CodeUsage, "%s: no containers given", name).
-					WithHint("pass container IDs or names, or --filter key=value; " + filterHelp)
-			}
-			match, err := parseContainerFilter(filters)
+			targets, _, err := lifecycleTargets(env, name, args)
 			if err != nil {
 				return Result{}, err
 			}
-			list, err := env.Backend.ListContainers(true)
-			if err != nil {
-				return Result{}, err
-			}
-			data := ActionData{Action: name, Targets: resolveTargets(list, refs, match)}
+			data := ActionData{Action: name, Targets: targets}
 			for i := range data.Targets {
 				t := &data.Targets[i]
 				if t.Result == outcomeFailed {
@@ -102,9 +93,66 @@ func lifecycleOp(name, summary string, tier Tier, extra map[string]*Schema, act 
 				}
 				t.Result = outcomeOK
 			}
-			return actionResult(data, len(filters) > 0)
+			return actionResult(data, len(args.Strings("filter")) > 0)
+		},
+		Plan: func(_ context.Context, env *Env, args Args) ([]string, error) {
+			targets, byID, err := lifecycleTargets(env, name, args)
+			if err != nil {
+				return nil, err
+			}
+			steps := make([]string, 0, len(targets))
+			for _, t := range targets {
+				if t.Result == outcomeFailed {
+					steps = append(steps, t.Error+" — will be reported as failed")
+					continue
+				}
+				steps = append(steps, step(byID[t.ID], args))
+			}
+			return steps, nil
 		},
 	}
+}
+
+// lifecycleTargets resolves the targets of a lifecycle command (see
+// resolveTargets) and returns them with the listed containers by ID. No refs
+// and no filter is a usage error.
+func lifecycleTargets(env *Env, name string, args Args) ([]ActionTarget, map[string]docker.Container, error) {
+	if env.Backend == nil {
+		return nil, nil, errNoBackend(name)
+	}
+	refs, filters := args.Strings("targets"), args.Strings("filter")
+	if len(refs) == 0 && len(filters) == 0 {
+		return nil, nil, Errorf(CodeUsage, "%s: no containers given", name).
+			WithHint("pass container IDs or names, or --filter key=value; " + filterHelp)
+	}
+	match, err := parseContainerFilter(filters)
+	if err != nil {
+		return nil, nil, err
+	}
+	list, err := env.Backend.ListContainers(true)
+	if err != nil {
+		return nil, nil, err
+	}
+	byID := make(map[string]docker.Container, len(list))
+	for _, c := range list {
+		byID[c.ID] = c
+	}
+	return resolveTargets(list, refs, match), byID, nil
+}
+
+// containerLabel names a container in a plan step: "web (9ae942fd8fbc)".
+func containerLabel(c docker.Container) string {
+	return fmt.Sprintf("%s (%s)", c.Name, c.ID)
+}
+
+// stateStep returns a plan step for verb on c, noting a state the action will
+// not change ("start container web (…) — already running").
+func stateStep(verb string, c docker.Container, noop func(state string) bool, note string) string {
+	s := verb + " container " + containerLabel(c)
+	if noop(c.State) {
+		s += " — " + note
+	}
+	return s
 }
 
 func (t *ActionTarget) fail(e *Error) {
@@ -307,19 +355,30 @@ func targetLabel(t ActionTarget) string {
 	return t.Ref
 }
 
+func isRunning(state string) bool { return state == "running" }
+
 func startOp() Op {
 	return lifecycleOp("start", "Start stopped containers.", TierSafe, nil,
-		func(b docker.Backend, id string, _ Args) error { return b.StartContainer(id) })
+		func(b docker.Backend, id string, _ Args) error { return b.StartContainer(id) },
+		func(c docker.Container, _ Args) string {
+			return stateStep("start", c, isRunning, "already running")
+		})
 }
 
 func stopOp() Op {
 	return lifecycleOp("stop", "Stop running containers gracefully.", TierSafe, nil,
-		func(b docker.Backend, id string, _ Args) error { return b.StopContainer(id) })
+		func(b docker.Backend, id string, _ Args) error { return b.StopContainer(id) },
+		func(c docker.Container, _ Args) string {
+			return stateStep("stop", c, func(s string) bool { return !isRunning(s) && s != "paused" }, "not running")
+		})
 }
 
 func restartOp() Op {
 	return lifecycleOp("restart", "Restart containers.", TierSafe, nil,
-		func(b docker.Backend, id string, _ Args) error { return b.RestartContainer(id) })
+		func(b docker.Backend, id string, _ Args) error { return b.RestartContainer(id) },
+		func(c docker.Container, _ Args) string {
+			return "restart container " + containerLabel(c)
+		})
 }
 
 func killOp() Op {
@@ -327,7 +386,11 @@ func killOp() Op {
 		map[string]*Schema{
 			"signal": String("Signal to send, e.g. KILL, TERM, HUP.").WithDefault("KILL").WithShort("s"),
 		},
-		func(b docker.Backend, id string, args Args) error { return b.KillContainer(id, args.String("signal")) })
+		func(b docker.Backend, id string, args Args) error { return b.KillContainer(id, args.String("signal")) },
+		func(c docker.Container, args Args) string {
+			return stateStep("send "+args.String("signal")+" to", c,
+				func(s string) bool { return !isRunning(s) }, "not running, will fail")
+		})
 }
 
 func rmOp() Op {
@@ -335,5 +398,12 @@ func rmOp() Op {
 		map[string]*Schema{
 			"force": Boolean("Kill and remove running containers.").WithShort("f"),
 		},
-		func(b docker.Backend, id string, args Args) error { return b.RemoveContainer(id, args.Bool("force")) })
+		func(b docker.Backend, id string, args Args) error { return b.RemoveContainer(id, args.Bool("force")) },
+		func(c docker.Container, args Args) string {
+			note := "running, will fail without --force"
+			if args.Bool("force") {
+				note = "running, killed first"
+			}
+			return stateStep("remove", c, isRunning, note)
+		})
 }

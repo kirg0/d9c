@@ -31,6 +31,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   read-only mode (`-read-only`, `readOnly:`, a host's `read_only`) always wins. A refused command
   fails with `forbidden` before connecting, with a hint naming the setting that blocks it;
   `d9c help` lists only the allowed commands and `hosts ls` reports each host's `agent_tier`.
+- **Dry runs and confirmation for write commands:** `--dry-run` prints the plan of any write
+  command (targets resolved, their state noted) without changing anything, and is not blocked by
+  the write policy. A destructive command without `-y`/`--yes` changes nothing and fails with
+  `confirmation_required` (exit `7`), carrying the plan in `error.plan` for the user to approve.
 
 ### Fixed
 

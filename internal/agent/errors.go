@@ -60,6 +60,9 @@ type Error struct {
 	// Hint is an actionable next step for the agent (how to fix or widen
 	// the request); empty when there is nothing useful to add.
 	Hint string `json:"hint,omitempty"`
+	// Plan is what a destructive operation would do; set only on
+	// CodeConfirmationRequired, so the agent can show it to the user.
+	Plan *PlanData `json:"plan,omitempty"`
 	// Err is the underlying cause, kept for errors.Is/As; never serialized.
 	Err error `json:"-"`
 }

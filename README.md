@@ -1015,6 +1015,18 @@ A command with several targets reports one outcome per container; when only some
 the envelope carries `"partial": true` and the exit status is `8`. Compose operations on project
 files (`up`, `pull`, `down`, `backup`, `restore`) need an SSH host.
 
+**Plans and confirmation.** `--dry-run` on any write command prints what it would do and changes
+nothing: `data` is `{"operation","tier","steps","confirm"}`, with targets resolved and their state
+noted ("stop container db (3f1ab77c9012) — not running"). A dry run only reads, so the write policy
+does not block it. A destructive command without `-y`/`--yes` changes nothing either: it fails
+with `confirmation_required` (exit `7`), and the error carries the same plan in `error.plan`. An
+agent must show that plan to the user and rerun with `--yes` only after they approve it:
+
+```sh
+d9c rm --filter status=exited --dry-run --host staging   # what would go
+d9c rm --filter status=exited --yes --host staging       # after the user said yes
+```
+
 ### Write policy
 
 The command-line mode is read-only by default: a write command answers `forbidden` (exit `5`)

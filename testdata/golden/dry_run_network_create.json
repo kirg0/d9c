@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "operation": "network create",
+    "tier": "safe",
+    "steps": [
+      "create network edge (driver bridge by default)"
+    ],
+    "confirm": false
+  },
+  "truncated": false
+}

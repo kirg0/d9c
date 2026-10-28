@@ -20,6 +20,7 @@ import (
 func testRegistry(t *testing.T) *agent.Registry {
 	t.Helper()
 	nop := func(context.Context, *agent.Env, agent.Args) (agent.Result, error) { return agent.Result{}, nil }
+	plan := func(context.Context, *agent.Env, agent.Args) ([]string, error) { return nil, nil }
 	r := agent.NewRegistry()
 	r.MustRegister(
 		agent.Op{Name: "info", Summary: "Engine summary.", Args: agent.NoArgs(), Tier: agent.TierRead, Handler: nop},
@@ -36,9 +37,9 @@ func testRegistry(t *testing.T) *agent.Registry {
 				"format":    agent.String("Format.").WithEnum("json", "text"),
 				"all":       agent.Boolean("Every line.").WithShort("a"),
 			}, "id")},
-		agent.Op{Name: "rm", Summary: "Remove.", Tier: agent.TierDestructive, Handler: nop,
+		agent.Op{Name: "rm", Summary: "Remove.", Tier: agent.TierDestructive, Handler: nop, Plan: plan,
 			Args: agent.Object(map[string]*agent.Schema{"ids": agent.StringArray("Containers.")}, "ids")},
-		agent.Op{Name: "stop", Summary: "Stop.", Tier: agent.TierSafe, Handler: nop,
+		agent.Op{Name: "stop", Summary: "Stop.", Tier: agent.TierSafe, Handler: nop, Plan: plan,
 			Args: agent.Object(map[string]*agent.Schema{
 				"targets": agent.StringArray("Containers.").WithPositional(),
 				"filter":  agent.StringArray("Predicates."),
@@ -127,6 +128,44 @@ func TestParse(t *testing.T) {
 
 // The parsed raw arguments must pass the registry's normalization, so the CLI
 // and MCP end up with identical typed values.
+func TestParseWriteFlags(t *testing.T) {
+	tests := []struct {
+		args        []string
+		dryRun, yes bool
+		wantErr     string
+		wantTargets []string
+	}{
+		{[]string{"stop", "web", "--dry-run"}, true, false, "", []string{"web"}},
+		{[]string{"rm", "a", "-y"}, false, true, "", nil},
+		{[]string{"stop", "--yes", "web"}, false, true, "", []string{"web"}},
+		{[]string{"stop", "web", "--yes=false", "--dry-run=true"}, true, false, "", []string{"web"}},
+		{[]string{"stop", "web", "--yes=maybe"}, false, false, "want true or false", nil},
+	}
+	for _, tt := range tests {
+		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
+			inv, err := Parse(testRegistry(t), &config.Config{}, tt.args)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("err = %v, want %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if inv.DryRun != tt.dryRun || inv.Yes != tt.yes {
+				t.Errorf("dryRun=%v yes=%v, want %v %v", inv.DryRun, inv.Yes, tt.dryRun, tt.yes)
+			}
+			if _, isArg := inv.Args["yes"]; isArg {
+				t.Errorf("--yes leaked into the op args: %v", inv.Args)
+			}
+			if tt.wantTargets != nil && !reflect.DeepEqual(inv.Args["targets"], tt.wantTargets) {
+				t.Errorf("targets = %v, want %v", inv.Args["targets"], tt.wantTargets)
+			}
+		})
+	}
+}
+
 func TestParseNormalizes(t *testing.T) {
 	r := testRegistry(t)
 	inv, err := Parse(r, &config.Config{}, []string{"logs", "api", "--tail", "50", "--no-redact", "--grep", "x"})
@@ -229,6 +268,20 @@ func TestWriteHelp(t *testing.T) {
 	}
 	if want := "usage: d9c stop [<targets>...] [--filter value (repeatable)] [--force]\n"; !strings.Contains(buf.String(), want) {
 		t.Errorf("positional list usage lacks %q:\n%s", want, buf.String())
+	}
+	if !strings.Contains(buf.String(), "Write flags: --dry-run") || strings.Contains(buf.String(), "Destructive:") {
+		t.Errorf("safe op help: want write flags, no destructive note:\n%s", buf.String())
+	}
+	if strings.Contains(out, "Write flags:") {
+		t.Errorf("read op help lists write flags:\n%s", out)
+	}
+	buf.Reset()
+	op, _ = r.Lookup("rm")
+	if err := WriteHelp(&buf, r, Invocation{Op: op, Help: true}, agent.TierDestructive); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "exits with 7 (confirmation_required)") {
+		t.Errorf("destructive op help lacks the confirmation note:\n%s", buf.String())
 	}
 	// Required arguments come first.
 	if !strings.Contains(out, "--grep (list of strings): Filters.") {

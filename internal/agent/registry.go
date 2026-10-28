@@ -33,6 +33,12 @@ type Env struct {
 // Handler executes an operation with already-normalized arguments.
 type Handler func(ctx context.Context, env *Env, args Args) (Result, error)
 
+// Planner describes, without changing anything, what a write operation would
+// do with already-normalized arguments: one human-readable step per action
+// ("stop container web (9ae942fd8fbc)"). It may read engine state to resolve
+// targets and must fail the same way the handler would on bad input.
+type Planner func(ctx context.Context, env *Env, args Args) ([]string, error)
+
 // Op declares one agent operation.
 type Op struct {
 	// Name is the command path as typed on the CLI: lower-case words separated
@@ -52,6 +58,10 @@ type Op struct {
 	Local bool
 	// Handler runs the operation.
 	Handler Handler
+	// Plan describes what Handler would do (--dry-run, and the plan of a
+	// destructive operation awaiting confirmation). Required for every tier
+	// above TierRead.
+	Plan Planner
 }
 
 // Description returns the summary plus, for untrusted output, UntrustedNote —
@@ -146,6 +156,9 @@ func (r *Registry) Register(op Op) error {
 	if op.Summary == "" {
 		return fmt.Errorf("op %q: missing summary", op.Name)
 	}
+	if op.Tier > TierRead && op.Plan == nil {
+		return fmt.Errorf("op %q: a %s operation needs a planner for --dry-run", op.Name, op.Tier)
+	}
 	if err := op.Args.check(); err != nil {
 		return fmt.Errorf("op %q: %w", op.Name, err)
 	}
@@ -187,29 +200,101 @@ func (r *Registry) Allowed(ceiling Tier) []Op {
 	return out
 }
 
-// Invoke runs the operation name with raw args under the tier ceiling. Every
-// failure comes back as an *Error: CodeUsage for an unknown operation or bad
-// arguments, CodeForbidden when the operation's tier exceeds ceiling, and the
-// Classify result for a handler error.
-func (r *Registry) Invoke(ctx context.Context, env *Env, name string, args Args, ceiling Tier) (Result, error) {
+// Call holds how one invocation runs, beyond its arguments.
+type Call struct {
+	// Ceiling is the highest tier the write policy admits (TierRead when
+	// zero).
+	Ceiling Tier
+	// DryRun asks for the plan instead of running the operation. Planning
+	// changes nothing, so it is not limited by Ceiling.
+	DryRun bool
+	// Confirmed is the user's explicit consent to a destructive operation
+	// (the CLI's --yes; an MCP client confirming the tool call).
+	Confirmed bool
+}
+
+// PlanData is the output of a dry run and the plan carried by a
+// confirmation_required error: what the operation would do, step by step.
+type PlanData struct {
+	Operation string   `json:"operation"`
+	Tier      Tier     `json:"tier"`
+	Steps     []string `json:"steps"`
+	// Confirm reports that running the plan needs the user's explicit
+	// confirmation (--yes): the operation is destructive.
+	Confirm bool `json:"confirm"`
+}
+
+// ItemsKey implements Lister: the steps are the items.
+func (PlanData) ItemsKey() string { return "steps" }
+
+// Invoke runs the operation name with raw args as call says. Every failure
+// comes back as an *Error: CodeUsage for an unknown operation, bad arguments
+// or a dry run of a read operation; CodeForbidden when the operation's tier
+// exceeds call.Ceiling; CodeConfirmationRequired, carrying the plan, for a
+// destructive operation without call.Confirmed; and the Classify result for a
+// handler or planner error.
+func (r *Registry) Invoke(ctx context.Context, env *Env, name string, args Args, call Call) (Result, error) {
 	op, ok := r.ops[name]
 	if !ok {
 		return Result{}, Errorf(CodeUsage, "unknown operation %q", name).
 			WithHint("run `d9c help` to list the available operations")
 	}
-	if !ceiling.Allows(op.Tier) {
-		return Result{}, Errorf(CodeForbidden, "operation %q is %s, above the allowed tier %s", name, op.Tier, ceiling).
+	if call.DryRun {
+		if op.Plan == nil {
+			return Result{}, Errorf(CodeUsage, "--dry-run applies to commands that change state; %q only reads", name).
+				WithHint("run it without --dry-run")
+		}
+	} else if !call.Ceiling.Allows(op.Tier) {
+		return Result{}, Errorf(CodeForbidden, "operation %q is %s, above the allowed tier %s", name, op.Tier, call.Ceiling).
 			WithHint("ask the user to raise the agent tier ceiling for this host")
 	}
 	norm, err := op.Args.Normalize(args)
 	if err != nil {
 		return Result{}, err
 	}
+	if call.DryRun || (op.Tier == TierDestructive && !call.Confirmed) {
+		plan, err := planOf(ctx, op, env, norm)
+		if err != nil {
+			return Result{}, Classify(err)
+		}
+		if call.DryRun {
+			res := Result{Data: plan}
+			if len(plan.Steps) == 0 {
+				res.Hint = "nothing to do"
+			}
+			return res, nil
+		}
+		return Result{}, &Error{
+			Code:    CodeConfirmationRequired,
+			Message: fmt.Sprintf("operation %q is destructive and needs the user's confirmation", name),
+			Hint:    "show error.plan to the user and rerun with --yes only after they approve it",
+			Plan:    &plan,
+		}
+	}
 	res, err := callHandler(ctx, op, env, norm)
 	if err != nil {
 		return Result{}, Classify(err)
 	}
 	return res, nil
+}
+
+// planOf runs op's planner, turning a panic into an internal *Error like
+// callHandler does.
+func planOf(ctx context.Context, op Op, env *Env, args Args) (plan PlanData, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = Errorf(CodeInternal, "planning %q panicked: %v", op.Name, r).
+				WithHint("this is a d9c bug; please report it with the command that triggered it")
+		}
+	}()
+	steps, err := op.Plan(ctx, env, args)
+	if err != nil {
+		return PlanData{}, err
+	}
+	if steps == nil {
+		steps = []string{}
+	}
+	return PlanData{Operation: op.Name, Tier: op.Tier, Steps: steps, Confirm: op.Tier == TierDestructive}, nil
 }
 
 // callHandler runs op's handler, turning a panic into an internal *Error so a

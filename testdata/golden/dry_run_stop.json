@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "operation": "stop",
+    "tier": "safe",
+    "steps": [
+      "stop container web (9ae942fd8fbc)",
+      "stop container db (3f1ab77c9012) — not running",
+      "no such container: ghost — will be reported as failed"
+    ],
+    "confirm": false
+  },
+  "truncated": false
+}
