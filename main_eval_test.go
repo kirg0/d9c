@@ -52,8 +52,8 @@ var skillEvals = map[string][]evalStep{
 	"unhealthy-compose": {
 		{args: []string{"compose", "ps", "shop"}, want: []string{"shop-api-1", `"health":"unhealthy"`}, none: []string{`"name":"web"`}},
 		{args: []string{"compose", "backup", "shop"}, want: []string{`"project":"shop"`, ".tar.gz"}},
-		{args: []string{"compose", "pull", "shop"}, want: []string{`"action":"compose pull"`}},
-		{args: []string{"compose", "up", "shop"}, want: []string{`"action":"compose up"`}},
+		{args: []string{"compose", "pull", "shop"}, want: []string{`"action":"compose pull"`, "acme/shop-web:2.0"}, none: []string{"nginx"}},
+		{args: []string{"compose", "up", "shop"}, want: []string{`"action":"compose up"`, "shop-api-1"}, none: []string{"shop-web-1  Created"}},
 		{args: []string{"wait", "shop-api-1", "--until", "healthy", "--timeout", "0"}, exit: 9, want: []string{`"code":"timeout"`}},
 		{args: []string{"inspect", "shop-api-1"}, want: []string{"expected 42: run migrations", `"failingstreak":9`}},
 		{args: []string{"compose", "logs", "shop", "--since", "10m"}, want: []string{"shop-api-1 | ", "refusing to serve until migrations run"}},

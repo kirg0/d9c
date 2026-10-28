@@ -1,6 +1,8 @@
 package docker
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"io"
 	"os"
 	"path/filepath"
@@ -691,5 +693,47 @@ func TestFakeContainerStats_Jitter(t *testing.T) {
 	}
 	if len(seen) < 5 {
 		t.Errorf("jitter produced only %d distinct CPU values", len(seen))
+	}
+}
+
+// A scenario's compose backup is a real gzip-compressed tar of the project's
+// files, not a placeholder an agent would rightly distrust.
+func TestFakeScenarioBackupArchive(t *testing.T) {
+	t.Chdir(t.TempDir())
+	fb, err := NewFakeScenario("unhealthy-compose")
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, err := fb.BackupComposeProject(composeIdentity("shop", "/srv/shop"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = f.Close() }()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr := tar.NewReader(gz)
+	var names []string
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(tr)
+		if h.Name == "compose.yaml" && !strings.Contains(string(body), "acme/shop-api:2.0") {
+			t.Errorf("compose.yaml = %q", body)
+		}
+		names = append(names, h.Name)
+	}
+	if strings.Join(names, ",") != ".env,compose.yaml" {
+		t.Errorf("archive holds %v", names)
 	}
 }

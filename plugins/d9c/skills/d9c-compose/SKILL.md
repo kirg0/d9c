@@ -36,7 +36,7 @@ Show the user the plan before changing anything, and preview each step:
    `d9c wait <container> --until healthy --timeout 120` /
    `d9c_containers` `{action: "wait", container: "<container>", until: "healthy", timeout: 120}`;
    for the others `--until running`. Then `d9c compose ps <project>`: all containers running,
-   none restarting.
+   none restarting. A container that already reports `unhealthy` needs no wait — go to step 3.
 
 ## 3. When the rollout fails
 
