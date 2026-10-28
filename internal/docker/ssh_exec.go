@@ -59,7 +59,7 @@ func sshCapture(ctx context.Context, client *ssh.Client, cmd string, stdout, std
 	case <-ctx.Done():
 		_ = session.Signal(ssh.SIGKILL)
 		_ = session.Close()
-		<-done
+		<-done //nolint:errcheck // Wait returns once the session is closed; its error is moot
 		return -1, ctx.Err()
 	}
 	var ee *ssh.ExitError

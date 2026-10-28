@@ -103,7 +103,7 @@ func (b *dockerBackend) Exec(ctx context.Context, containerID string, cmd []stri
 		}
 	case <-ctx.Done():
 		att.Close()
-		<-done
+		<-done //nolint:errcheck // the reader stops once the connection is closed; its error is moot
 		return execResult(stdout, stderr, -1), ctx.Err()
 	}
 

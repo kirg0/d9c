@@ -6,6 +6,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.35.1] - 2026-10-28
+
+### Fixed
+
+- **CI lint:** the current `errcheck` flags discarding the result of an error channel; the two
+  places that wait for an aborted reader (`exec` over the API and over SSH) now say why the error
+  is ignored, so `make check` passes with the latest golangci-lint again.
+
 ## [1.35.0] - 2026-10-28
 
 ### Added
