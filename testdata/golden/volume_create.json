@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "name": "uploads",
+    "driver": "local",
+    "mountpoint": "/var/lib/docker/volumes/uploads/_data",
+    "created": "<time>"
+  },
+  "truncated": false
+}

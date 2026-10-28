@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "pruned": "images",
+    "deleted": 1
+  },
+  "truncated": false
+}

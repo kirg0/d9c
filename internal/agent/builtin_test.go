@@ -48,6 +48,11 @@ func TestBuiltinDeclarations(t *testing.T) {
 		{"compose restart", TierSafe, false, false},
 		{"compose backup", TierSafe, false, false},
 		{"compose restore", TierDestructive, false, false},
+		{"network create", TierSafe, false, false},
+		{"volume create", TierSafe, false, false},
+		{"image prune", TierDestructive, false, false},
+		{"volume prune", TierDestructive, false, false},
+		{"system prune", TierDestructive, false, false},
 	}
 	if got := len(r.Ops()); got != len(tests) {
 		t.Errorf("Builtin has %d ops, want %d", got, len(tests))

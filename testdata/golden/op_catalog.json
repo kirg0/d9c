@@ -231,6 +231,15 @@
     }
   },
   {
+    "name": "image prune",
+    "description": "Remove dangling (untagged) images no container uses.",
+    "tier": "destructive",
+    "args": {
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "images",
     "description": "List the images on the host.",
     "tier": "read",
@@ -355,6 +364,36 @@
     },
     "cli_short": {
       "tail": "n"
+    }
+  },
+  {
+    "name": "network create",
+    "description": "Create a user-defined network.",
+    "tier": "safe",
+    "args": {
+      "type": "object",
+      "properties": {
+        "driver": {
+          "type": "string",
+          "description": "Network driver; the engine default (bridge) when omitted."
+        },
+        "gateway": {
+          "type": "string",
+          "description": "Gateway address inside --subnet, e.g. 172.28.0.1; needs --subnet."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the new network."
+        },
+        "subnet": {
+          "type": "string",
+          "description": "IPAM subnet in CIDR form, e.g. 172.28.0.0/16."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
     }
   },
   {
@@ -539,6 +578,46 @@
     "name": "system df",
     "description": "Show the engine's disk usage by object type (images, containers, volumes, build cache).",
     "tier": "read",
+    "args": {
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "system prune",
+    "description": "Remove stopped containers, unused networks, dangling images and the build cache; volumes are kept (see `volume prune`).",
+    "tier": "destructive",
+    "args": {
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "volume create",
+    "description": "Create a named volume.",
+    "tier": "safe",
+    "args": {
+      "type": "object",
+      "properties": {
+        "driver": {
+          "type": "string",
+          "description": "Volume driver; the engine default (local) when omitted."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the new volume."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "volume prune",
+    "description": "Remove volumes no container uses; their data is lost. Docker Engine 23+ removes only anonymous volumes this way.",
+    "tier": "destructive",
     "args": {
       "type": "object",
       "additionalProperties": false

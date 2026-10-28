@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "forbidden",
+    "message": "operation \"system prune\" is destructive, above the allowed tier read",
+    "hint": "ask the user to raise the agent tier ceiling for this host"
+  }
+}

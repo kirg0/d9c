@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "summary": "prune: containers 1, networks 0, images 1, cache 3 — reclaimed 53.0 MB"
+  },
+  "truncated": false
+}

@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "usage",
+    "message": "network create: --gateway needs --subnet"
+  }
+}

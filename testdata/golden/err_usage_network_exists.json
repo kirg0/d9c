@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "usage",
+    "message": "network \"app-net\" already exists",
+    "hint": "pick another name; `d9c networks` lists the existing ones"
+  }
+}

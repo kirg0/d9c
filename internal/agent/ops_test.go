@@ -44,6 +44,7 @@ func TestOpsWithoutBackend(t *testing.T) {
 		"pull": {"image": "x"}, "compose up": {"project": "x"}, "compose down": {"project": "x"},
 		"compose pull": {"project": "x"}, "compose restart": {"project": "x"}, "compose backup": {"project": "x"},
 		"compose restore": {"project": "x", "file": "x"},
+		"network create":  {"name": "x"}, "volume create": {"name": "x"},
 	}
 	for _, op := range r.Ops() {
 		if op.Local {

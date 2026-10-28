@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "id": "fake00000004",
+    "name": "edge",
+    "driver": "bridge",
+    "scope": "local",
+    "subnet": "172.30.0.0/16"
+  },
+  "truncated": false
+}
