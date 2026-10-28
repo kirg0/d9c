@@ -4,6 +4,8 @@ import (
 	"context"
 	"io"
 	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/kirg0/d9c/internal/agent"
 	"github.com/kirg0/d9c/internal/cli"
@@ -49,6 +51,32 @@ func runCLI(cfg *config.Config, reg *agent.Registry, args []string, stdout, stde
 		return 0
 	}
 
+	// Every write command leaves a line in the audit log, refused ones
+	// included; without a log it does not run at all.
+	if inv.Op.Tier > agent.TierRead {
+		audit, err := agent.OpenAuditLog(auditPath(set))
+		if err != nil {
+			return cli.WriteError(stderr, err)
+		}
+		defer func() { _ = audit.Close() }()
+		call := agent.Call{DryRun: inv.DryRun, Confirmed: inv.Yes}
+		label, rt, res, err := execCLI(cfg, reg, inv, store, pol)
+		if label == "" {
+			label = cliTargetGuess(cfg)
+		}
+		// The command has run: a failed log write cannot undo it, and stderr
+		// carries only the command's own error.
+		_ = audit.Record(agent.NewAuditEntry(time.Now(), label, inv.Op, inv.Args, call, res, err))
+		return writeCLIOutcome(stdout, stderr, inv, label, rt, res, err)
+	}
+	label, rt, res, err := execCLI(cfg, reg, inv, store, pol)
+	return writeCLIOutcome(stdout, stderr, inv, label, rt, res, err)
+}
+
+// execCLI resolves the target, applies the write policy, connects and runs
+// inv. It returns the host label and runtime for the envelope (the label is
+// empty when the target could not be resolved).
+func execCLI(cfg *config.Config, reg *agent.Registry, inv cli.Invocation, store *hosts.Store, pol agent.Policy) (string, docker.Runtime, agent.Result, error) {
 	// An agent must never trust an SSH host key nobody has verified.
 	docker.SetStrictHostKeys(true)
 
@@ -59,8 +87,9 @@ func runCLI(cfg *config.Config, reg *agent.Registry, args []string, stdout, stde
 	case cfg.Demo:
 		label = "demo"
 	default:
+		var err error
 		if label, err = resolveCLITarget(cfg, store, os.Getenv, dockerctx.Dir()); err != nil {
-			return cli.WriteError(stderr, err)
+			return "", rt, agent.Result{}, err
 		}
 		pol.Host = policyHost(cfg, store)
 	}
@@ -71,12 +100,12 @@ func runCLI(cfg *config.Config, reg *agent.Registry, args []string, stdout, stde
 		err = pol.Check(inv.Op)
 	}
 	if err != nil {
-		return cli.WriteError(stderr, err)
+		return label, rt, agent.Result{}, err
 	}
 	if !inv.Op.Local {
 		b, err := connectCLI(cfg)
 		if err != nil {
-			return cli.WriteError(stderr, err)
+			return label, rt, agent.Result{}, err
 		}
 		defer b.Close()
 		env.Backend = b
@@ -84,11 +113,17 @@ func runCLI(cfg *config.Config, reg *agent.Registry, args []string, stdout, stde
 
 	res, err := reg.Invoke(context.Background(), env, inv.Op.Name, inv.Args,
 		agent.Call{Ceiling: ceiling, DryRun: inv.DryRun, Confirmed: inv.Yes})
-	if err != nil {
-		return cli.WriteError(stderr, err)
-	}
 	if env.Backend != nil {
 		rt = env.Backend.Runtime()
+	}
+	return label, rt, res, err
+}
+
+// writeCLIOutcome writes the result envelope or the error and returns the
+// exit status.
+func writeCLIOutcome(stdout, stderr io.Writer, inv cli.Invocation, label string, rt docker.Runtime, res agent.Result, err error) int {
+	if err != nil {
+		return cli.WriteError(stderr, err)
 	}
 	out := agent.NewEnvelope(label, rt, res)
 	if inv.Op.Local {
@@ -101,6 +136,26 @@ func runCLI(cfg *config.Config, reg *agent.Registry, args []string, stdout, stde
 		return agent.ExitPartial
 	}
 	return 0
+}
+
+// auditPath is where the CLI keeps the audit log: next to the config file,
+// so ~/.d9c/agent-audit.log by default.
+func auditPath(set *settings.Store) string {
+	return filepath.Join(filepath.Dir(set.Path()), agent.AuditFileName)
+}
+
+// cliTargetGuess names the host a command meant to address when resolving it
+// failed: the saved host or context asked for, else the -H URL.
+func cliTargetGuess(cfg *config.Config) string {
+	switch {
+	case cfg.Demo:
+		return "demo"
+	case cfg.SavedHost != "":
+		return cfg.SavedHost
+	case cfg.Context != "":
+		return cfg.Context
+	}
+	return cfg.Host
 }
 
 // cliPolicy assembles the agent write policy of a CLI command from the flags

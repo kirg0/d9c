@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -431,5 +432,76 @@ func TestApplySavedHost(t *testing.T) {
 	cfg = &config.Config{SavedHost: "plain", SSHPassword: "flag", SSHKeyFile: "/flag/key"}
 	if _, err := applySavedHost(cfg, store); err != nil || cfg.SSHPassword != "" || cfg.SSHKeyFile != "/flag/key" {
 		t.Errorf("key host: err=%v cfg=%+v", err, cfg)
+	}
+}
+
+// Write commands leave one audit line each, whatever their outcome; read
+// commands leave none; and a write command does not run without a log.
+func TestRunCLIAudit(t *testing.T) {
+	cfgPath := writeCLIConfig(t, "  - name: prod\n    host: tcp://127.0.0.1:1\n")
+	logPath := filepath.Join(filepath.Dir(cfgPath), agent.AuditFileName)
+	runs := []struct {
+		args       []string
+		wantExit   int
+		wantResult string
+		wantCode   agent.Code
+	}{
+		{[]string{"ps", "-demo"}, 0, "", ""},
+		{[]string{"stop", "web", "-demo"}, 5, agent.AuditError, agent.CodeForbidden},
+		{[]string{"stop", "web", "db", "-demo", "--allow-write"}, 0, agent.AuditOK, ""},
+		{[]string{"rm", "--filter", "status=exited", "-demo", "--dry-run"}, 0, agent.AuditPlanned, ""},
+		{[]string{"stop", "web", "--host", "prod", "--allow-write"}, 4, agent.AuditError, agent.CodeConnection},
+		{[]string{"stop", "web", "--host", "nope", "--allow-write"}, 3, agent.AuditError, agent.CodeNotFound},
+	}
+	var want []agent.AuditEntry
+	for _, r := range runs {
+		if code, _, errOut := cliRun(t, &config.Config{ConfigFile: cfgPath}, r.args...); code != r.wantExit {
+			t.Fatalf("%v: exit %d, want %d (%s)", r.args, code, r.wantExit, errOut)
+		}
+		if r.wantResult != "" {
+			want = append(want, agent.AuditEntry{Result: r.wantResult, Code: r.wantCode})
+		}
+	}
+	raw, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSuffix(string(raw), "\n"), "\n")
+	if len(lines) != len(want) {
+		t.Fatalf("audit log has %d lines, want %d:\n%s", len(lines), len(want), raw)
+	}
+	for i, line := range lines {
+		var e agent.AuditEntry
+		if err := json.Unmarshal([]byte(line), &e); err != nil {
+			t.Fatal(err)
+		}
+		if e.Result != want[i].Result || e.Code != want[i].Code || e.Time.IsZero() || e.Op == "" {
+			t.Errorf("line %d = %s, want result %s code %q", i, line, want[i].Result, want[i].Code)
+		}
+	}
+	var stop agent.AuditEntry
+	_ = json.Unmarshal([]byte(lines[1]), &stop)
+	if stop.Host != "demo" || !reflect.DeepEqual(stop.Targets, []string{"web (9ae942fd8fbc)", "db (3f1ab77c9012)"}) {
+		t.Errorf("stop entry = %+v", stop)
+	}
+	var unreachable agent.AuditEntry
+	_ = json.Unmarshal([]byte(lines[3]), &unreachable)
+	var missing agent.AuditEntry
+	_ = json.Unmarshal([]byte(lines[4]), &missing)
+	if unreachable.Host != "prod" || missing.Host != "nope" {
+		t.Errorf("hosts = %q, %q, want prod, nope", unreachable.Host, missing.Host)
+	}
+
+	// No log, no write: the command fails before dialing the host.
+	blockedCfg := writeCLIConfig(t, "")
+	if err := os.Mkdir(filepath.Join(filepath.Dir(blockedCfg), agent.AuditFileName), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	code, _, errOut := cliRun(t, &config.Config{ConfigFile: blockedCfg}, "stop", "web", "-H", "tcp://127.0.0.1:1", "--allow-write")
+	if code != 1 || !strings.Contains(errOut, "audit log") {
+		t.Errorf("blocked log: exit %d, stderr %q", code, errOut)
+	}
+	if code, _, _ := cliRun(t, &config.Config{ConfigFile: blockedCfg}, "ps", "-demo"); code != 0 {
+		t.Errorf("read command with a blocked log: exit %d", code)
 	}
 }
