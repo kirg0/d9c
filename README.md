@@ -1061,6 +1061,13 @@ hosts:
 The policy guards against accidents, not against a determined user of the machine: whoever can
 edit the config can change it.
 
+**Audit log.** Every write command — run, refused, dry-run or failed — appends one JSON line to
+`agent-audit.log` next to the config file (`~/.d9c/agent-audit.log` by default): `time`, `host`,
+`op`, `tier`, `targets` (the resolved containers of a lifecycle command, else the project, image
+or name given), `args`, `dry_run`, `yes`, `result` (`ok`, `partial`, `planned` or `error`) and,
+for a failure, `code` and `error`. Read commands are not logged. When the log cannot be opened, a
+write command fails before it connects: writes always leave a trail.
+
 **Output.** By default stdout gets one JSON envelope
 `{"schema":1,"host","runtime","data","truncated","hint"}`. `-o text` prints a compact table,
 `-o ndjson` one list item per line. `--fields name,state` keeps only those fields, `--limit N`

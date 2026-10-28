@@ -35,6 +35,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   command (targets resolved, their state noted) without changing anything, and is not blocked by
   the write policy. A destructive command without `-y`/`--yes` changes nothing and fails with
   `confirmation_required` (exit `7`), carrying the plan in `error.plan` for the user to approve.
+- **Audit log of write commands:** each write command, whatever its outcome (done, partial,
+  planned, refused, failed), appends a JSON line to `agent-audit.log` next to the config file
+  (`~/.d9c/agent-audit.log` by default) with the time, host, operation, targets, arguments and
+  result. A write command that cannot open the log fails before connecting.
 
 ### Fixed
 
