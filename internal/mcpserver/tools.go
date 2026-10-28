@@ -271,7 +271,8 @@ func describe(t *tool) string {
 	case agent.TierSafe:
 		b.WriteString("\nChanges state (recoverable); dry_run returns the plan without changing anything.")
 	case agent.TierDestructive:
-		b.WriteString("\nDestructive: confirm with the user before calling; dry_run returns the plan without changing anything.")
+		b.WriteString("\nDestructive: call with dry_run first, show the user the plan and make the real call only after " +
+			"their explicit yes to it, even when the request already asked for this change; dry_run changes nothing.")
 	}
 	if untrusted {
 		b.WriteString("\n" + agent.UntrustedNote)

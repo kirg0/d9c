@@ -35,7 +35,8 @@ Choose the least destructive prune that frees enough:
 - Show the user the plan (the dry-run steps plus the expected space from `system df`) and wait for
   an explicit yes.
 - CLI: `d9c system prune --yes` (without `--yes` it stops with `confirmation_required` and the plan).
-  MCP: call `d9c_prune` with the approved action.
+  MCP: call `d9c_prune` with the approved action — only after the explicit yes, even if the client
+  would confirm the call itself; "free up space" is not a yes to a particular prune.
 - A `forbidden` error means the policy does not allow it: tell the user which setting the hint
   names; do not look for another way to delete data.
 

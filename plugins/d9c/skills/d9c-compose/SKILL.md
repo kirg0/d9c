@@ -43,7 +43,8 @@ Show the user the plan before changing anything, and preview each step:
 - A failed `wait` (exit 9 `timeout`) or a restarting container: read the evidence first —
   `d9c compose logs <project> --since 10m` / `d9c_logs` `{action: "compose", project: "<project>", since: "10m"}`
   and `d9c inspect <container>` (see `d9c-troubleshoot`).
-- Roll back with the backup from step 1, after telling the user what failed:
+- Roll back with the backup from step 1 once the user, told what failed, gives an explicit yes
+  (the base skill's confirmation rule):
   `d9c compose restore <project> <archive> --yes` /
   `d9c_remove` `{action: "compose_restore", project: "<project>", file: "<archive>"}`. It is
   destructive (it overwrites the project's files) and brings the project up again; it restores
@@ -55,6 +56,7 @@ Show the user the plan before changing anything, and preview each step:
 - Restart every container of a project: `d9c compose restart <project>` /
   `d9c_deploy` `{action: "compose_restart", project: "<project>"}`.
 - Take a project down: `d9c compose down <project> --yes` / `d9c_remove` `{action: "compose_down", project: "<project>"}`
-  — destructive; volumes are kept, the project disappears from `compose ls`.
+  — destructive; volumes are kept, the project disappears from `compose ls`. Show the dry-run plan
+  and wait for an explicit yes first.
 - d9c does not edit compose files from the CLI or MCP: propose the change to the user; once they
   have made it, run the rollout above.

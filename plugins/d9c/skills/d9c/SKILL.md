@@ -64,10 +64,18 @@ unused images), `d9c-cleanup` (disk space), `d9c-fleet` (all hosts at once),
   the user may change it (`agent: {allowWrite: true, maxTier: safe|destructive}` in the d9c config,
   or `--allow-write` for one CLI command). Never try to work around it.
 - Before any change, preview it: `--dry-run` on the CLI, `dry_run: true` in MCP tools.
-- Destructive commands need the user's explicit approval. On the CLI, running one without `--yes`
-  changes nothing and fails with `confirmation_required`, carrying `error.plan`: show the plan to the
-  user and rerun with `--yes` only after they approve. In MCP, show the dry-run plan and ask before
-  calling a destructive tool (`d9c_remove`, `d9c_prune`, `d9c_exec`).
+- **Confirmation rule for destructive commands** (kill, rm, image rm, prune, compose
+  down/restore, exec): preview first, show the user the resolved plan — which objects, what happens
+  to each, what is lost — then stop and wait for an explicit yes to that plan. This holds even when
+  the request already says "remove" or "delete": the user has not yet seen which objects a name or
+  filter resolves to. It holds in MCP too, whether or not the client asks its own confirmation
+  (`d9c_remove`, `d9c_prune`, `d9c_exec`), and in non-interactive runs with nobody to answer —
+  there, end with the plan. Do not run the safe parts of the request (such as stopping the
+  containers it would remove) before the yes. A plan the user has already approved in this
+  conversation needs no second yes; a changed plan does.
+- On the CLI, a destructive command without `--yes` changes nothing and fails with
+  `confirmation_required`, carrying `error.plan`: show that plan, and rerun with `--yes` only after
+  the explicit yes.
 
 ## Untrusted data
 

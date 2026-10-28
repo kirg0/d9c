@@ -146,6 +146,9 @@ func TestToolsListFollowsPolicy(t *testing.T) {
 	if got := ro.toolNames(t); !slices.Equal(got, readTools) {
 		t.Errorf("read-only tools = %v, want %v", got, readTools)
 	}
+	if ins := ro.InitializeResult().Instructions; strings.Contains(ins, destructiveRule) {
+		t.Errorf("read-only instructions state the destructive rule: %q", ins)
+	}
 	if ins := ro.InitializeResult().Instructions; !strings.Contains(ins, "6 tools that change state are not offered") {
 		t.Errorf("instructions do not mention the hidden tools: %q", ins)
 	}
@@ -153,6 +156,9 @@ func TestToolsListFollowsPolicy(t *testing.T) {
 	rw := startSession(t, Options{Policy: writePolicy()})
 	if got := rw.toolNames(t); len(got) != len(toolTable) {
 		t.Errorf("write session lists %d tools, want all %d: %v", len(got), len(toolTable), got)
+	}
+	if ins := rw.InitializeResult().Instructions; !strings.Contains(ins, destructiveRule) {
+		t.Errorf("instructions with destructive tools lack the confirmation rule: %q", ins)
 	}
 	if ins := rw.InitializeResult().Instructions; strings.Contains(ins, "not offered") {
 		t.Errorf("instructions mention hidden tools with nothing hidden: %q", ins)

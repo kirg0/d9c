@@ -146,6 +146,20 @@ func TestSkillsFollowAgentSkillsFormat(t *testing.T) {
 	}
 }
 
+// destructiveRE finds a destructive MCP tool or CLI command in a skill.
+var destructiveRE = regexp.MustCompile("`d9c_(?:remove|prune|exec)`|`d9c (?:rm|kill|image rm|image prune|volume prune|system prune|compose down|compose restore|exec) ")
+
+// A skill that names a destructive command states the confirmation rule: the
+// plan, then the user's explicit yes (an agent was seen removing containers
+// right after a dry run when only the client's confirmation stood guard).
+func TestSkillsStateTheConfirmationRule(t *testing.T) {
+	for name, body := range skillBodies(t) {
+		if destructiveRE.MatchString(body) && !strings.Contains(body, "explicit yes") {
+			t.Errorf("%s names a destructive command but not the \"explicit yes\" rule", name)
+		}
+	}
+}
+
 // Every scenario skill works in both channels: it names CLI commands and MCP
 // tools.
 func TestSkillsCoverBothChannels(t *testing.T) {

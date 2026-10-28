@@ -6,6 +6,20 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.35.3] - 2026-10-28
+
+### Fixed
+
+- **Destructive commands always wait for the user's yes:** the skills disagreed — the base skill
+  asked for approval, `d9c-lifecycle` left it to the MCP client — and with the client's prompt
+  switched off (auto mode, an allowed tool) an agent removed containers right after the dry run.
+  Now every skill with a destructive command states one rule: show the resolved plan and wait for
+  an explicit yes, even when the request already says "remove", without stopping things first as a
+  head start. `d9c mcp` says the same in the destructive tools' descriptions and, when they are
+  offered, in its instructions, so clients without the skills get it too. A test checks the rule in
+  every such skill; a new eval case (`remove-staging-asks-first`) passed 3 of 3 runs.
+- **Skill evals:** the compose order grader ignores dry-run calls.
+
 ## [1.35.2] - 2026-10-28
 
 ### Fixed

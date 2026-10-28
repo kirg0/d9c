@@ -39,9 +39,12 @@ state: **safe** for start/stop/restart, **destructive** for kill and rm.
 | Remove stopped containers | `d9c rm --filter status=exited --yes` | `d9c_remove` `{action: "rm", filter: ["status=exited"]}` |
 | Remove a running container | `d9c rm web -f --yes` | `d9c_remove` `{action: "rm", targets: ["web"], force: true}` |
 
-- Destructive commands (kill, rm) without `--yes` stop with `confirmation_required` and the plan:
-  ask the user, then rerun with `--yes`. In MCP the client confirms the call — still say what will
-  be removed before calling.
+- Destructive commands (kill, rm) follow the confirmation rule of the base `d9c` skill: run the
+  dry run, show the resolved targets and what each loses, and wait for an explicit yes — even when
+  the user asked to "remove" them, and even when the MCP client would confirm the call itself.
+  Without `--yes` the CLI stops with `confirmation_required` and the plan; rerun with `--yes`
+  after the yes. Do not stop the containers first as a head start: that is part of the plan the
+  user has not approved yet.
 - `rm` deletes the container and its writable layer; named volumes stay. Mention data that lives
   only in the container.
 - Prefer `stop` over `kill`: stop sends SIGTERM and waits 10 s before SIGKILL.
