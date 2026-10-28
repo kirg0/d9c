@@ -1,0 +1,19 @@
+{
+  "name": "d9c",
+  "description": "Agent skills and the MCP server for d9c, the terminal UI and CLI for Docker, Podman, nerdctl and CRI-O hosts.",
+  "owner": {
+    "name": "kirg0",
+    "url": "https://github.com/kirg0"
+  },
+  "plugins": [
+    {
+      "name": "d9c",
+      "source": "./plugins/d9c",
+      "description": "Manage containers on saved Docker, Podman, nerdctl and CRI-O hosts: troubleshooting, logs, lifecycle, compose deploys, images, cleanup, fleet reports, security audits, networks and volumes.",
+      "category": "devops",
+      "homepage": "https://github.com/kirg0/d9c",
+      "license": "MIT",
+      "keywords": ["docker", "podman", "containers", "compose", "devops", "mcp"]
+    }
+  ]
+}

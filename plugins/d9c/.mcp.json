@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "d9c": {
+      "command": "d9c",
+      "args": ["mcp", "--host=${user_config.host}"]
+    }
+  }
+}
