@@ -2,7 +2,10 @@
   "mcpServers": {
     "d9c": {
       "command": "d9c",
-      "args": ["mcp", "--host=${user_config.host}"]
+      "args": ["mcp", "--host=${user_config.host}"],
+      "env": {
+        "D9C_DEMO_SCENARIO": "${EVAL_D9C_SCENARIO:-}"
+      }
     }
   }
 }

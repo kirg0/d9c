@@ -118,7 +118,11 @@ func runOnHost(cfg *config.Config, reg *agent.Registry, inv cli.Invocation, stor
 		if _, err := applySavedHost(&c, store); err != nil {
 			return fail(err)
 		}
-		b = docker.NewFakeBackend()
+		fb, err := newDemoBackend(&c)
+		if err != nil {
+			return fail(err)
+		}
+		b = fb
 	} else {
 		if _, err := resolveCLITarget(&c, store, os.Getenv, ""); err != nil {
 			return fail(err)

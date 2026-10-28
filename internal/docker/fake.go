@@ -13,6 +13,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/docker/docker/api/types"
+	dockernetwork "github.com/docker/docker/api/types/network"
+	"gopkg.in/yaml.v3"
+
 	"github.com/kirg0/d9c/internal/i18n"
 )
 
@@ -50,6 +54,27 @@ type FakeBackend struct {
 	StatsJitter bool
 	statsCalls  int
 	statsMu     sync.Mutex
+
+	// The fields below let a scenario (see NewFakeScenario) replace the canned
+	// demo answers; nil/empty keeps them.
+
+	// Details is the engine description of a container by ID, served by
+	// InspectContainer in the real Docker backend's YAML layout.
+	Details map[string]types.ContainerJSON
+	// LogsByContainer is a container's own log stream by ID (LogLines otherwise).
+	LogsByContainer map[string][]string
+	// EventLines replaces the demo event stream.
+	EventLines []string
+	// DFReport replaces the system df table.
+	DFReport string
+	// Stats replaces the resource samples by container ID.
+	Stats map[string]ContainerStats
+	// NetworkDetails is the engine description of a network by ID.
+	NetworkDetails map[string]dockernetwork.Inspect
+	// ComposeConfigs is the resolved compose file by project name.
+	ComposeConfigs map[string]string
+	// HostInfo replaces the CPU/memory figures Info reports.
+	HostInfo *HostSummary
 }
 
 // NewFakeBackend returns a FakeBackend pre-populated with representative data.
@@ -113,7 +138,17 @@ func (f *FakeBackend) ListContainers(showAll bool) ([]Container, error) {
 // InspectContainer accepts an ID or a name, like the daemon.
 func (f *FakeBackend) InspectContainer(id string) (*InspectResult, error) {
 	for _, c := range f.Containers {
-		if c.ID == id || c.Name == id {
+		if c.ID != id && c.Name != id {
+			continue
+		}
+		if d, ok := f.Details[c.ID]; ok {
+			y, err := yaml.Marshal(d)
+			if err != nil {
+				return nil, err
+			}
+			return &InspectResult{Name: c.Name, RawYAML: string(y)}, nil
+		}
+		{
 			return &InspectResult{Name: c.Name, RawYAML: fmt.Sprintf("Id: %s\nName: %s\nImage: %s\nState: %s\nStatus: %s\n"+
 				"Config:\n  Env:\n    - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin\n    - API_TOKEN=demo-token-%s\n",
 				c.ID, c.Name, c.Image, c.State, c.Status, c.ID)}, nil
@@ -167,9 +202,12 @@ func (f *FakeBackend) KillContainer(id, signal string) error {
 func (f *FakeBackend) ContainerStats(ids []string) (map[string]ContainerStats, error) {
 	// Deterministic sample figures keyed by container ID so the demo and tests
 	// show stable, recognisable values.
-	samples := map[string]ContainerStats{
-		"9ae942fd8fbc": {ID: "9ae942fd8fbc", CPUPerc: 2.5, MemUsage: 48 * 1024 * 1024, MemLimit: 512 * 1024 * 1024, MemPerc: 9.4, NetRx: 1024 * 1024, NetTx: 512 * 1024, BlockRead: 8 * 1024 * 1024, BlockWrite: 2 * 1024 * 1024},
-		"d2c94e258dcb": {ID: "d2c94e258dcb", CPUPerc: 0.1, MemUsage: 6 * 1024 * 1024, MemLimit: 512 * 1024 * 1024, MemPerc: 1.2, NetRx: 2048, NetTx: 1024, BlockRead: 512 * 1024, BlockWrite: 0},
+	samples := f.Stats
+	if samples == nil {
+		samples = map[string]ContainerStats{
+			"9ae942fd8fbc": {ID: "9ae942fd8fbc", CPUPerc: 2.5, MemUsage: 48 * 1024 * 1024, MemLimit: 512 * 1024 * 1024, MemPerc: 9.4, NetRx: 1024 * 1024, NetTx: 512 * 1024, BlockRead: 8 * 1024 * 1024, BlockWrite: 2 * 1024 * 1024},
+			"d2c94e258dcb": {ID: "d2c94e258dcb", CPUPerc: 0.1, MemUsage: 6 * 1024 * 1024, MemLimit: 512 * 1024 * 1024, MemPerc: 1.2, NetRx: 2048, NetTx: 1024, BlockRead: 512 * 1024, BlockWrite: 0},
+		}
 	}
 	var tick int
 	if f.StatsJitter {
@@ -441,16 +479,35 @@ func (f *FakeBackend) CopyToContainer(containerID, localPath, destDir string) er
 }
 
 func (f *FakeBackend) ContainerLogs(id string, opts LogOptions) (<-chan string, func(), error) {
-	if _, err := f.InspectContainer(id); err != nil {
-		return nil, nil, err // same "no such container" as the daemon
+	c, ok := f.findContainer(id)
+	if !ok {
+		return nil, nil, fmt.Errorf("no such container: %s", id) // as the daemon says
 	}
-	lines := tailLines(f.LogLines, opts.Tail)
+	lines := tailLines(f.logsOf(c.ID), opts.Tail)
 	ch := make(chan string, len(lines))
 	for _, l := range lines {
 		ch <- l
 	}
 	close(ch)
 	return ch, func() {}, nil
+}
+
+// findContainer finds a demo container by ID or name.
+func (f *FakeBackend) findContainer(ref string) (Container, bool) {
+	for _, c := range f.Containers {
+		if c.ID == ref || c.Name == ref {
+			return c, true
+		}
+	}
+	return Container{}, false
+}
+
+// logsOf returns the log lines of the container with the given ID.
+func (f *FakeBackend) logsOf(id string) []string {
+	if l, ok := f.LogsByContainer[id]; ok {
+		return l
+	}
+	return f.LogLines
 }
 
 // tailLines returns the last n lines (all of them for n <= 0), as the
@@ -583,7 +640,17 @@ func (f *FakeBackend) ListNetworks() ([]Network, error) { return f.Networks, nil
 
 func (f *FakeBackend) InspectNetwork(id string) (*InspectResult, error) {
 	for _, n := range f.Networks {
-		if n.ID == id {
+		if n.ID != id && n.Name != id {
+			continue
+		}
+		if d, ok := f.NetworkDetails[n.ID]; ok {
+			y, err := yaml.Marshal(d)
+			if err != nil {
+				return nil, err
+			}
+			return &InspectResult{Name: n.Name, RawYAML: string(y)}, nil
+		}
+		{
 			return &InspectResult{Name: n.Name, RawYAML: fmt.Sprintf("Id: %s\nName: %s\nDriver: %s\nScope: %s\n", n.ID, n.Name, n.Driver, n.Scope)}, nil
 		}
 	}
@@ -686,14 +753,33 @@ func (f *FakeBackend) PruneVolumes() (int, error) {
 
 func (f *FakeBackend) ListComposeProjects() ([]ComposeProject, error) { return f.Composes, nil }
 
-// ListComposeContainers returns the demo containers as the project's containers.
+// ListComposeContainers returns the containers labelled with the project's
+// name, or every demo container when none carries a compose label.
 func (f *FakeBackend) ListComposeContainers(project string) ([]Container, error) {
 	for _, c := range f.Composes {
 		if composeIdentity(c.Project, c.WorkingDir) == project {
-			return f.Containers, nil
+			return f.projectContainers(c.Project), nil
 		}
 	}
 	return nil, fmt.Errorf("no such compose project: %s", project)
+}
+
+// projectContainers selects the containers of compose project name.
+func (f *FakeBackend) projectContainers(name string) []Container {
+	var out []Container
+	labelled := false
+	for _, c := range f.Containers {
+		if p, ok := c.Labels[composeProjectLabel]; ok {
+			labelled = true
+			if p == name {
+				out = append(out, c)
+			}
+		}
+	}
+	if !labelled {
+		return f.Containers
+	}
+	return out
 }
 
 func (f *FakeBackend) InspectComposeProject(project string) (*InspectResult, error) {
@@ -701,7 +787,7 @@ func (f *FakeBackend) InspectComposeProject(project string) (*InspectResult, err
 		if composeIdentity(p.Project, p.WorkingDir) == project {
 			var b strings.Builder
 			fmt.Fprintf(&b, "project: %s\nworking_dir: %s\nstatus: %s\nservices:\n", p.Name, p.WorkingDir, p.Status)
-			for _, c := range f.Containers {
+			for _, c := range f.projectContainers(p.Project) {
 				fmt.Fprintf(&b, "  - name: %s\n    image: %s\n    state: %s\n    ports: %s\n", c.Name, c.Image, c.State, c.Ports)
 			}
 			return &InspectResult{Name: project, RawYAML: b.String()}, nil
@@ -713,10 +799,21 @@ func (f *FakeBackend) InspectComposeProject(project string) (*InspectResult, err
 func (f *FakeBackend) ComposeLogs(project string, opts LogOptions) (<-chan string, func(), error) {
 	for _, p := range f.Composes {
 		if composeIdentity(p.Project, p.WorkingDir) == project {
-			lines := tailLines(f.LogLines, opts.Tail)
-			ch := make(chan string, len(lines))
-			for _, l := range lines {
-				ch <- "web | " + l
+			var out []string
+			if f.LogsByContainer == nil {
+				for _, l := range tailLines(f.LogLines, opts.Tail) {
+					out = append(out, "web | "+l)
+				}
+			} else {
+				for _, c := range f.projectContainers(p.Project) {
+					for _, l := range tailLines(f.logsOf(c.ID), opts.Tail) {
+						out = append(out, c.Name+" | "+l)
+					}
+				}
+			}
+			ch := make(chan string, len(out))
+			for _, l := range out {
+				ch <- l
 			}
 			close(ch)
 			return ch, func() {}, nil
@@ -820,6 +917,9 @@ func (f *FakeBackend) ComposeDown(project string) (<-chan string, func(), error)
 func (f *FakeBackend) ComposeConfig(project string) (string, error) {
 	for _, p := range f.Composes {
 		if composeIdentity(p.Project, p.WorkingDir) == project {
+			if cfg, ok := f.ComposeConfigs[p.Project]; ok {
+				return cfg, nil
+			}
 			return fmt.Sprintf("name: %s\nservices:\n  web:\n    image: nginx:1.25\n    environment:\n      DB_PASSWORD: demo-secret\n      TZ: UTC\n    ports:\n      - 8080:80\n", project), nil
 		}
 	}
@@ -942,6 +1042,9 @@ func (f *FakeBackend) composeTotal(project string) int {
 
 // SystemDF returns a canned disk-usage report derived from the demo data.
 func (f *FakeBackend) SystemDF() (*InspectResult, error) {
+	if f.DFReport != "" {
+		return &InspectResult{Name: "system df", RawYAML: f.DFReport}, nil
+	}
 	running := 0
 	for _, c := range f.Containers {
 		if c.State == "running" {
@@ -1001,6 +1104,10 @@ func (f *FakeBackend) Info() (HostSummary, error) {
 			stopped++
 		}
 	}
+	ncpu, mem := 4, int64(8*1024*1024*1024)
+	if f.HostInfo != nil {
+		ncpu, mem = f.HostInfo.NCPU, f.HostInfo.MemTotal
+	}
 	return HostSummary{
 		Reachable:  true,
 		Containers: len(f.Containers),
@@ -1010,8 +1117,8 @@ func (f *FakeBackend) Info() (HostSummary, error) {
 		Images:     len(f.Images),
 		Version:    "27.4.0",
 		Name:       "demo",
-		NCPU:       4,
-		MemTotal:   8 * 1024 * 1024 * 1024,
+		NCPU:       ncpu,
+		MemTotal:   mem,
 	}, nil
 }
 
@@ -1022,12 +1129,15 @@ func (f *FakeBackend) Close() {}
 // stream stays open (mimicking a subscription) until stop closes it; a windowed
 // one is closed once the lines are delivered, like the daemon's.
 func (f *FakeBackend) Events(opts EventOptions) (<-chan string, func(), error) {
-	lines := []string{
-		"container create 9ae942fd8fbc (local)",
-		"container start 9ae942fd8fbc (local)",
-		"container die d2c94e258dcb (local)",
-		"container health_status: healthy 9ae942fd8fbc (local)",
-		"container oom 3f1ab77c9012 (local)",
+	lines := f.EventLines
+	if lines == nil {
+		lines = []string{
+			"container create 9ae942fd8fbc (local)",
+			"container start 9ae942fd8fbc (local)",
+			"container die d2c94e258dcb (local)",
+			"container health_status: healthy 9ae942fd8fbc (local)",
+			"container oom 3f1ab77c9012 (local)",
+		}
 	}
 	ch := make(chan string, len(lines))
 	for _, l := range lines {

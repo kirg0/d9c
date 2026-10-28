@@ -24,6 +24,17 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   `.claude/skills`), stamped with the binary version in `metadata.d9c-version`; `--dry-run` reports
   created/updated/unchanged without writing, other skills in the directory are left alone.
   `d9c skills ls` lists the skills and targets.
+- **Demo scenarios (`-demo-scenario <name>`, `D9C_DEMO_SCENARIO`):** demo data with one planted
+  problem per skill — `oom`, `restart-loop`, `staging`, `unhealthy-compose`, `stale-images`,
+  `disk-full`, `fleet`, `insecure`, `isolated-network` (plus `default`) — in the TUI, the CLI and
+  `d9c mcp`. Container and network `inspect` there has the real Docker layout. A scenario that
+  exercises writes admits them up to its own tier, on the fake only; `-read-only` still wins.
+  `d9c skills ls` lists them.
+- **Skill evals:** a `claude plugin eval` suite in `plugins/d9c/evals` (a case per skill plus a
+  trigger-discipline case) runs the agent against the plugin's real MCP server on those scenarios
+  (`EVAL_D9C_SCENARIO`), grading the diagnosis and the tool calls — including that destructive
+  steps are only planned, never run without the user's approval. `go test` replays each skill's
+  commands on its scenario and validates the suite for free.
 - **Image commands for agents:** `image history <image>` (read), `image tag <source> <target>`,
   `image push <image>`, `image build <dir> [-t tag]` (safe) and `image rm <image> [-f]` (destructive),
   in the CLI and the MCP tools (`d9c_resources` image_history, `d9c_deploy` image_build/image_tag/

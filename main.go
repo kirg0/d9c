@@ -127,7 +127,10 @@ func run() error {
 	var startInHosts bool
 	switch {
 	case cfg.Demo:
-		fb := docker.NewFakeBackend()
+		fb, err := newDemoBackend(cfg)
+		if err != nil {
+			return err
+		}
 		fb.StatsJitter = true // live-looking CPU/MEM graphs in the stats view
 		backend = fb
 
