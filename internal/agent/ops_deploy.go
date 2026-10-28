@@ -45,6 +45,7 @@ func pullOp() Op {
 			if ref == "" {
 				return Result{}, Errorf(CodeUsage, "pull: empty image reference")
 			}
+			env.report("pulling " + ref)
 			if err := env.Backend.PullImage(ref); err != nil {
 				return Result{}, err
 			}
@@ -79,10 +80,11 @@ type progress struct {
 	context []string // the output lines just before the failure
 }
 
-// collectProgress reads a progress stream to its end. Unlike drain it never
-// stops early on the cap: stopping would abort the operation half-way. A
-// cancelled ctx does abort it, through stop.
-func collectProgress(ctx context.Context, ch <-chan string, stop func()) (progress, error) {
+// collectProgress reads a progress stream to its end, passing every line to
+// report as it arrives. Unlike drain it never stops early on the cap:
+// stopping would abort the operation half-way. A cancelled ctx does abort
+// it, through stop.
+func collectProgress(ctx context.Context, ch <-chan string, stop func(), report func(string)) (progress, error) {
 	defer stop()
 	p := progress{lines: []string{}}
 	for {
@@ -97,6 +99,7 @@ func collectProgress(ctx context.Context, ch <-chan string, stop func()) (progre
 			if l == "" {
 				continue
 			}
+			report(l)
 			if msg, failed := strings.CutPrefix(l, progressErrorPrefix); failed && p.failure == "" {
 				p.failure = msg
 				p.context = lastLines(p.lines, failureContextLines)
@@ -171,7 +174,7 @@ func composeStreamOp(name, summary string, tier Tier, extra map[string]*Schema, 
 			if err != nil {
 				return Result{}, err
 			}
-			prog, err := collectProgress(ctx, ch, stop)
+			prog, err := collectProgress(ctx, ch, stop, env.report)
 			if err != nil {
 				return Result{}, err
 			}
@@ -352,6 +355,7 @@ func composeBackupOp() Op {
 			if err != nil {
 				return Result{}, err
 			}
+			env.report("archiving " + projectLabel(p))
 			path, err := env.Backend.BackupComposeProject(p.Identity())
 			if err != nil {
 				return Result{}, err

@@ -28,6 +28,17 @@ type Env struct {
 	// Policy is the write policy of the invocation without a target host;
 	// `hosts ls` resolves it per saved host to report each host's ceiling.
 	Policy Policy
+	// Progress, when set, receives a line per step of a long operation while
+	// it runs (compose output, wait polls); the MCP server forwards them as
+	// progress notifications. Nil drops them.
+	Progress func(msg string)
+}
+
+// report passes msg to Progress, if any.
+func (e *Env) report(msg string) {
+	if e != nil && e.Progress != nil {
+		e.Progress(msg)
+	}
 }
 
 // Handler executes an operation with already-normalized arguments.

@@ -49,7 +49,7 @@ func TestCollectProgress(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			stops := 0
 			ch, stop := cannedStream(tt.in, &stops)
-			p, err := collectProgress(context.Background(), ch, stop)
+			p, err := collectProgress(context.Background(), ch, stop, func(string) {})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -70,7 +70,7 @@ func TestCollectProgressCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	stopped := false
-	_, err := collectProgress(ctx, make(chan string), func() { stopped = true })
+	_, err := collectProgress(ctx, make(chan string), func() { stopped = true }, func(string) {})
 	if !errors.Is(err, context.Canceled) || !stopped {
 		t.Errorf("err = %v, stopped = %v", err, stopped)
 	}

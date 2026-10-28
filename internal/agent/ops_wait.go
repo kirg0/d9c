@@ -79,6 +79,7 @@ func waitOp() Op {
 				if left <= 0 {
 					return Result{}, waitTimeout(c, until, seconds)
 				}
+				env.report(fmt.Sprintf("%s is %s, waiting for %s", c.Name, waitState(c), until))
 				select {
 				case <-ctx.Done():
 					return Result{}, ctx.Err()
@@ -127,13 +128,17 @@ func waitReached(c docker.Container, until string) (bool, error) {
 	}
 }
 
+// waitState phrases c's state and health: "running, health starting".
+func waitState(c docker.Container) string {
+	if c.Health != "" {
+		return c.State + ", health " + c.Health
+	}
+	return c.State
+}
+
 // waitTimeout is the error of a wait that ran out of time, with the state the
 // container was last seen in.
 func waitTimeout(c docker.Container, until string, seconds int) *Error {
-	now := c.State
-	if c.Health != "" {
-		now += ", health " + c.Health
-	}
-	return Errorf(CodeTimeout, "container %s did not become %s within %ds (now %s)", c.Name, until, seconds, now).
+	return Errorf(CodeTimeout, "container %s did not become %s within %ds (now %s)", c.Name, until, seconds, waitState(c)).
 		WithHint(fmt.Sprintf("raise --timeout, or look for the cause with `d9c logs %s` and `d9c inspect %s`", c.Name, c.Name))
 }
