@@ -6,7 +6,8 @@ description: Free disk space on a container host with d9c — measure usage, pla
 # Clean up disk space with d9c
 
 Follow the base `d9c` skill. Pruning is **destructive**: it needs the write policy to allow
-destructive commands and the user's explicit approval of the plan.
+destructive commands and the user's explicit approval of the plan. To remove one particular
+image, see `d9c-images`; to remove particular containers, `d9c-lifecycle`.
 
 ## 1. Measure
 
