@@ -21,6 +21,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   engine output (the newest 200 lines); a failure is an error that quotes the output leading to
   it. `compose down` and `compose restore` are destructive; all of them stay forbidden until the
   write policy lands.
+- **Network, volume and prune commands in command-line mode:** `network create <name>`
+  (`--driver`, `--subnet`, `--gateway`) and `volume create <name>` (`--driver`) return the new
+  object; an existing name or a gateway outside the subnet is a usage error. `image prune`
+  (dangling images), `volume prune` and `system prune` (stopped containers, unused networks,
+  dangling images, build cache; volumes kept) are destructive. All of them stay forbidden until
+  the write policy lands.
 
 ### Fixed
 

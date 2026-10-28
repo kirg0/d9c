@@ -88,6 +88,11 @@ var cliGoldenCases = []goldenCase{
 	{"compose_restart", []string{"compose", "restart", "/srv/monitoring"}, 0, true},
 	{"compose_backup", []string{"compose", "backup", "webapp"}, 0, true},
 	{"compose_restore", []string{"compose", "restore", "webapp", "webapp.tar.gz"}, 0, true},
+	{"network_create", []string{"network", "create", "edge", "--subnet", "172.30.0.0/16", "--gateway", "172.30.0.1"}, 0, true},
+	{"volume_create", []string{"volume", "create", "uploads"}, 0, true},
+	{"image_prune", []string{"image", "prune"}, 0, true},
+	{"volume_prune", []string{"volume", "prune"}, 0, true},
+	{"system_prune", []string{"system", "prune"}, 0, true},
 
 	{"err_usage_flag", []string{"ps", "--bogus"}, 2, false},
 	{"err_usage_field", []string{"ps", "--fields", "bogus"}, 2, false},
@@ -101,6 +106,9 @@ var cliGoldenCases = []goldenCase{
 	{"err_not_found_target", []string{"start", "ghost"}, 3, true},
 	{"err_not_found_backup", []string{"compose", "restore", "webapp", "nope.tar.gz"}, 3, true},
 	{"err_forbidden_compose_down", []string{"compose", "down", "webapp"}, 5, false},
+	{"err_usage_network_exists", []string{"network", "create", "app-net"}, 2, true},
+	{"err_usage_gateway_no_subnet", []string{"network", "create", "edge", "--gateway", "172.30.0.1"}, 2, true},
+	{"err_forbidden_system_prune", []string{"system", "prune"}, 5, false},
 }
 
 // goldenSetup prepares the working directory of cases that touch local files:
