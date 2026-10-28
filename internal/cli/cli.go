@@ -250,6 +250,40 @@ func Parse(reg *agent.Registry, cfg *config.Config, args []string) (Invocation, 
 	return inv, nil
 }
 
+// ParseGlobals applies the global flags in args to cfg — the command line of a
+// subcommand that takes nothing else (`d9c mcp --host prod --allow-write`).
+// help reports -h/--help. Every other token is a CodeUsage *agent.Error.
+func ParseGlobals(cfg *config.Config, args []string) (help bool, err error) {
+	for i := 0; i < len(args); i++ {
+		tok := args[i]
+		name, value, hasValue := strings.Cut(strings.TrimPrefix(strings.TrimPrefix(tok, "-"), "-"), "=")
+		if name == "h" || name == "help" {
+			help = true
+			continue
+		}
+		g, ok := findGlobal(name)
+		if !strings.HasPrefix(tok, "-") || !ok {
+			return false, agent.Errorf(agent.CodeUsage, "unexpected argument %q", tok).
+				WithHint("accepted flags: " + GlobalUsage())
+		}
+		v := "true"
+		switch {
+		case hasValue:
+			v = value
+		case !g.isBool:
+			if i+1 >= len(args) {
+				return false, agent.Errorf(agent.CodeUsage, "flag %s needs a value", tok)
+			}
+			i++
+			v = args[i]
+		}
+		if err := g.set(cfg, v); err != nil {
+			return false, agent.Errorf(agent.CodeUsage, "flag %s: want true or false, got %q", tok, v)
+		}
+	}
+	return help, nil
+}
+
 // resolveOp finds the longest registered operation name formed by the leading
 // non-flag words of args and returns it with the remaining arguments.
 func resolveOp(reg *agent.Registry, args []string) (agent.Op, []string, error) {
@@ -400,8 +434,8 @@ func typeWord(t string) string {
 	}
 }
 
-// globalUsage lists the global flags for help texts.
-func globalUsage() string {
+// GlobalUsage lists the global flags for help texts.
+func GlobalUsage() string {
 	parts := make([]string, len(globals))
 	for i, g := range globals {
 		parts[i] = g.usage
@@ -430,7 +464,7 @@ func WriteHelp(w io.Writer, reg *agent.Registry, inv Invocation, ceiling agent.T
 				"by default: with the user's consent pass --allow-write, or set agent: {allowWrite: true,\n"+
 				"maxTier: safe|destructive} in the config, globally or under a saved host.\n", hidden, ceiling)
 		}
-		b.WriteString("\nGlobal flags: " + globalUsage() + "\n")
+		b.WriteString("\nGlobal flags: " + GlobalUsage() + "\n")
 		b.WriteString("Output flags: " + outputUsage + "\n")
 		b.WriteString("Write flags: " + writeUsage + ";\n" +
 			"a destructive command without --yes changes nothing and fails with confirmation_required (exit 7),\n" +
@@ -441,6 +475,7 @@ func WriteHelp(w io.Writer, reg *agent.Registry, inv Invocation, ceiling agent.T
 			"-o ndjson writes list items one per line, -o text a compact table;\n" +
 			"errors as JSON on stderr with a non-zero exit status.\n")
 		b.WriteString("Run `d9c help <command>` for the arguments of a command.\n")
+		b.WriteString("Run `d9c mcp` to serve these commands as MCP tools over stdio (`d9c mcp -h`).\n")
 	} else {
 		op := inv.Op
 		b.WriteString(usageLine(op) + "\n\n" + op.Description() + "\n")
@@ -467,7 +502,7 @@ func WriteHelp(w io.Writer, reg *agent.Registry, inv Invocation, ceiling agent.T
 				b.WriteString("\n")
 			}
 		}
-		b.WriteString("\nGlobal flags: " + globalUsage() + "\n")
+		b.WriteString("\nGlobal flags: " + GlobalUsage() + "\n")
 		b.WriteString("Output flags: " + outputUsage + "\n")
 		if op.Tier > agent.TierRead {
 			b.WriteString("Write flags: " + writeUsage + "\n")

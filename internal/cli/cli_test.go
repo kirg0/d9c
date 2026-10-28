@@ -337,3 +337,43 @@ func TestWriteError(t *testing.T) {
 		})
 	}
 }
+
+func TestParseGlobals(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		wantCfg  config.Config
+		wantHelp bool
+		wantErr  bool
+	}{
+		{"none", nil, config.Config{}, false, false},
+		{"saved host", []string{"--host", "prod"}, config.Config{SavedHost: "prod"}, false, false},
+		{"equals and bools", []string{"-H=tcp://x:2375", "--allow-write", "-read-only=false"},
+			config.Config{Host: "tcp://x:2375", HostFlagSet: true, AllowWrite: true}, false, false},
+		{"demo", []string{"-demo"}, config.Config{Demo: true}, false, false},
+		{"help", []string{"-h"}, config.Config{}, true, false},
+		{"positional", []string{"prod"}, config.Config{}, false, true},
+		{"unknown flag", []string{"--tail", "5"}, config.Config{}, false, true},
+		{"missing value", []string{"--host"}, config.Config{}, false, true},
+		{"bad bool", []string{"--demo=maybe"}, config.Config{}, false, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var cfg config.Config
+			help, err := ParseGlobals(&cfg, tt.args)
+			if tt.wantErr {
+				var ae *agent.Error
+				if !errors.As(err, &ae) || ae.Code != agent.CodeUsage {
+					t.Fatalf("err = %v, want a usage error", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if help != tt.wantHelp || cfg != tt.wantCfg {
+				t.Errorf("got help=%v cfg=%+v, want help=%v cfg=%+v", help, cfg, tt.wantHelp, tt.wantCfg)
+			}
+		})
+	}
+}

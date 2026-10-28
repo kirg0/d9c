@@ -6,6 +6,17 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **MCP server `d9c mcp`:** serves the agent operations over the Model Context Protocol on
+  stdin/stdout for one session with one host (`--host`, `-H`, `-context`, `-demo` as in the CLI).
+  Twelve grouped tools (`d9c_containers`, `d9c_logs`, `d9c_compose`, `d9c_system`, `d9c_remove`…)
+  with an `action` argument, `fields`/`limit` output shaping and `dry_run` on write tools; results
+  are the CLI's JSON envelope as text and structured content, failures `{"error":{code,message,hint}}`
+  with `isError`. Tool annotations follow the operation tier (`readOnlyHint`, `destructiveHint`,
+  `idempotentHint`), and only the tools the write policy admits are listed. The connection is
+  dialed on first use and redialed after it drops (reads are retried once, writes never).
+
 ## [1.33.0] - 2026-10-28
 
 ### Added
