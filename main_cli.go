@@ -168,6 +168,12 @@ func cliTargetGuess(cfg *config.Config) string {
 // and the config; the caller sets its Host once the target is known.
 func cliPolicy(cfg *config.Config, set *settings.Store) agent.Policy {
 	p := agent.Policy{Global: set.File.Agent, AllowWriteFlag: cfg.AllowWrite, ConfigPath: set.Path()}
+	// A demo scenario serves fake data: its own ceiling replaces the config's
+	// agent block, which is about real hosts. -read-only still wins.
+	if s, ok := docker.LookupFakeScenario(cfg.DemoScenario); ok && s.MaxTier != "" {
+		allow := true
+		p.Global = &hosts.AgentPolicy{AllowWrite: &allow, MaxTier: s.MaxTier}
+	}
 	switch {
 	case cfg.ReadOnly:
 		p.ReadOnly = "-read-only flag"
@@ -195,7 +201,7 @@ func policyHost(cfg *config.Config, store *hosts.Store) *hosts.Host {
 // resolveCLITarget has already applied to cfg (the demo backend for -demo).
 func connectCLI(cfg *config.Config) (docker.Backend, error) {
 	if cfg.Demo {
-		return docker.NewFakeBackend(), nil
+		return newDemoBackend(cfg)
 	}
 	b, err := docker.New(cfg)
 	if err != nil {
@@ -207,6 +213,20 @@ func connectCLI(cfg *config.Config) (docker.Backend, error) {
 		return nil, e
 	}
 	return b, nil
+}
+
+// newDemoBackend returns the fake engine of -demo, loaded with the
+// -demo-scenario data set when one is named.
+func newDemoBackend(cfg *config.Config) (*docker.FakeBackend, error) {
+	if cfg.DemoScenario == "" {
+		return docker.NewFakeBackend(), nil
+	}
+	fb, err := docker.NewFakeScenario(cfg.DemoScenario)
+	if err != nil {
+		return nil, agent.Errorf(agent.CodeUsage, "unknown demo scenario %q", cfg.DemoScenario).
+			WithHint("scenarios: " + docker.FakeScenarioNames())
+	}
+	return fb, nil
 }
 
 // resolveCLITarget points cfg at the host a CLI command addresses — the saved

@@ -78,7 +78,11 @@ func newMCPServer(cfg *config.Config, reg *agent.Registry, stderr io.Writer) (*m
 	// An agent must never trust an SSH host key nobody has verified.
 	docker.SetStrictHostKeys(true)
 	label := "demo"
-	if !cfg.Demo {
+	if cfg.Demo {
+		if _, err := newDemoBackend(cfg); err != nil {
+			return nil, err // a misspelt scenario fails at startup, not on every call
+		}
+	} else {
 		if label, err = resolveCLITarget(cfg, store, os.Getenv, dockerctx.Dir()); err != nil {
 			return nil, err
 		}

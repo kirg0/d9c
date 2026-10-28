@@ -13,14 +13,17 @@ const DefaultHost = "unix:///var/run/docker.sock"
 const DefaultRefreshInterval = 3 * time.Second
 
 type Config struct {
-	Host            string
-	TLSCACert       string
-	TLSCert         string
-	TLSKey          string
-	SSHKeyFile      string
-	SSHPassword     string
-	ShowAll         bool
-	Demo            bool
+	Host        string
+	TLSCACert   string
+	TLSCert     string
+	TLSKey      string
+	SSHKeyFile  string
+	SSHPassword string
+	ShowAll     bool
+	Demo        bool
+	// DemoScenario names a demo data set with a planted problem
+	// (-demo-scenario, D9C_DEMO_SCENARIO); it implies Demo.
+	DemoScenario    string
 	ShowVersion     bool
 	HostsFile       string
 	PluginsFile     string
@@ -59,6 +62,7 @@ func Load() *Config {
 	flag.StringVar(&cfg.SSHPassword, "ssh-password", getenv("DOCKER_SSH_PASSWORD", ""), "SSH password (insecure, prefer key auth)")
 	flag.BoolVar(&cfg.ShowAll, "a", false, "Show all containers (default: running only)")
 	flag.BoolVar(&cfg.Demo, "demo", false, "Run with built-in sample data (no Docker connection)")
+	flag.StringVar(&cfg.DemoScenario, "demo-scenario", getenv("D9C_DEMO_SCENARIO", ""), "Demo data with a planted problem, for trying the agent skills (implies -demo; see d9c skills ls)")
 	flag.BoolVar(&cfg.ShowVersion, "version", false, "Print the version and exit")
 	flag.StringVar(&cfg.HostsFile, "hosts-file", "", "Path to the legacy d9c-hosts.json to migrate into the config (default: next to the binary)")
 	flag.StringVar(&cfg.PluginsFile, "plugins-file", "", "Path to the plugins file (default: ~/.d9c/d9c-plugins.yaml)")
@@ -70,6 +74,9 @@ func Load() *Config {
 	flag.StringVar(&cfg.SavedHost, "host", "", "Saved host to connect to, by name, with its stored SSH key and TLS files (list them with: d9c hosts ls); CLI read commands take a comma-separated list")
 	flag.BoolVar(&cfg.AllHosts, "all-hosts", false, "CLI read commands only: run on every saved host")
 	flag.Parse()
+	if cfg.DemoScenario != "" {
+		cfg.Demo = true
+	}
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "H" {
 			cfg.HostFlagSet = true

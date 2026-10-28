@@ -35,6 +35,9 @@ Install the agent skills shipped with this d9c binary (same version) as
 agent; --dir any directory, e.g. .claude/skills of a project. Existing d9c
 skills there are replaced; other skills are left alone.
 
+Demo scenarios (fake data with one planted problem per skill, to try a skill
+without a real host): d9c -demo-scenario <name> ...; list them with d9c skills ls.
+
 Targets:
 `
 
@@ -65,11 +68,20 @@ type SkillEntry struct {
 	Description string `json:"description"`
 }
 
+// ScenarioEntry is one demo scenario in `skills ls`: fake data with a planted
+// problem for trying a skill (d9c -demo-scenario <name>).
+type ScenarioEntry struct {
+	Name    string `json:"name"`
+	Skill   string `json:"skill"`
+	Summary string `json:"summary"`
+}
+
 // SkillsListData is the `skills ls` output.
 type SkillsListData struct {
-	Version string        `json:"version"`
-	Skills  []SkillEntry  `json:"skills"`
-	Targets []skillTarget `json:"targets"`
+	Version   string          `json:"version"`
+	Skills    []SkillEntry    `json:"skills"`
+	Targets   []skillTarget   `json:"targets"`
+	Scenarios []ScenarioEntry `json:"scenarios"`
 }
 
 // InstalledSkill is one skill written by `skills install`.
@@ -204,7 +216,11 @@ func listSkills(fsys fs.FS) (SkillsListData, error) {
 	if err != nil {
 		return SkillsListData{}, err
 	}
-	return SkillsListData{Version: version.Version, Skills: list, Targets: skillTargets}, nil
+	var scenarios []ScenarioEntry
+	for _, s := range docker.FakeScenarios() {
+		scenarios = append(scenarios, ScenarioEntry{Name: s.Name, Skill: s.Skill, Summary: s.Summary})
+	}
+	return SkillsListData{Version: version.Version, Skills: list, Targets: skillTargets, Scenarios: scenarios}, nil
 }
 
 // skillsDir resolves --target / --dir to the directory skills go into.

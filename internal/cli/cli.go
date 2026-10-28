@@ -116,6 +116,10 @@ var globals = []global{
 		c.Demo = b
 		return err
 	}},
+	{name: "demo-scenario", usage: "--demo-scenario <name>", set: func(c *config.Config, v string) error {
+		c.DemoScenario, c.Demo = v, v != "" || c.Demo
+		return nil
+	}},
 	{name: "read-only", usage: "-read-only", isBool: true, set: func(c *config.Config, v string) error {
 		b, err := strconv.ParseBool(v)
 		c.ReadOnly = b

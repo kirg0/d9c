@@ -11,6 +11,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/kirg0/d9c/internal/docker"
 	"github.com/kirg0/d9c/internal/version"
 )
 
@@ -42,6 +43,9 @@ func TestSkillsLs(t *testing.T) {
 	}
 	if len(d.Targets) != len(skillTargets) {
 		t.Errorf("targets = %+v", d.Targets)
+	}
+	if len(d.Scenarios) != len(docker.FakeScenarios()) || d.Scenarios[1].Skill != "d9c-troubleshoot" {
+		t.Errorf("scenarios = %+v", d.Scenarios)
 	}
 }
 
