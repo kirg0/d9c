@@ -29,6 +29,9 @@ type Config struct {
 	// ReadOnly forbids every mutating action (stop/rm/prune/run/exec/…) for the
 	// whole session, regardless of the config file and per-host settings.
 	ReadOnly bool
+	// AllowWrite lets agent CLI commands change state for this invocation, up
+	// to the configured agent.maxTier, unless the config sets allowWrite: false.
+	AllowWrite bool
 	// Context names the Docker CLI context to start with (-context). Empty
 	// means none; DOCKER_CONTEXT is resolved later, honoring DOCKER_HOST.
 	Context string
@@ -59,6 +62,7 @@ func Load() *Config {
 	flag.StringVar(&cfg.ConfigFile, "config", "", "Path to the unified config file (theme/colors/keys/alerts/hosts; default: ~/.d9c/d9c-config.yaml)")
 	flag.DurationVar(&cfg.RefreshInterval, "interval", DefaultRefreshInterval, "Auto-refresh interval (e.g. 1s, 5s); toggle pause at runtime with 'p'")
 	flag.BoolVar(&cfg.ReadOnly, "read-only", false, "Read-only mode: forbid every mutating action (stop/kill/rm/prune/run/exec/cp/compose/build/push/create)")
+	flag.BoolVar(&cfg.AllowWrite, "allow-write", false, "CLI commands only: allow state-changing commands for this invocation (up to agent.maxTier in the config, default safe)")
 	flag.StringVar(&cfg.Context, "context", "", "Docker CLI context to connect with (from ~/.docker/contexts; overrides DOCKER_HOST and DOCKER_CONTEXT)")
 	flag.StringVar(&cfg.SavedHost, "host", "", "Saved host to connect to, by name, with its stored SSH key and TLS files (list them with: d9c hosts ls)")
 	flag.Parse()

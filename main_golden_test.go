@@ -46,8 +46,9 @@ type goldenCase struct {
 	name string
 	args []string // -demo is appended unless --host picks a saved host
 	exit int
-	// write raises the CLI tier ceiling to destructive for the case; without
-	// it a write command answers forbidden, as it does for users today.
+	// write runs the case with a config that sets agent: {allowWrite: true,
+	// maxTier: destructive}; without it a write command answers forbidden,
+	// as it does under the default policy.
 	write bool
 }
 
@@ -109,6 +110,9 @@ var cliGoldenCases = []goldenCase{
 	{"err_usage_network_exists", []string{"network", "create", "app-net"}, 2, true},
 	{"err_usage_gateway_no_subnet", []string{"network", "create", "edge", "--gateway", "172.30.0.1"}, 2, true},
 	{"err_forbidden_system_prune", []string{"system", "prune"}, 5, false},
+	{"stop_allow_write", []string{"stop", "web", "--allow-write"}, 0, false},
+	{"err_forbidden_rm_max_tier", []string{"rm", "web", "--allow-write"}, 5, false},
+	{"err_forbidden_read_only", []string{"start", "db", "-read-only"}, 5, true},
 }
 
 // goldenSetup prepares the working directory of cases that touch local files:
@@ -125,7 +129,9 @@ var goldenSetup = map[string]func(t *testing.T){
 }
 
 func TestCLIGolden(t *testing.T) {
-	cfgPath := writeCLIConfig(t, "  - name: prod\n    host: tcp://127.0.0.1:1\n    read_only: true\n  - name: pw\n    host: ssh://u@pw.invalid\n    ssh_auth: password\n")
+	hostsYAML := "  - name: prod\n    host: tcp://127.0.0.1:1\n    read_only: true\n  - name: pw\n    host: ssh://u@pw.invalid\n    ssh_auth: password\n"
+	cfgPath := writeCLIConfig(t, hostsYAML)
+	writePath := writeCLIConfig(t, hostsYAML+"agent:\n  allowWrite: true\n  maxTier: destructive\n")
 	for _, tc := range cliGoldenCases {
 		t.Run(tc.name, func(t *testing.T) {
 			args := append([]string{}, tc.args...)
@@ -136,11 +142,11 @@ func TestCLIGolden(t *testing.T) {
 			if setup := goldenSetup[tc.name]; setup != nil {
 				setup(t)
 			}
+			path := cfgPath
 			if tc.write {
-				cliCeiling = agent.TierDestructive
-				t.Cleanup(func() { cliCeiling = agent.TierRead })
+				path = writePath
 			}
-			code, out, errOut := cliRun(t, &config.Config{ConfigFile: cfgPath}, args...)
+			code, out, errOut := cliRun(t, &config.Config{ConfigFile: path}, args...)
 			if code != tc.exit {
 				t.Fatalf("exit %d, want %d (stdout %q, stderr %q)", code, tc.exit, out, errOut)
 			}
@@ -155,7 +161,7 @@ func TestCLIGolden(t *testing.T) {
 			if strings.Count(got, "\n") != 1 || !strings.HasSuffix(got, "\n") {
 				t.Errorf("want exactly one JSON line, got %q", got)
 			}
-			compareGolden(t, tc.name, []byte(got))
+			compareGolden(t, tc.name, []byte(maskPath(got, path, "<config>")))
 		})
 	}
 }
@@ -223,6 +229,16 @@ func TestOpCatalogGolden(t *testing.T) {
 // compareGolden checks got (one JSON document) against testdata/golden/<name>.json
 // after masking timestamps; -update rewrites the file. Files are indented so a
 // schema change reads as a small diff in review.
+// maskPath replaces the JSON spelling of path in out with placeholder: the
+// policy hints name the temporary config file.
+func maskPath(out, path, placeholder string) string {
+	quoted, err := json.Marshal(path)
+	if err != nil {
+		panic(err)
+	}
+	return strings.ReplaceAll(out, strings.Trim(string(quoted), `"`), placeholder)
+}
+
 func compareGolden(t *testing.T, name string, got []byte) {
 	t.Helper()
 	norm := timestampRE.ReplaceAll(bytes.TrimSpace(got), []byte("<time>"))

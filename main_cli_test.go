@@ -164,9 +164,7 @@ func TestRunCLI(t *testing.T) {
 	})
 
 	t.Run("lifecycle text output", func(t *testing.T) {
-		cliCeiling = agent.TierDestructive
-		t.Cleanup(func() { cliCeiling = agent.TierRead })
-		code, out, errOut := cliRun(t, &config.Config{ConfigFile: cfgPath}, "stop", "web", "ghost", "-o", "text", "-demo")
+		code, out, errOut := cliRun(t, &config.Config{ConfigFile: cfgPath}, "stop", "web", "ghost", "-o", "text", "-demo", "--allow-write")
 		if code != agent.ExitPartial {
 			t.Fatalf("exit %d, want %d (stderr %q)", code, agent.ExitPartial, errOut)
 		}
@@ -186,7 +184,7 @@ func TestRunCLI(t *testing.T) {
 		if code != 0 || errOut != "" {
 			t.Fatalf("exit %d, stderr %q", code, errOut)
 		}
-		want := `{"schema":1,"host":"","runtime":"","data":[{"name":"prod","host":"tcp://127.0.0.1:1","read_only":true},{"name":"pw","host":"ssh://u@pw.invalid","read_only":false}],"truncated":false}` + "\n"
+		want := `{"schema":1,"host":"","runtime":"","data":[{"name":"prod","host":"tcp://127.0.0.1:1","read_only":true,"agent_tier":"read"},{"name":"pw","host":"ssh://u@pw.invalid","read_only":false,"agent_tier":"read"}],"truncated":false}` + "\n"
 		if out != want {
 			t.Errorf("stdout = %q, want %q", out, want)
 		}
@@ -279,6 +277,91 @@ func TestRunCLIDefaultHostHint(t *testing.T) {
 	if code != agent.CodeConnection.ExitCode() || !strings.Contains(errOut, "no host was given") {
 		t.Errorf("exit %d, stderr %q", code, errOut)
 	}
+}
+
+// TestRunCLIPolicy drives the agent write policy end to end. The saved hosts
+// point at closed ports, so a command the policy admits fails with
+// connection and a refused one with forbidden — before any dial.
+func TestRunCLIPolicy(t *testing.T) {
+	cfgPath := writeCLIConfig(t, `  - name: prod
+    host: tcp://127.0.0.1:1
+    read_only: true
+  - name: dev
+    host: tcp://127.0.0.1:2
+    agent:
+      allowWrite: true
+  - name: locked
+    host: tcp://127.0.0.1:3
+    agent:
+      allowWrite: false
+  - name: wide
+    host: tcp://127.0.0.1:4
+    agent:
+      maxTier: destructive
+agent:
+  maxTier: safe
+`)
+	tests := []struct {
+		name     string
+		args     []string
+		wantCode agent.Code // "" = success
+		wantErr  string
+	}{
+		{"default refuses writes", []string{"stop", "web", "-demo"}, agent.CodeForbidden, "off by default"},
+		{"flag allows safe", []string{"stop", "web", "-demo", "--allow-write"}, "", ""},
+		{"flag stops at maxTier", []string{"rm", "web", "-demo", "--allow-write"}, agent.CodeForbidden, "above agent.maxTier safe (set globally)"},
+		{"read-only flag wins", []string{"stop", "web", "-demo", "--allow-write", "-read-only"}, agent.CodeForbidden, "-read-only flag"},
+		{"host read_only wins", []string{"stop", "web", "--host", "prod", "--allow-write"}, agent.CodeForbidden, `saved host \"prod\" has read_only: true`},
+		{"host allowWrite admits safe", []string{"stop", "web", "--host", "dev"}, agent.CodeConnection, ""},
+		{"host keeps global maxTier", []string{"rm", "web", "--host", "dev"}, agent.CodeForbidden, "above agent.maxTier safe"},
+		{"explicit false beats flag", []string{"stop", "web", "--host", "locked", "--allow-write"}, agent.CodeForbidden, `allowWrite is false for saved host \"locked\"`},
+		{"-H matches saved host", []string{"stop", "web", "-H", "tcp://127.0.0.1:3", "--allow-write"}, agent.CodeForbidden, "allowWrite is false"},
+		{"host maxTier with flag", []string{"rm", "web", "--host", "wide", "--allow-write"}, agent.CodeConnection, ""},
+		{"maxTier alone keeps writes off", []string{"rm", "web", "--host", "wide"}, agent.CodeForbidden, "off by default"},
+		{"reads need no permission", []string{"ps", "--host", "locked"}, agent.CodeConnection, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, _, errOut := cliRun(t, &config.Config{ConfigFile: cfgPath}, tt.args...)
+			want := 0
+			if tt.wantCode != "" {
+				want = tt.wantCode.ExitCode()
+			}
+			if code != want || (tt.wantCode != "" && !strings.Contains(errOut, `"`+string(tt.wantCode)+`"`)) {
+				t.Fatalf("exit %d, want %d (%s); stderr %q", code, want, tt.wantCode, errOut)
+			}
+			if !strings.Contains(errOut, tt.wantErr) {
+				t.Errorf("stderr %q lacks %q", errOut, tt.wantErr)
+			}
+		})
+	}
+
+	t.Run("invalid maxTier", func(t *testing.T) {
+		bad := writeCLIConfig(t, "  - name: x\n    host: tcp://127.0.0.1:1\nagent:\n  maxTier: all\n")
+		code, _, errOut := cliRun(t, &config.Config{ConfigFile: bad}, "ps", "-demo")
+		if code != agent.CodeUsage.ExitCode() || !strings.Contains(errOut, `unknown tier \"all\"`) {
+			t.Errorf("exit %d, stderr %q", code, errOut)
+		}
+	})
+
+	t.Run("help follows the policy", func(t *testing.T) {
+		_, out, _ := cliRun(t, &config.Config{ConfigFile: cfgPath}, "help")
+		if strings.Contains(out, "  stop ") || !strings.Contains(out, "commands that change state are hidden (allowed tier: read)") {
+			t.Errorf("default help:\n%s", out)
+		}
+		_, out, _ = cliRun(t, &config.Config{ConfigFile: cfgPath, SavedHost: "dev"}, "help")
+		if !strings.Contains(out, "  stop ") || strings.Contains(out, "  rm ") || !strings.Contains(out, "allowed tier: safe") {
+			t.Errorf("help for dev:\n%s", out)
+		}
+	})
+
+	t.Run("hosts ls reports each ceiling", func(t *testing.T) {
+		_, out, errOut := cliRun(t, &config.Config{ConfigFile: cfgPath}, "hosts", "ls", "--fields", "name,agent_tier", "-o", "text")
+		want := "NAME    AGENT_TIER\nprod    read\ndev     safe\nlocked  read\nwide    read\n"
+		if out != want {
+			t.Errorf("stdout %q, want %q (stderr %q)", out, want, errOut)
+		}
+	})
 }
 
 // run() hands a known command to the CLI and turns its status into exitCode;

@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "forbidden",
+    "message": "operation \"rm\" is destructive, above agent.maxTier safe (the default)",
+    "hint": "ask the user; they can set maxTier: destructive in the agent: block in <config>"
+  }
+}

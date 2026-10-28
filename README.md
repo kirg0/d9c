@@ -62,7 +62,8 @@ Built on [Bubble Tea](https://github.com/charmbracelet/bubbletea) and the offici
   `:connect`, saved hosts with CRUD, auto-reconnect on disconnect (backoff + banner).
 - **All core resources** — Containers / Images / Networks / Volumes / Compose / Hosts.
 - **Command-line mode for scripts and agents** — `d9c ps`, `logs`, `inspect`, `stats`, `events`,
-  compose and more as JSON/NDJSON/text with stable exit codes; no prompts, secrets masked.
+  compose and more as JSON/NDJSON/text with stable exit codes; no prompts, secrets masked;
+  write commands only when the `allowWrite`/`maxTier` policy allows them.
 - **Management, not just viewing** — start/stop/restart/kill/rm, bulk operations
   (multi-select with `Space` — bulk operations on containers and image removal),
   a `run` wizard, network/volume creation, `build`/`tag`/`push`
@@ -972,7 +973,8 @@ plugins:
 ## Command-line mode
 
 A known command as the first argument runs d9c non-interactively — for scripts, cron jobs and AI
-agents — instead of opening the interface. The commands are read-only:
+agents — instead of opening the interface. Reading is always allowed; commands that change state
+are off until the [write policy](#write-policy) allows them:
 
 ```sh
 d9c ps -a --host prod                    # saved host; -H <url> and -context work too
@@ -981,6 +983,7 @@ d9c inspect web                          # secret-looking env values masked
 d9c stats -o text                        # one sample, takes about a second
 d9c events --since 1h --until 30m
 d9c compose config webapp                # needs an SSH host
+d9c restart web --allow-write            # a write command, allowed for this invocation
 d9c help logs                            # arguments of one command
 ```
 
@@ -996,6 +999,56 @@ d9c help logs                            # arguments of one command
 | `events [--since 10m] [--until now]` | events of a past window (no live following) |
 | `compose ls`, `compose ps/config/logs <project>` | compose projects |
 
+Write commands, with their tier (see the [write policy](#write-policy)):
+
+| Command | Tier | What it does |
+|---------|------|--------------|
+| `start`, `stop`, `restart <containers…> [--filter k=v]` | safe | lifecycle of containers given by ID, unique ID prefix or name, and/or exact filters (`name=`/`image=` globs, `status=`, `label=k[=v]`, `network=`, `health=`) |
+| `kill [-s SIG]`, `rm [-f]` (same targets) | destructive | kill or remove containers |
+| `pull <image>` | safe | pull an image |
+| `compose up/pull/restart <project>`, `compose backup <project>` | safe | deploy a project; the backup archive lands in the current directory |
+| `compose down <project>`, `compose restore <project> <archive>` | destructive | stop and remove the project (volumes kept) or restore it from a backup |
+| `network create <name> [--driver --subnet --gateway]`, `volume create <name> [--driver]` | safe | create a network or volume |
+| `image prune`, `volume prune`, `system prune` | destructive | remove unused objects (`system prune` keeps volumes) |
+
+A command with several targets reports one outcome per container; when only some of them fail,
+the envelope carries `"partial": true` and the exit status is `8`. Compose operations on project
+files (`up`, `pull`, `down`, `backup`, `restore`) need an SSH host.
+
+### Write policy
+
+The command-line mode is read-only by default: a write command answers `forbidden` (exit `5`)
+with a hint on what would allow it. Writes are turned on by `allowWrite` in the `agent:` block of
+`d9c-config.yaml` — globally and/or per saved host — up to the tier ceiling `maxTier`
+(`read` < `safe` < `destructive`; `safe` when unset, so destructive commands always need an
+explicit `maxTier: destructive`):
+
+```yaml
+agent:                     # every host
+  allowWrite: true
+  maxTier: safe
+hosts:
+  - name: staging
+    host: ssh://deploy@staging
+    agent:                 # this host only; overrides the global block key by key
+      maxTier: destructive
+  - name: prod
+    host: ssh://deploy@prod
+    agent:
+      allowWrite: false    # never, not even with --allow-write
+```
+
+- `--allow-write` allows writes for one command (up to `maxTier`) when the config leaves
+  `allowWrite` unset; an explicit `allowWrite: false` is a lock the flag cannot open.
+- Read-only mode always wins: `-read-only`, `readOnly: true` or a host's `read_only: true` keep
+  every agent command at the `read` tier.
+- The policy applies to the host the command targets: the `--host` name, or the saved host whose
+  URL matches `-H`. `hosts ls` shows each host's resulting ceiling in `agent_tier`, and `d9c help`
+  lists only the commands allowed for the target.
+
+The policy guards against accidents, not against a determined user of the machine: whoever can
+edit the config can change it.
+
 **Output.** By default stdout gets one JSON envelope
 `{"schema":1,"host","runtime","data","truncated","hint"}`. `-o text` prints a compact table,
 `-o ndjson` one list item per line. `--fields name,state` keeps only those fields, `--limit N`
@@ -1004,7 +1057,8 @@ Output is always English and free of terminal control characters.
 
 **Errors** go to stderr as `{"error":{"code","message","hint"}}`, and the exit status tells the
 class apart: `0` ok, `1` internal, `2` usage, `3` not_found, `4` connection, `5` forbidden,
-`6` auth_required, `7` confirmation_required.
+`6` auth_required, `7` confirmation_required, `8` partial (some targets failed; the result is on
+stdout).
 
 **Safety.** The command-line mode never prompts. A password-auth SSH host needs the password in
 `D9C_SSH_PASSWORD`, otherwise the command fails with `auth_required`. An SSH host key missing

@@ -112,7 +112,7 @@ func TestItemFields(t *testing.T) {
 		{"lister of maps", SystemDFData{}, nil},
 		{"fielder", parseDF("TYPE  TOTAL  SIZE\nImages  2  1 GB\n"), []string{"type", "total", "size"}},
 		{"strings", []string{"x"}, nil},
-		{"object", HostEntry{}, []string{"name", "host", "read_only"}},
+		{"object", HostEntry{}, []string{"name", "host", "read_only", "agent_tier"}},
 	}
 	for _, tt := range tests {
 		if got := ItemFields(tt.data); !reflect.DeepEqual(got, tt.want) {

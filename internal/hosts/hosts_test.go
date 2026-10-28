@@ -238,12 +238,18 @@ func TestReadOnlyFor(t *testing.T) {
 // ReadOnly lives only in the config file (the host form doesn't expose it), so
 // an edit from the UI must keep it rather than silently clearing it.
 func TestEditHostKeepsReadOnly(t *testing.T) {
-	s := NewStore([]Host{{Name: "prod", Host: "ssh://root@prod", ReadOnly: true}}, nil)
+	off := false
+	pol := &AgentPolicy{AllowWrite: &off}
+	s := NewStore([]Host{{Name: "prod", Host: "ssh://root@prod", ReadOnly: true, Agent: pol}}, nil)
 	if err := s.EditHost("prod", Host{Name: "prod2", Host: "ssh://admin@prod"}); err != nil {
 		t.Fatal(err)
 	}
 	if h, _ := s.Find("prod2"); !h.ReadOnly {
 		t.Error("EditHost dropped read_only")
+	}
+	// The agent policy is config-only too: losing it would unlock writes.
+	if h, _ := s.Find("prod2"); h.Agent != pol {
+		t.Errorf("EditHost dropped the agent block: %+v", h.Agent)
 	}
 	if err := s.Edit("prod2", "prod3", "ssh://root@prod"); err != nil {
 		t.Fatal(err)
