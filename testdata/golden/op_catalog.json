@@ -669,5 +669,39 @@
       "type": "object",
       "additionalProperties": false
     }
+  },
+  {
+    "name": "wait",
+    "description": "Wait until a container is running, healthy or exited, polling its state; fails with timeout (exit 9) when --timeout runs out first.",
+    "tier": "read",
+    "args": {
+      "type": "object",
+      "properties": {
+        "container": {
+          "type": "string",
+          "description": "Container ID, unique ID prefix or name."
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Seconds to wait; 0 checks once without waiting.",
+          "default": 60,
+          "minimum": 0
+        },
+        "until": {
+          "type": "string",
+          "description": "State to wait for; healthy needs a container healthcheck.",
+          "enum": [
+            "running",
+            "healthy",
+            "exited"
+          ],
+          "default": "running"
+        }
+      },
+      "required": [
+        "container"
+      ],
+      "additionalProperties": false
+    }
   }
 ]

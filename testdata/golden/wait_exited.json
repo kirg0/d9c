@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "container": "db",
+    "id": "3f1ab77c9012",
+    "until": "exited",
+    "state": "exited",
+    "health": "",
+    "waited_ms": 0
+  },
+  "truncated": false
+}

@@ -129,6 +129,10 @@ var cliGoldenCases = []goldenCase{
 	{"err_confirmation_exec", []string{"exec", "web", "--", "printenv"}, 7, true},
 	{"err_usage_exec_not_running", []string{"exec", "db", "-y", "--", "echo"}, 2, true},
 	{"err_timeout_exec", []string{"exec", "web", "-y", "--timeout", "1", "--", "sleep", "60"}, 9, true},
+	{"wait_healthy", []string{"wait", "web", "--until", "healthy"}, 0, false},
+	{"wait_exited", []string{"wait", "db", "--until", "exited", "--timeout", "5"}, 0, false},
+	{"err_timeout_wait", []string{"wait", "api", "--until", "healthy", "--timeout", "0"}, 9, false},
+	{"err_usage_wait_until", []string{"wait", "web", "--until", "paused"}, 2, false},
 }
 
 // goldenSetup prepares the working directory of cases that touch local files:

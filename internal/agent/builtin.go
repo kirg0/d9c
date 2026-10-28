@@ -10,7 +10,7 @@ func Builtin() *Registry {
 	r := NewRegistry()
 	r.MustRegister(
 		hostsLsOp(), infoOp(),
-		psOp(), inspectOp(), logsOp(), statsOp(),
+		psOp(), inspectOp(), logsOp(), statsOp(), waitOp(),
 		imagesOp(), networksOp(), volumesOp(), systemDFOp(), eventsOp(),
 		composeLsOp(), composePsOp(), composeConfigOp(), composeLogsOp(),
 		startOp(), stopOp(), restartOp(), killOp(), rmOp(),

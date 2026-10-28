@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "usage",
+    "message": "argument \"until\": \"paused\" is not one of [running healthy exited]",
+    "hint": "until (string): State to wait for; healthy needs a container healthcheck."
+  }
+}
