@@ -206,7 +206,7 @@ var optionsSchema = agent.Object(map[string]*agent.Schema{
 // toolHandler serves tools/call for t.
 func (s *Server) toolHandler(t *tool) mcp.ToolHandler {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		res, err := s.callTool(ctx, t, req.Params.Arguments)
+		res, err := s.callTool(ctx, t, req.Params.Arguments, progressFunc(ctx, req))
 		if err != nil {
 			return errorResult(err), nil
 		}
@@ -214,9 +214,33 @@ func (s *Server) toolHandler(t *tool) mcp.ToolHandler {
 	}
 }
 
+// maxProgressMessage caps the length of one progress message.
+const maxProgressMessage = 300
+
+// progressFunc returns the Env.Progress of a call: each reported line goes to
+// the client as notifications/progress on the call's progress token. It is
+// nil when the client asked for no progress.
+func progressFunc(ctx context.Context, req *mcp.CallToolRequest) func(string) {
+	token := req.Params.GetProgressToken()
+	if token == nil || req.Session == nil {
+		return nil
+	}
+	n := 0
+	return func(msg string) {
+		n++
+		if r := []rune(msg); len(r) > maxProgressMessage {
+			msg = string(r[:maxProgressMessage]) + "…"
+		}
+		// A lost notification only costs the client a status line.
+		_ = req.Session.NotifyProgress(ctx, &mcp.ProgressNotificationParams{
+			ProgressToken: token, Progress: float64(n), Message: msg,
+		})
+	}
+}
+
 // callTool decodes the arguments, runs the selected operation under the
-// policy and renders the envelope.
-func (s *Server) callTool(ctx context.Context, t *tool, raw json.RawMessage) (*mcp.CallToolResult, error) {
+// policy and renders the envelope; progress receives the operation's steps.
+func (s *Server) callTool(ctx context.Context, t *tool, raw json.RawMessage, progress func(string)) (*mcp.CallToolResult, error) {
 	var args map[string]any
 	if len(bytes.TrimSpace(raw)) > 0 && string(bytes.TrimSpace(raw)) != "null" {
 		if err := json.Unmarshal(raw, &args); err != nil {
@@ -246,7 +270,7 @@ func (s *Server) callTool(ctx context.Context, t *tool, raw json.RawMessage) (*m
 	shape := agent.Shape{Fields: opt.Strings(argFields), Limit: opt.Int(argLimit)}
 	call := agent.Call{Ceiling: s.ceiling, DryRun: opt.Bool(argDryRun), Confirmed: true}
 
-	rt, res, err := s.run(ctx, op, opArgs, call)
+	rt, res, err := s.run(ctx, op, opArgs, call, progress)
 	if op.Tier > agent.TierRead {
 		// The call has run (or was refused): a failed log write cannot undo
 		// it, and the result carries only the operation's own outcome.
@@ -267,11 +291,13 @@ func (s *Server) callTool(ctx context.Context, t *tool, raw json.RawMessage) (*m
 
 // run invokes op on the session's connection. A connection that was alive
 // before the call and drops during it is redialed: a read is retried once, a
-// write is not (it may have taken effect), and the next call reconnects.
-func (s *Server) run(ctx context.Context, op agent.Op, args agent.Args, call agent.Call) (docker.Runtime, agent.Result, error) {
+// write is not (it may have taken effect), and the next call reconnects. A
+// cancelled ctx (notifications/cancelled) stops the operation and its
+// streams.
+func (s *Server) run(ctx context.Context, op agent.Op, args agent.Args, call agent.Call, progress func(string)) (docker.Runtime, agent.Result, error) {
 	reg := s.opts.Registry
 	// hosts ls reports each host's ceiling from the policy without a target.
-	env := &agent.Env{Hosts: s.opts.Hosts, Policy: s.opts.Policy}
+	env := &agent.Env{Hosts: s.opts.Hosts, Policy: s.opts.Policy, Progress: progress}
 	env.Policy.Host = nil
 	if !call.DryRun {
 		if err := s.opts.Policy.Check(op); err != nil {

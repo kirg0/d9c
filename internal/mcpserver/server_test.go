@@ -37,6 +37,13 @@ type session struct {
 
 func startSession(t *testing.T, opts Options) *session {
 	t.Helper()
+	return startSessionWith(t, opts, nil)
+}
+
+// startSessionWith is startSession with client options (notification
+// handlers).
+func startSessionWith(t *testing.T, opts Options, clientOpts *mcp.ClientOptions) *session {
+	t.Helper()
 	if opts.Registry == nil {
 		opts.Registry = agent.Builtin()
 	}
@@ -65,7 +72,7 @@ func startSession(t *testing.T, opts Options) *session {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cs, err := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "1"}, nil).Connect(ctx, ct, nil)
+	cs, err := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "1"}, clientOpts).Connect(ctx, ct, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -16,6 +16,9 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   with `isError`. Tool annotations follow the operation tier (`readOnlyHint`, `destructiveHint`,
   `idempotentHint`), and only the tools the write policy admits are listed. The connection is
   dialed on first use and redialed after it drops (reads are retried once, writes never).
+- **MCP progress and cancellation:** long tool calls (compose up/pull/down/restore, `pull`, compose
+  backup, `wait`) report each step as `notifications/progress` when the client passes a progress
+  token; cancelling a call stops the operation and its engine stream.
 
 ## [1.33.0] - 2026-10-28
 
