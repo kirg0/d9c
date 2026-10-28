@@ -35,6 +35,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   (`EVAL_D9C_SCENARIO`), grading the diagnosis and the tool calls — including that destructive
   steps are only planned, never run without the user's approval. `go test` replays each skill's
   commands on its scenario and validates the suite for free.
+- **CI checks for the plugin:** a `plugin` job runs `claude plugin validate --strict` on the
+  marketplace and the plugin; `make check` verifies the Agent Skills frontmatter (name = directory,
+  description with "Use when", only format keys), unknown manifest keys, that every CLI command a
+  skill names parses and every MCP tool/action/argument exists, and the eval suite.
 - **Image commands for agents:** `image history <image>` (read), `image tag <source> <target>`,
   `image push <image>`, `image build <dir> [-t tag]` (safe) and `image rm <image> [-f]` (destructive),
   in the CLI and the MCP tools (`d9c_resources` image_history, `d9c_deploy` image_build/image_tag/

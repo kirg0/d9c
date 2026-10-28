@@ -4,8 +4,11 @@ import (
 	"io/fs"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/kirg0/d9c/internal/agent"
 	"github.com/kirg0/d9c/internal/cli"
@@ -94,6 +97,51 @@ func TestSkillCLICommandsExist(t *testing.T) {
 			if _, err := cli.Parse(reg, &config.Config{}, words); err != nil {
 				t.Errorf("%s: `%s`: %v", name, m[1], err)
 			}
+		}
+	}
+}
+
+// skillNameRE is the Agent Skills name rule: lowercase letters, digits and
+// single hyphens, not at either end.
+var skillNameRE = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+
+// skillFields are the frontmatter keys of the open Agent Skills format.
+var skillFields = []string{"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
+
+// The shipped skills follow the Agent Skills format, so every agent that reads
+// it (and `claude plugin validate`) accepts them.
+func TestSkillsFollowAgentSkillsFormat(t *testing.T) {
+	for dir, body := range skillBodies(t) {
+		front, rest, err := splitFrontmatter([]byte(body))
+		if err != nil {
+			t.Errorf("%s: %v", dir, err)
+			continue
+		}
+		var m map[string]any
+		if err := yaml.Unmarshal(front, &m); err != nil {
+			t.Errorf("%s: frontmatter is not YAML (a \": \" in an unquoted description?): %v", dir, err)
+			continue
+		}
+		for k := range m {
+			if !slices.Contains(skillFields, k) {
+				t.Errorf("%s: frontmatter key %q is not in the Agent Skills format", dir, k)
+			}
+		}
+		name, _ := m["name"].(string)
+		if name != dir || len(name) > 64 || !skillNameRE.MatchString(name) {
+			t.Errorf("%s: name %q must equal the directory, be at most 64 chars, lowercase and hyphenated", dir, name)
+		}
+		desc, _ := m["description"].(string)
+		if desc == "" || len(desc) > 1024 || !strings.Contains(desc, "Use when") {
+			t.Errorf("%s: description must say what the skill does and when to use it (\"Use when\"), at most 1024 chars", dir)
+		}
+		// Keep the body small enough to load whole (the format suggests
+		// under 500 lines).
+		if n := strings.Count(string(rest), "\n"); n > 500 {
+			t.Errorf("%s: body has %d lines", dir, n)
+		}
+		if strings.Contains(body, "\r") {
+			t.Errorf("%s: CRLF line endings", dir)
 		}
 	}
 }
