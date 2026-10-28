@@ -66,6 +66,7 @@ var cliGoldenCases = []goldenCase{
 	{"logs_tail", []string{"logs", "web", "-n", "3"}, 0, false},
 	{"logs_grep", []string{"logs", "web", "--grep", "ERROR"}, 0, false},
 	{"stats", []string{"stats"}, 0, false},
+	{"stats_positional", []string{"stats", "web"}, 0, false},
 	{"images", []string{"images"}, 0, false},
 	{"networks", []string{"networks"}, 0, false},
 	{"volumes", []string{"volumes"}, 0, false},

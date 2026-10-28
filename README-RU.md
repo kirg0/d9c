@@ -1005,7 +1005,7 @@ d9c help logs                            # аргументы одной ком�
 | `ps [-a]`, `images`, `networks`, `volumes` | списки ресурсов |
 | `inspect <target> [--type container\|image\|network\|volume\|compose]` | полное описание от движка |
 | `logs <container> [-n/--tail N] [--since] [--until] [--grep RE]` | последние строки (по умолчанию 200) |
-| `stats [--container ID]` | замер CPU/MEM/сети/диска запущенных контейнеров |
+| `stats [<контейнеры>...]` (или `--container`) | замер CPU/MEM/сети/диска запущенных контейнеров |
 | `system df` | занятое место по типам объектов |
 | `events [--since 10m] [--until now]` | события прошедшего окна (без live-режима) |
 | `compose ls`, `compose ps/config/logs <project>` | compose-проекты |

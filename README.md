@@ -994,7 +994,7 @@ d9c help logs                            # arguments of one command
 | `ps [-a]`, `images`, `networks`, `volumes` | resource lists |
 | `inspect <target> [--type container\|image\|network\|volume\|compose]` | full engine description |
 | `logs <container> [-n/--tail N] [--since] [--until] [--grep RE]` | recent lines (200 by default) |
-| `stats [--container ID]` | CPU/MEM/net/block I/O sample of running containers |
+| `stats [<containers>...]` (or `--container`) | CPU/MEM/net/block I/O sample of running containers |
 | `system df` | disk usage by object type |
 | `events [--since 10m] [--until now]` | events of a past window (no live following) |
 | `compose ls`, `compose ps/config/logs <project>` | compose projects |

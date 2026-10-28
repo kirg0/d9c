@@ -337,8 +337,8 @@ func statsOp() Op {
 		Args: Object(map[string]*Schema{
 			"once": Boolean("Take a single sample; required, as streaming stats are not available yet.").
 				WithDefault(true),
-			"container": StringArray("Only these containers (ID, ID prefix or name); repeatable. Default: all running.").
-				WithShort("c"),
+			"container": StringArray("Only these containers (ID, ID prefix or name); repeatable, or positional. Default: all running.").
+				WithShort("c").WithPositional(),
 		}),
 		Tier: TierRead,
 		Handler: func(ctx context.Context, env *Env, args Args) (Result, error) {
