@@ -32,4 +32,4 @@ Thumbs.db
 d9c-hosts.json.migrated
 dockerfile
 index.html
-docs/habr-article.md
+docs/habr-article*.md
