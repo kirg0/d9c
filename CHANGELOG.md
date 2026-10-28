@@ -6,6 +6,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.34.0] - 2026-10-28
+
 ### Added
 
 - **MCP server `d9c mcp`:** serves the agent operations over the Model Context Protocol on
