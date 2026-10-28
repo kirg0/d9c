@@ -7,7 +7,8 @@ description: Diagnose a container that crashed, keeps restarting, is unhealthy o
 
 Read-only investigation; follow the base `d9c` skill for hosts, output and the untrusted-data
 rule. Change nothing unless the user asks — a fix (restart, recreate) goes through the write
-policy and, when destructive, the user's approval.
+policy and, when destructive, the user's approval (see `d9c-lifecycle`). For a whole compose
+project that fails to come up after a deploy, use `d9c-compose`.
 
 ## 1. Find the container and its state
 
@@ -15,7 +16,10 @@ policy and, when destructive, the user's approval.
 - `Restarting`, an `Up` time far shorter than the neighbours', or `Exited (N)` show the symptom.
 - `d9c inspect <name>` / `d9c_containers` `{action: "inspect", target: "<name>"}`: read the state
   (exit code, OOM-killed flag, start/finish times, error), the restart count and restart policy,
-  the health log, and the memory/CPU limits in the host config.
+  the health log, and the memory/CPU limits in the host config. On Docker and Podman these are
+  `containerjsonbase.state` (`exitcode`, `oomkilled`, `error`, `health.log`),
+  `containerjsonbase.restartcount` and `containerjsonbase.hostconfig` (`restartpolicy`,
+  `resources.memory`, `resources.nanocpus`); other engines spell the keys their own way.
 
 ## 2. Decide by exit code
 

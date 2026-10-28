@@ -79,6 +79,8 @@ func TestShippedSkills(t *testing.T) {
 	}
 	toolRE := regexp.MustCompile("`(d9c_[a-z_]+)`")
 	callRE := regexp.MustCompile("`(d9c_[a-z_]+)` `\\{action: \"([a-z_]+)\"")
+	argsRE := regexp.MustCompile("`(d9c_[a-z_]+)` `\\{([^`]*)\\}`")
+	keyRE := regexp.MustCompile(`(?:^|, )([a-z_]+): `)
 	for _, sc := range scenarios {
 		for _, m := range toolRE.FindAllStringSubmatch(sc.body, -1) {
 			if byName[m[1]] == nil {
@@ -88,6 +90,17 @@ func TestShippedSkills(t *testing.T) {
 		for _, m := range callRE.FindAllStringSubmatch(sc.body, -1) {
 			if tl := byName[m[1]]; tl != nil && !slices.Contains(tl.actions, m[2]) {
 				t.Errorf("%s calls %s with the unknown action %q", sc.Name, m[1], m[2])
+			}
+		}
+		for _, m := range argsRE.FindAllStringSubmatch(sc.body, -1) {
+			tl := byName[m[1]]
+			if tl == nil {
+				continue
+			}
+			for _, k := range keyRE.FindAllStringSubmatch(m[2], -1) {
+				if _, ok := tl.schema.Properties[k[1]]; !ok {
+					t.Errorf("%s passes %s the unknown argument %q", sc.Name, m[1], k[1])
+				}
 			}
 		}
 	}

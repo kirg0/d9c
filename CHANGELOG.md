@@ -11,6 +11,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 - **Claude Code marketplace:** the repository is a plugin marketplace (`.claude-plugin/marketplace.json`)
   with the `d9c` plugin in `plugins/d9c`: its manifest, an optional saved-host option and `.mcp.json`,
   which starts `d9c mcp`, so installing the plugin wires up the MCP server.
+- **Agent skills:** ten skills in `plugins/d9c/skills` in the open Agent Skills format, each
+  usable through the CLI and the MCP tools: the base `d9c` (install, hosts, output and error
+  contract, write policy, untrusted data) and `d9c-troubleshoot`, `d9c-logs`, `d9c-lifecycle`,
+  `d9c-compose` (backup → pull → up → wait healthy → restore on failure), `d9c-images`,
+  `d9c-cleanup`, `d9c-fleet`, `d9c-security-audit` (read-only) and `d9c-net-storage`. The MCP
+  server serves all of them as prompts. Tests parse every CLI command a skill names with the real
+  CLI parser and check every MCP tool, action and argument against the tool schemas.
 - **Image commands for agents:** `image history <image>` (read), `image tag <source> <target>`,
   `image push <image>`, `image build <dir> [-t tag]` (safe) and `image rm <image> [-f]` (destructive),
   in the CLI and the MCP tools (`d9c_resources` image_history, `d9c_deploy` image_build/image_tag/
