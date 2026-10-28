@@ -532,7 +532,7 @@
       "properties": {
         "container": {
           "type": "array",
-          "description": "Only these containers (ID, ID prefix or name); repeatable. Default: all running.",
+          "description": "Only these containers (ID, ID prefix or name); repeatable, or positional. Default: all running.",
           "items": {
             "type": "string"
           }

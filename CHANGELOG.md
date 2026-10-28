@@ -36,6 +36,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Pull reported success on a failed pull** (Docker/Podman API): an error the daemon sends
   inside the progress stream (unknown manifest, registry failure mid-download) is now reported.
+- **`d9c stats web` was a usage error:** container names and IDs are now accepted as positional
+  arguments, the same as `--container`.
 
 ## [1.32.0] - 2026-10-27
 
