@@ -44,6 +44,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   its exit code, stdout and stderr, each cut at `--max-bytes` (64 KiB by default) with the full
   sizes reported. `--timeout` (60 s) ends the wait with the new error code `timeout` (exit `9`).
   The command is destructive: it needs `maxTier: destructive` and `--yes`.
+- **`wait` in command-line mode:** `d9c wait <container> --until running|healthy|exited` polls the
+  container until it gets there and returns its state; `--timeout` (60 s, `0` = check once) ends
+  with `timeout` (exit `9`) naming the state it was left in. Waiting for `healthy` on a container
+  without a healthcheck is a usage error at once.
 
 ### Fixed
 

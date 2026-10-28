@@ -46,6 +46,7 @@ func TestOpsWithoutBackend(t *testing.T) {
 		"compose restore": {"project": "x", "file": "x"},
 		"network create":  {"name": "x"}, "volume create": {"name": "x"},
 		"exec": {"container": "x", "cmd": []string{"x"}},
+		"wait": {"container": "x"},
 	}
 	for _, op := range r.Ops() {
 		if op.Local {

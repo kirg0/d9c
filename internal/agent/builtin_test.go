@@ -27,6 +27,7 @@ func TestBuiltinDeclarations(t *testing.T) {
 		{"inspect", TierRead, false, true},
 		{"logs", TierRead, false, true},
 		{"stats", TierRead, false, false},
+		{"wait", TierRead, false, false},
 		{"images", TierRead, false, false},
 		{"networks", TierRead, false, false},
 		{"volumes", TierRead, false, false},

@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "timeout",
+    "message": "container api did not become healthy within 0s (now running, health starting)",
+    "hint": "raise --timeout, or look for the cause with `d9c logs api` and `d9c inspect api`"
+  }
+}

@@ -1007,6 +1007,7 @@ d9c help logs                            # аргументы одной ком�
 | `logs <container> [-n/--tail N] [--since] [--until] [--grep RE]` | последние строки (по умолчанию 200) |
 | `stats [<контейнеры>...]` (или `--container`) | замер CPU/MEM/сети/диска запущенных контейнеров |
 | `system df` | занятое место по типам объектов |
+| `wait <контейнер> [--until running\|healthy\|exited] [--timeout 60]` | дождаться состояния (опрос раз в 0,5 с); `timeout` (код `9`), если не дождались, и сразу `usage` для `healthy` без healthcheck |
 | `events [--since 10m] [--until now]` | события прошедшего окна (без live-режима) |
 | `compose ls`, `compose ps/config/logs <project>` | compose-проекты |
 

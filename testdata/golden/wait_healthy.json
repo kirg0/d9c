@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "container": "web",
+    "id": "9ae942fd8fbc",
+    "until": "healthy",
+    "state": "running",
+    "health": "healthy",
+    "waited_ms": 0
+  },
+  "truncated": false
+}

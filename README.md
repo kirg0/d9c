@@ -997,6 +997,7 @@ d9c help logs                            # arguments of one command
 | `stats [<containers>...]` (or `--container`) | CPU/MEM/net/block I/O sample of running containers |
 | `system df` | disk usage by object type |
 | `events [--since 10m] [--until now]` | events of a past window (no live following) |
+| `wait <container> [--until running\|healthy\|exited] [--timeout 60]` | wait for a state (polled every 0.5 s); `timeout` (exit `9`) if it does not come, `usage` at once for `healthy` without a healthcheck |
 | `compose ls`, `compose ps/config/logs <project>` | compose projects |
 
 Write commands, with their tier (see the [write policy](#write-policy)):
