@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "timeout",
+    "message": "exec in web timed out after 1s",
+    "hint": "raise --timeout, or run something that finishes sooner; with the Docker API the process may still be running in the container"
+  }
+}

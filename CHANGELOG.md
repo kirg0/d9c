@@ -39,6 +39,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   planned, refused, failed), appends a JSON line to `agent-audit.log` next to the config file
   (`~/.d9c/agent-audit.log` by default) with the time, host, operation, targets, arguments and
   result. A write command that cannot open the log fails before connecting.
+- **`exec` in command-line mode:** `d9c exec <container> -- <cmd> [args…]` runs a command without a
+  terminal on every runtime (Docker/Podman API, nerdctl and crictl locally or over SSH) and returns
+  its exit code, stdout and stderr, each cut at `--max-bytes` (64 KiB by default) with the full
+  sizes reported. `--timeout` (60 s) ends the wait with the new error code `timeout` (exit `9`).
+  The command is destructive: it needs `maxTier: destructive` and `--yes`.
 
 ### Fixed
 

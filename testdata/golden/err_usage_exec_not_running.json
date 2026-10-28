@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "usage",
+    "message": "container db is exited, not running",
+    "hint": "commands run only in a running container; start it with `d9c start db`"
+  }
+}

@@ -1010,6 +1010,7 @@ Write commands, with their tier (see the [write policy](#write-policy)):
 | `compose down <project>`, `compose restore <project> <archive>` | destructive | stop and remove the project (volumes kept) or restore it from a backup |
 | `network create <name> [--driver --subnet --gateway]`, `volume create <name> [--driver]` | safe | create a network or volume |
 | `image prune`, `volume prune`, `system prune` | destructive | remove unused objects (`system prune` keeps volumes) |
+| `exec <container> -- <cmd> [args…] [--timeout 60] [--max-bytes 65536]` | destructive | run a command without a terminal; `data` holds `exit_code`, `stdout`, `stderr` (each cut at `--max-bytes`, full sizes in `stdout_bytes`/`stderr_bytes`) — a non-zero `exit_code` is still exit status `0` |
 
 A command with several targets reports one outcome per container; when only some of them fail,
 the envelope carries `"partial": true` and the exit status is `8`. Compose operations on project
@@ -1077,7 +1078,7 @@ Output is always English and free of terminal control characters.
 **Errors** go to stderr as `{"error":{"code","message","hint"}}`, and the exit status tells the
 class apart: `0` ok, `1` internal, `2` usage, `3` not_found, `4` connection, `5` forbidden,
 `6` auth_required, `7` confirmation_required, `8` partial (some targets failed; the result is on
-stdout).
+stdout), `9` timeout (`--timeout` of `exec`/`wait` ran out).
 
 **Safety.** The command-line mode never prompts. A password-auth SSH host needs the password in
 `D9C_SSH_PASSWORD`, otherwise the command fails with `auth_required`. An SSH host key missing

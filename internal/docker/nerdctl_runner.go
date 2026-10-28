@@ -2,6 +2,8 @@ package docker
 
 import (
 	"bufio"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -21,6 +23,10 @@ type nerdctlRunner interface {
 	output(args []string) (string, error)
 	stream(args []string) (<-chan string, func(), error)
 	interactive(args []string) (ExecSession, error)
+	// capture runs a command to completion with stdout and stderr going to
+	// their own writers and returns its exit status; a non-zero status is
+	// not an error. Cancelling ctx kills the command.
+	capture(ctx context.Context, args []string, stdout, stderr io.Writer) (int, error)
 	close()
 }
 
@@ -50,6 +56,23 @@ func (r localRunner) stream(args []string) (<-chan string, func(), error) {
 // covers interactive exec; everything else works locally.
 func (r localRunner) interactive([]string) (ExecSession, error) {
 	return nil, fmt.Errorf("interactive exec is only available over the ssh transport (use nerdctl+ssh://…)")
+}
+
+func (r localRunner) capture(ctx context.Context, args []string, stdout, stderr io.Writer) (int, error) {
+	c := exec.CommandContext(ctx, r.bin, args...)
+	c.Stdout, c.Stderr = stdout, stderr
+	err := c.Run()
+	if ctx.Err() != nil {
+		return -1, ctx.Err()
+	}
+	var ee *exec.ExitError
+	if errors.As(err, &ee) {
+		return ee.ExitCode(), nil
+	}
+	if err != nil {
+		return -1, fmt.Errorf("run %s: %w", r.bin, err)
+	}
+	return 0, nil
 }
 
 func (r localRunner) close() {}
@@ -160,6 +183,10 @@ func (r sshRunner) stream(args []string) (<-chan string, func(), error) {
 
 func (r sshRunner) interactive(args []string) (ExecSession, error) {
 	return sshInteractive(r.client, r.cmd(args))
+}
+
+func (r sshRunner) capture(ctx context.Context, args []string, stdout, stderr io.Writer) (int, error) {
+	return sshCapture(ctx, r.client, r.cmd(args), stdout, stderr)
 }
 
 func (r sshRunner) close() {

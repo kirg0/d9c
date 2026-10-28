@@ -1,12 +1,14 @@
 package docker
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -261,6 +263,53 @@ func (f *FakeBackend) ExecInteractive(containerID string, cmd []string) (ExecSes
 		"fake session: typed input is echoed, type 'exit' is not handled.\r\n/ # "
 	s.ch <- []byte(banner) // buffered: never blocks
 	return s, nil
+}
+
+// Exec mimics a non-interactive exec in a running demo container: `echo`
+// prints its arguments, `seq N` the numbers 1..N, `false` exits 1, `printenv`
+// shows a demo environment, `sleep` waits until ctx is cancelled; any other
+// command is "not found" (exit 127).
+func (f *FakeBackend) Exec(ctx context.Context, containerID string, cmd []string, opts ExecOptions) (ExecResult, error) {
+	if len(cmd) == 0 {
+		return ExecResult{}, errEmptyExec
+	}
+	var c *Container
+	for i := range f.Containers {
+		if f.Containers[i].ID == containerID || f.Containers[i].Name == containerID {
+			c = &f.Containers[i]
+		}
+	}
+	switch {
+	case c == nil:
+		return ExecResult{}, fmt.Errorf("no such container: %s", containerID)
+	case c.State != "running":
+		return ExecResult{}, fmt.Errorf("container %s is not running", c.ID)
+	}
+	stdout, stderr := newCapture(opts.MaxOutput), newCapture(opts.MaxOutput)
+	code := 0
+	switch cmd[0] {
+	case "echo":
+		_, _ = fmt.Fprintln(stdout, strings.Join(cmd[1:], " "))
+	case "seq":
+		n := 0
+		if len(cmd) > 1 {
+			n, _ = strconv.Atoi(cmd[1])
+		}
+		for i := 1; i <= n; i++ {
+			_, _ = fmt.Fprintln(stdout, i)
+		}
+	case "false":
+		code = 1
+	case "printenv":
+		_, _ = fmt.Fprintf(stdout, "PATH=/usr/local/bin:/usr/bin:/bin\nHOSTNAME=%s\n", c.ID)
+	case "sleep":
+		<-ctx.Done()
+		return execResult(stdout, stderr, -1), ctx.Err()
+	default:
+		_, _ = fmt.Fprintf(stderr, "sh: %s: not found\n", cmd[0])
+		code = 127
+	}
+	return execResult(stdout, stderr, code), nil
 }
 
 // RunInteractive mimics `docker run --rm -it`: the image must exist among the

@@ -122,6 +122,13 @@ var cliGoldenCases = []goldenCase{
 	{"err_confirmation_rm", []string{"rm", "web", "db"}, 7, true},
 	{"err_confirmation_kill_yes_false", []string{"kill", "web", "--yes=false"}, 7, true},
 	{"err_usage_dry_run_read", []string{"ps", "--dry-run"}, 2, false},
+	{"exec", []string{"exec", "web", "--yes", "--", "echo", "hello"}, 0, true},
+	{"exec_exit_code", []string{"exec", "web", "-y", "--", "false"}, 0, true},
+	{"exec_truncated", []string{"exec", "web", "-y", "--max-bytes", "4", "--", "seq", "5"}, 0, true},
+	{"dry_run_exec", []string{"exec", "web", "--dry-run", "--", "sh", "-c", "rm -rf /tmp/cache"}, 0, false},
+	{"err_confirmation_exec", []string{"exec", "web", "--", "printenv"}, 7, true},
+	{"err_usage_exec_not_running", []string{"exec", "db", "-y", "--", "echo"}, 2, true},
+	{"err_timeout_exec", []string{"exec", "web", "-y", "--timeout", "1", "--", "sleep", "60"}, 9, true},
 }
 
 // goldenSetup prepares the working directory of cases that touch local files:
@@ -146,7 +153,12 @@ func TestCLIGolden(t *testing.T) {
 			args := append([]string{}, tc.args...)
 			// -demo would win over --host; those cases fail before dialing.
 			if !slices.Contains(args, "--host") {
-				args = append(args, "-demo")
+				// Before a `--`, which hands the rest to the command.
+				at := len(args)
+				if i := slices.Index(args, "--"); i >= 0 {
+					at = i
+				}
+				args = slices.Insert(args, at, "-demo")
 			}
 			if setup := goldenSetup[tc.name]; setup != nil {
 				setup(t)

@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "operation": "exec",
+    "tier": "destructive",
+    "steps": [
+      "run sh -c \"rm -rf /tmp/cache\" in container web (9ae942fd8fbc) as its default user; the command can change anything inside the container"
+    ],
+    "confirm": true
+  },
+  "truncated": false
+}

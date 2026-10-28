@@ -1,7 +1,9 @@
 package docker
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -373,6 +375,33 @@ func parseSize(s string) uint64 {
 func (b *nerdctlBackend) ExecInteractive(containerID string, cmd []string) (ExecSession, error) {
 	args := append([]string{"exec", "-it", containerID}, execArgv(cmd)...)
 	return b.runner.interactive(b.args(args...))
+}
+
+// Exec runs cmd in a container (`nerdctl exec`, no TTY) through the runner, so
+// it works locally and over SSH. A failure of nerdctl itself (no such
+// container, not running) is told apart from the command's own exit status by
+// nerdctl's fatal log line on stderr.
+func (b *nerdctlBackend) Exec(ctx context.Context, containerID string, cmd []string, opts ExecOptions) (ExecResult, error) {
+	if len(cmd) == 0 {
+		return ExecResult{}, errEmptyExec
+	}
+	return runnerExec(ctx, b.runner, b.args(append([]string{"exec", containerID}, cmd...)...), opts, cleanNerdctlErr)
+}
+
+// runnerExec runs an `exec` argv of a CLI runtime (nerdctl, crictl) and turns
+// a failure of the CLI itself — a non-zero status with its fatal log line on
+// stderr and nothing on stdout — into an error passed through clean.
+func runnerExec(ctx context.Context, r nerdctlRunner, args []string, opts ExecOptions, clean func(error) error) (ExecResult, error) {
+	stdout, stderr := newCapture(opts.MaxOutput), newCapture(opts.MaxOutput)
+	code, err := r.capture(ctx, args, stdout, stderr)
+	res := execResult(stdout, stderr, code)
+	if err != nil {
+		return res, err
+	}
+	if code != 0 && stdout.total == 0 && nerdctlFatalRe.Match(stderr.buf.Bytes()) {
+		return res, clean(errors.New(strings.TrimSpace(stderr.buf.String())))
+	}
+	return res, nil
 }
 
 // RunContainer creates and starts a detached container (`nerdctl run -d`).

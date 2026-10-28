@@ -1,6 +1,9 @@
 package docker
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 // disconnectedBackend is a stand-in Backend used when no Docker connection is
 // established. Every operation fails with a "not connected" error, letting the
@@ -36,6 +39,9 @@ func (b *disconnectedBackend) ContainerStats([]string) (map[string]ContainerStat
 }
 func (b *disconnectedBackend) ExecInteractive(string, []string) (ExecSession, error) {
 	return nil, b.err()
+}
+func (b *disconnectedBackend) Exec(context.Context, string, []string, ExecOptions) (ExecResult, error) {
+	return ExecResult{}, b.err()
 }
 func (b *disconnectedBackend) RunContainer(RunOptions) error { return b.err() }
 func (b *disconnectedBackend) RunInteractive(ExecRunOptions) (ExecSession, error) {

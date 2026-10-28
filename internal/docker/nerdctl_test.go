@@ -1,7 +1,9 @@
 package docker
 
 import (
+	"context"
 	"errors"
+	"io"
 	"reflect"
 	"strings"
 	"testing"
@@ -12,6 +14,7 @@ import (
 // output parsing are testable without a real nerdctl.
 type fakeRunner struct {
 	fn    func(args []string) (string, error)
+	capFn func(args []string) (stdout, stderr string, code int, err error)
 	calls [][]string
 }
 
@@ -33,6 +36,17 @@ func (r *fakeRunner) stream(args []string) (<-chan string, func(), error) {
 func (r *fakeRunner) interactive(args []string) (ExecSession, error) {
 	r.calls = append(r.calls, args)
 	return nil, nil
+}
+
+func (r *fakeRunner) capture(_ context.Context, args []string, stdout, stderr io.Writer) (int, error) {
+	r.calls = append(r.calls, args)
+	if r.capFn == nil {
+		return 0, nil
+	}
+	out, errOut, code, err := r.capFn(args)
+	_, _ = io.WriteString(stdout, out)
+	_, _ = io.WriteString(stderr, errOut)
+	return code, err
 }
 
 func (r *fakeRunner) close() {}
