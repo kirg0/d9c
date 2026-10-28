@@ -34,7 +34,7 @@ Work through these in order and stop at the first that explains it:
    between its members.
 
 To test from inside A, `d9c exec <A> -- getent hosts <B>` resolves the name — exec is
-destructive-tier and needs the user's approval, so suggest it rather than run it unasked.
+destructive-tier, so suggest it and run it only after an explicit yes.
 
 ## Volumes
 

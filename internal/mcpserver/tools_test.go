@@ -93,7 +93,7 @@ func TestMergedArguments(t *testing.T) {
 	if d := byName["d9c_logs"].desc; strings.Count(d, agent.UntrustedNote) != 1 {
 		t.Errorf("the untrusted note must appear once: %q", d)
 	}
-	if d := byName["d9c_remove"].desc; !strings.Contains(d, "confirm with the user") {
+	if d := byName["d9c_remove"].desc; !strings.Contains(d, "only after their explicit yes") {
 		t.Errorf("destructive tool description = %q", d)
 	}
 }

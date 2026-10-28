@@ -47,7 +47,7 @@ Follow the base `d9c` skill. Listing and history are **read**; pull, build, tag 
 ## Remove
 
 - `d9c image rm <image> --dry-run` shows what goes and which containers use it; run with `--yes`
-  after the user approves (`d9c_remove` `{action: "image_rm", image: "<image>"}`).
+  only after an explicit yes to that plan (`d9c_remove` `{action: "image_rm", image: "<image>"}`).
 - Named by `repository:tag` while other tags remain, only that tag goes. An image a container uses
   is refused unless `-f` / `force: true` — prefer removing the container first.
 - Build, tag, push and history need Docker, Podman or nerdctl; CRI-O hosts cannot do them.

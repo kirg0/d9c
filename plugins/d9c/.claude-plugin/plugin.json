@@ -1,7 +1,7 @@
 {
   "name": "d9c",
   "displayName": "d9c",
-  "version": "1.35.2",
+  "version": "1.35.3",
   "description": "Manage containers on saved Docker, Podman, nerdctl and CRI-O hosts through the d9c CLI and MCP server, with a read-only default and explicit write policy.",
   "author": {
     "name": "kirg0",
