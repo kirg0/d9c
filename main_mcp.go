@@ -94,16 +94,21 @@ func newMCPServer(cfg *config.Config, reg *agent.Registry, stderr io.Writer) (*m
 			return nil, err
 		}
 	}
-	return mcpserver.New(mcpserver.Options{
-		Registry: reg,
-		Hosts:    store,
-		Policy:   pol,
-		Label:    label,
-		Dial:     func() (docker.Backend, error) { return connectCLI(cfg) },
-		Audit:    audit,
-		Version:  version.String(),
-		Log:      stderr,
+	srv, err := mcpserver.New(mcpserver.Options{
+		Registry:  reg,
+		Hosts:     store,
+		Policy:    pol,
+		Label:     label,
+		Dial:      func() (docker.Backend, error) { return connectCLI(cfg) },
+		Audit:     audit,
+		Version:   version.String(),
+		Log:       stderr,
+		Scenarios: skills(),
 	})
+	if err != nil && audit != nil {
+		_ = audit.Close()
+	}
+	return srv, err
 }
 
 // nopWriteCloser keeps stdout open when the transport closes.

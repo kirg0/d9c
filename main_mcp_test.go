@@ -62,6 +62,11 @@ func TestRunMCPStdio(t *testing.T) {
 	if !names["d9c_lifecycle"] || names["d9c_remove"] || !names["d9c_containers"] {
 		t.Errorf("tools under --allow-write = %v", names)
 	}
+	// The embedded skills are the prompts.
+	prompts, err := cs.ListPrompts(ctx, nil)
+	if err != nil || len(prompts.Prompts) == 0 || prompts.Prompts[0].Name != "d9c" {
+		t.Errorf("prompts = %+v, %v; want the embedded skills, d9c first", prompts, err)
+	}
 	res, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "d9c_containers", Arguments: map[string]any{"action": "ps"}})
 	if err != nil || res.IsError {
 		t.Fatalf("ps: %v %+v", err, res)
