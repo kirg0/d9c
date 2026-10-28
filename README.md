@@ -51,6 +51,7 @@ Built on [Bubble Tea](https://github.com/charmbracelet/bubbletea) and the offici
 - [Plugins](#plugins)
 - [Command-line mode](#command-line-mode)
 - [MCP server](#mcp-server)
+- [For AI agents](#for-ai-agents)
 - [Development](#development)
 - [Support the project](#support-the-project)
 - [License](#license)
@@ -67,6 +68,9 @@ Built on [Bubble Tea](https://github.com/charmbracelet/bubbletea) and the offici
   write commands only when the `allowWrite`/`maxTier` policy allows them.
 - **MCP server for AI agents** — `d9c mcp` serves the same operations as twelve grouped MCP tools
   over stdio, with tier annotations, progress, prompts and the same write policy.
+- **Agent skills and a Claude Code plugin** — ten skills (troubleshooting, logs, compose deploys,
+  cleanup, security audit…) for Claude Code (`/plugin install d9c --marketplace kirg0/d9c`) and
+  any agent that reads `SKILL.md` (`d9c skills install`), with demo scenarios to try them.
 - **Management, not just viewing** — start/stop/restart/kill/rm, bulk operations
   (multi-select with `Space` — bulk operations on containers and image removal),
   a `run` wizard, network/volume creation, `build`/`tag`/`push`
@@ -1002,6 +1006,7 @@ d9c help logs                            # arguments of one command
 | `events [--since 10m] [--until now]` | events of a past window (no live following) |
 | `wait <container> [--until running\|healthy\|exited] [--timeout 60]` | wait for a state (polled every 0.5 s); `timeout` (exit `9`) if it does not come, `usage` at once for `healthy` without a healthcheck |
 | `compose ls`, `compose ps/config/logs <project>` | compose projects |
+| `image history <image>` | layers of an image with size and build step |
 
 Write commands, with their tier (see the [write policy](#write-policy)):
 
@@ -1010,6 +1015,8 @@ Write commands, with their tier (see the [write policy](#write-policy)):
 | `start`, `stop`, `restart <containers…> [--filter k=v]` | safe | lifecycle of containers given by ID, unique ID prefix or name, and/or exact filters (`name=`/`image=` globs, `status=`, `label=k[=v]`, `network=`, `health=`) |
 | `kill [-s SIG]`, `rm [-f]` (same targets) | destructive | kill or remove containers |
 | `pull <image>` | safe | pull an image |
+| `image build <dir> [-t tag]`, `image tag <source> <target>`, `image push <image>` | safe | build from a local directory (sent as the context), tag, push — credentials only from `D9C_REGISTRY_USERNAME`/`D9C_REGISTRY_PASSWORD` |
+| `image rm <image> [-f]` | destructive | remove an image (or one of its tags); refused while a container uses it unless `-f` |
 | `compose up/pull/restart <project>`, `compose backup <project>` | safe | deploy a project; the backup archive lands in the current directory |
 | `compose down <project>`, `compose restore <project> <archive>` | destructive | stop and remove the project (volumes kept) or restore it from a backup |
 | `network create <name> [--driver --subnet --gateway]`, `volume create <name> [--driver]` | safe | create a network or volume |
@@ -1135,12 +1142,12 @@ d9c mcp -h                                                            # usage
 | `d9c_system` | read | `info`, `df`, `events`, `stats` |
 | `d9c_containers` | read | `ps`, `inspect`, `wait` |
 | `d9c_logs` | read | `container`, `compose` |
-| `d9c_resources` | read | `images`, `networks`, `volumes` |
+| `d9c_resources` | read | `images`, `networks`, `volumes`, `image_history` |
 | `d9c_compose` | read | `ls`, `ps`, `config` |
 | `d9c_lifecycle` | safe | `start`, `stop`, `restart` |
-| `d9c_deploy` | safe | `pull`, `compose_up`, `compose_pull`, `compose_restart`, `compose_backup` |
+| `d9c_deploy` | safe | `pull`, `image_build`, `image_tag`, `image_push`, `compose_up`, `compose_pull`, `compose_restart`, `compose_backup` |
 | `d9c_create` | safe | `network`, `volume` |
-| `d9c_remove` | destructive | `kill`, `rm`, `compose_down`, `compose_restore` |
+| `d9c_remove` | destructive | `kill`, `rm`, `image_rm`, `compose_down`, `compose_restore` |
 | `d9c_prune` | destructive | `images`, `volumes`, `system` |
 | `d9c_exec` | destructive | run a command without a terminal |
 
@@ -1163,14 +1170,81 @@ operation. A read that hits a dropped connection is retried once on a new one; a
 retried (it may have taken effect) — the next call reconnects.
 
 **Prompts and resources.** The agent skills shipped in [`plugins/d9c/skills`](plugins/d9c/skills)
-are served as prompts from the same text (`d9c`, `d9c-troubleshoot`, `d9c-logs`, `d9c-cleanup`),
-each with an optional `focus` argument. Resources: `d9c://hosts` and
+are served as prompts from the same text (all ten, see [For AI agents](#for-ai-agents)), each
+with an optional `focus` argument. Resources: `d9c://hosts` and
 `d9c://containers/{id}/logs` (the last 200 lines).
 
 The [safety rules](#command-line-mode) of the command-line mode apply unchanged: no prompts for
 passwords (`D9C_SSH_PASSWORD`), no unknown SSH host keys, masked secrets, and container output
 marked as untrusted data in the tool descriptions.
 
+
+## For AI agents
+
+d9c gives an AI agent — Claude Code or any other — the containers on your saved hosts through two
+channels with one contract: the [command line](#command-line-mode) for agents with a shell, the
+[MCP server](#mcp-server) for the rest. On top of them, ten **agent skills** (the open Agent
+Skills format, `SKILL.md`) teach the agent the workflows: which commands to run, how to read the
+results, when to stop and ask.
+
+| Skill | Use it for |
+|-------|-----------|
+| `d9c` | the base: installing, hosts, output and exit codes, write policy, untrusted data |
+| `d9c-troubleshoot` | a container that crashed, restarts, is unhealthy or slow (exit codes, OOM, health, stats) |
+| `d9c-logs` | answers in the logs: time windows, regex, compose projects, events, token budget |
+| `d9c-lifecycle` | start/stop/restart/kill/rm by name or filter, dry run, approval, `wait` |
+| `d9c-compose` | safe deploys: backup → pull → up → wait healthy → restore on failure |
+| `d9c-images` | build, tag, push, layer history, images no container uses |
+| `d9c-cleanup` | disk space: `system df` → prune plan → approval → report |
+| `d9c-fleet` | every host at once: health, capacity, environment drift |
+| `d9c-security-audit` | read-only review: privileged, root, engine socket, public ports, `latest`, env secrets |
+| `d9c-net-storage` | networks and volumes: who is connected, why A cannot reach B, creating them |
+
+**Claude Code.** This repository is a plugin marketplace. The `d9c` plugin brings the skills and
+wires up the MCP server (`d9c mcp`; the `d9c` binary must be on `PATH`):
+
+```sh
+/plugin install d9c --marketplace kirg0/d9c        # in a session (Claude Code 2.1.275+)
+claude plugin marketplace add kirg0/d9c            # or from the shell, in two steps
+claude plugin install d9c@d9c
+```
+
+On enabling, the plugin asks for an optional saved host (`d9c hosts ls`); empty means
+`DOCKER_HOST`, the Docker context or the local socket. The plugin never turns writes on — that
+stays with the [write policy](#write-policy) in your config. The skills are also served as MCP
+prompts, so an MCP-only client gets the same text.
+
+**Other agents** (Codex, Gemini CLI, Cursor, GitHub Copilot, OpenCode…). The skills are embedded
+in the binary, versioned with it:
+
+```sh
+d9c skills ls                          # the skills, the targets and the demo scenarios
+d9c skills install --target agents     # ~/.agents/skills: Codex, Gemini CLI, Cursor, Copilot, OpenCode
+d9c skills install --target claude     # ~/.claude/skills (without the plugin)
+d9c skills install --dir .claude/skills --dry-run   # a project directory; report only
+```
+
+Targets: `claude`, `agents`, `codex` (`~/.agents/skills`), `gemini` (`~/.gemini/skills`), `cursor`
+(`~/.cursor/skills`), `copilot` (`~/.copilot/skills`), `opencode` (`~/.config/opencode/skills`).
+Each skill is written as `<dir>/<name>/SKILL.md` with `metadata.d9c-version`; rerunning after an
+upgrade replaces the d9c skills and leaves others alone. Add the MCP server to the agent's
+config as `{"command": "d9c", "args": ["mcp", "--host", "<name>"]}`.
+
+**Trying a skill without a host.** `-demo-scenario <name>` (or `D9C_DEMO_SCENARIO`) serves demo
+data with one planted problem per skill — `oom`, `restart-loop`, `staging`, `unhealthy-compose`,
+`stale-images`, `disk-full`, `fleet`, `insecure`, `isolated-network` — in the TUI, the CLI and
+`d9c mcp`. Scenarios that exercise writes allow them on the fake data only.
+
+```sh
+d9c -demo-scenario oom inspect worker     # exit 137, OOM-killed, 256 MiB limit
+claude mcp add d9c-demo -- d9c mcp -demo-scenario unhealthy-compose
+```
+
+**Evals.** [`plugins/d9c/evals`](plugins/d9c/evals) is a `claude plugin eval` suite — a case per
+skill — that runs the agent against the real MCP server on these scenarios and grades both the
+diagnosis and the tool calls (destructive steps planned, never run without approval). `go test`
+checks the suite, replays every skill's commands on its scenario, parses every command a skill
+names and checks every MCP tool, action and argument, so a skill cannot drift from the binary.
 
 ---
 
