@@ -50,6 +50,7 @@ Docker **по TCP или SSH**. Один бинарник, без агентов
 - [Плагины](#плагины)
 - [Режим командной строки](#режим-командной-строки)
 - [MCP-сервер](#mcp-сервер)
+- [Для ИИ-агентов](#для-ии-агентов)
 - [Разработка](#разработка)
 - [Поддержать проект](#поддержать-проект)
 - [Лицензия](#лицензия)
@@ -66,6 +67,9 @@ Docker **по TCP или SSH**. Один бинарник, без агентов
   секреты замаскированы; команды записи — только если их разрешает политика `allowWrite`/`maxTier`.
 - **MCP-сервер для ИИ-агентов** — `d9c mcp` отдаёт те же операции двенадцатью сгруппированными
   MCP-инструментами по stdio: аннотации по уровню, прогресс, prompts и та же политика записи.
+- **Skills для агентов и плагин Claude Code** — десять skills (диагностика, логи, деплой compose,
+  очистка, аудит безопасности…) для Claude Code (`/plugin install d9c --marketplace kirg0/d9c`) и
+  любого агента, читающего `SKILL.md` (`d9c skills install`), плюс демо-сценарии, чтобы их попробовать.
 - **Управление, а не только просмотр** — start/stop/restart/kill/rm, массовые операции
   (множественный выбор `Space` — bulk-операции над контейнерами и удаление образов),
   `run`-мастер, создание сетей/томов, `build`/`tag`/`push`
@@ -1013,6 +1017,7 @@ d9c help logs                            # аргументы одной ком�
 | `wait <контейнер> [--until running\|healthy\|exited] [--timeout 60]` | дождаться состояния (опрос раз в 0,5 с); `timeout` (код `9`), если не дождались, и сразу `usage` для `healthy` без healthcheck |
 | `events [--since 10m] [--until now]` | события прошедшего окна (без live-режима) |
 | `compose ls`, `compose ps/config/logs <project>` | compose-проекты |
+| `image history <image>` | слои образа с размером и шагом сборки |
 
 Команды записи и их уровень (см. [политику записи](#политика-записи)):
 
@@ -1021,6 +1026,8 @@ d9c help logs                            # аргументы одной ком�
 | `start`, `stop`, `restart <containers…> [--filter k=v]` | safe | жизненный цикл контейнеров по ID, уникальному префиксу ID или имени и/или точным фильтрам (`name=`/`image=` — glob, `status=`, `label=k[=v]`, `network=`, `health=`) |
 | `kill [-s SIG]`, `rm [-f]` (те же цели) | destructive | убить или удалить контейнеры |
 | `pull <image>` | safe | скачать образ |
+| `image build <dir> [-t tag]`, `image tag <source> <target>`, `image push <image>` | safe | собрать из локального каталога (он уходит как контекст), протегировать, запушить — учётные данные только из `D9C_REGISTRY_USERNAME`/`D9C_REGISTRY_PASSWORD` |
+| `image rm <image> [-f]` | destructive | удалить образ (или один его тег); пока его использует контейнер — только с `-f` |
 | `compose up/pull/restart <project>`, `compose backup <project>` | safe | развернуть проект; архив бэкапа сохраняется в текущий каталог |
 | `compose down <project>`, `compose restore <project> <archive>` | destructive | остановить и удалить проект (тома сохраняются) или восстановить его из бэкапа |
 | `network create <name> [--driver --subnet --gateway]`, `volume create <name> [--driver]` | safe | создать сеть или том |
@@ -1148,12 +1155,12 @@ d9c mcp -h                                                            # спра
 | `d9c_system` | read | `info`, `df`, `events`, `stats` |
 | `d9c_containers` | read | `ps`, `inspect`, `wait` |
 | `d9c_logs` | read | `container`, `compose` |
-| `d9c_resources` | read | `images`, `networks`, `volumes` |
+| `d9c_resources` | read | `images`, `networks`, `volumes`, `image_history` |
 | `d9c_compose` | read | `ls`, `ps`, `config` |
 | `d9c_lifecycle` | safe | `start`, `stop`, `restart` |
-| `d9c_deploy` | safe | `pull`, `compose_up`, `compose_pull`, `compose_restart`, `compose_backup` |
+| `d9c_deploy` | safe | `pull`, `image_build`, `image_tag`, `image_push`, `compose_up`, `compose_pull`, `compose_restart`, `compose_backup` |
 | `d9c_create` | safe | `network`, `volume` |
-| `d9c_remove` | destructive | `kill`, `rm`, `compose_down`, `compose_restore` |
+| `d9c_remove` | destructive | `kill`, `rm`, `image_rm`, `compose_down`, `compose_restore` |
 | `d9c_prune` | destructive | `images`, `volumes`, `system` |
 | `d9c_exec` | destructive | команда в контейнере без терминала |
 
@@ -1176,7 +1183,7 @@ structured content; ошибка — `{"error":{"code","message","hint"}}` с `i
 новом; запись не повторяется (она могла уже выполниться) — переподключится следующий вызов.
 
 **Prompts и ресурсы.** Skills для агентов из [`plugins/d9c/skills`](plugins/d9c/skills)
-отдаются как prompts из того же текста (`d9c`, `d9c-troubleshoot`, `d9c-logs`, `d9c-cleanup`), у
+отдаются как prompts из того же текста (все десять, см. [Для ИИ-агентов](#для-ии-агентов)), у
 каждого необязательный аргумент `focus`. Ресурсы: `d9c://hosts` и `d9c://containers/{id}/logs`
 (последние 200 строк).
 
@@ -1184,6 +1191,74 @@ structured content; ошибка — `{"error":{"code","message","hint"}}` с `i
 пароли не спрашиваются (`D9C_SSH_PASSWORD`), неизвестные ключи SSH-хостов не принимаются,
 секреты маскируются, а вывод контейнеров помечен в описаниях инструментов как недоверенные данные.
 
+
+## Для ИИ-агентов
+
+d9c даёт ИИ-агенту — Claude Code или любому другому — контейнеры на ваших сохранённых хостах через
+два канала с одним контрактом: [командную строку](#режим-командной-строки) для агентов с shell и
+[MCP-сервер](#mcp-сервер) для остальных. Поверх них десять **skills** (открытый формат Agent
+Skills, `SKILL.md`) учат агента сценариям: какие команды запускать, как читать результат, когда
+остановиться и спросить.
+
+| Skill | Для чего |
+|-------|----------|
+| `d9c` | база: установка, хосты, вывод и коды выхода, политика записи, недоверенные данные |
+| `d9c-troubleshoot` | контейнер упал, перезапускается, нездоров или тормозит (коды выхода, OOM, health, stats) |
+| `d9c-logs` | ответ в логах: окна времени, regex, compose-проекты, события, бюджет токенов |
+| `d9c-lifecycle` | start/stop/restart/kill/rm по имени или фильтру, dry run, подтверждение, `wait` |
+| `d9c-compose` | безопасный деплой: backup → pull → up → wait healthy → restore при провале |
+| `d9c-images` | build, tag, push, история слоёв, образы, которые не использует ни один контейнер |
+| `d9c-cleanup` | место на диске: `system df` → план prune → подтверждение → отчёт |
+| `d9c-fleet` | все хосты сразу: здоровье, ёмкость, расхождения окружений |
+| `d9c-security-audit` | только чтение: privileged, root, сокет движка, публичные порты, `latest`, секреты в env |
+| `d9c-net-storage` | сети и тома: кто к чему подключён, почему A не видит B, создание |
+
+**Claude Code.** Этот репозиторий — marketplace плагинов. Плагин `d9c` приносит skills и
+подключает MCP-сервер (`d9c mcp`; бинарник `d9c` должен быть в `PATH`):
+
+```sh
+/plugin install d9c --marketplace kirg0/d9c        # в сессии (Claude Code 2.1.275+)
+claude plugin marketplace add kirg0/d9c            # или из shell, в два шага
+claude plugin install d9c@d9c
+```
+
+При включении плагин спрашивает необязательный сохранённый хост (`d9c hosts ls`); пусто —
+`DOCKER_HOST`, Docker-контекст или локальный сокет. Плагин никогда не включает запись — это
+остаётся за [политикой записи](#политика-записи) в вашем конфиге. Skills отдаются и как MCP
+prompts, так что клиент только с MCP получает тот же текст.
+
+**Другие агенты** (Codex, Gemini CLI, Cursor, GitHub Copilot, OpenCode…). Skills встроены в
+бинарник, версия у них та же:
+
+```sh
+d9c skills ls                          # skills, цели установки и демо-сценарии
+d9c skills install --target agents     # ~/.agents/skills: Codex, Gemini CLI, Cursor, Copilot, OpenCode
+d9c skills install --target claude     # ~/.claude/skills (без плагина)
+d9c skills install --dir .claude/skills --dry-run   # каталог проекта; только отчёт
+```
+
+Цели: `claude`, `agents`, `codex` (`~/.agents/skills`), `gemini` (`~/.gemini/skills`), `cursor`
+(`~/.cursor/skills`), `copilot` (`~/.copilot/skills`), `opencode` (`~/.config/opencode/skills`).
+Каждый skill пишется как `<dir>/<name>/SKILL.md` с `metadata.d9c-version`; повторный запуск после
+обновления заменяет skills d9c и не трогает чужие. MCP-сервер добавляется в конфиг агента как
+`{"command": "d9c", "args": ["mcp", "--host", "<имя>"]}`.
+
+**Попробовать skill без хоста.** `-demo-scenario <имя>` (или `D9C_DEMO_SCENARIO`) отдаёт
+демо-данные с одной подброшенной поломкой под каждый skill — `oom`, `restart-loop`, `staging`,
+`unhealthy-compose`, `stale-images`, `disk-full`, `fleet`, `insecure`, `isolated-network` — в TUI,
+CLI и `d9c mcp`. Сценарии, проверяющие запись, разрешают её только над фейковыми данными.
+
+```sh
+d9c -demo-scenario oom inspect worker     # exit 137, OOM-kill, лимит 256 MiB
+claude mcp add d9c-demo -- d9c mcp -demo-scenario unhealthy-compose
+```
+
+**Evals.** [`plugins/d9c/evals`](plugins/d9c/evals) — набор `claude plugin eval` (кейс на каждый
+skill): агент работает с настоящим MCP-сервером на этих сценариях, оценивается и диагноз, и вызовы
+инструментов (разрушающие шаги — только план, без подтверждения не выполняются). `go test`
+проверяет набор, прогоняет команды каждого skill на его сценарии, разбирает каждую упомянутую
+команду и сверяет каждый MCP-инструмент, действие и аргумент — skill не может разойтись с
+бинарником.
 
 ---
 

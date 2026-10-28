@@ -6,6 +6,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.35.0] - 2026-10-28
+
 ### Added
 
 - **Claude Code marketplace:** the repository is a plugin marketplace (`.claude-plugin/marketplace.json`)
@@ -39,6 +41,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   marketplace and the plugin; `make check` verifies the Agent Skills frontmatter (name = directory,
   description with "Use when", only format keys), unknown manifest keys, that every CLI command a
   skill names parses and every MCP tool/action/argument exists, and the eval suite.
+- **README "For AI agents" / «Для ИИ-агентов»:** the skills, installing the plugin and the skills for
+  other agents, demo scenarios and evals.
 - **Image commands for agents:** `image history <image>` (read), `image tag <source> <target>`,
   `image push <image>`, `image build <dir> [-t tag]` (safe) and `image rm <image> [-f]` (destructive),
   in the CLI and the MCP tools (`d9c_resources` image_history, `d9c_deploy` image_build/image_tag/
