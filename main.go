@@ -50,6 +50,12 @@ func run() error {
 	// A known command word after the global flags selects the CLI; anything
 	// else (including no arguments) starts the TUI.
 	if args := flag.Args(); len(args) > 0 {
+		if args[0] == skillsCommand {
+			if code := runSkills(skills(), args[1:], os.Stdout, os.Stderr); code != 0 {
+				return exitCode(code)
+			}
+			return nil
+		}
 		if args[0] == mcpCommand {
 			if code := runMCP(cfg, agent.Builtin(), args[1:], os.Stdin, os.Stdout, os.Stderr); code != 0 {
 				return exitCode(code)

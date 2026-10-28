@@ -476,6 +476,7 @@ func WriteHelp(w io.Writer, reg *agent.Registry, inv Invocation, ceiling agent.T
 			"errors as JSON on stderr with a non-zero exit status.\n")
 		b.WriteString("Run `d9c help <command>` for the arguments of a command.\n")
 		b.WriteString("Run `d9c mcp` to serve these commands as MCP tools over stdio (`d9c mcp -h`).\n")
+		b.WriteString("Run `d9c skills install --target <agent>` to install the agent skills (`d9c skills -h`).\n")
 	} else {
 		op := inv.Op
 		b.WriteString(usageLine(op) + "\n\n" + op.Description() + "\n")
