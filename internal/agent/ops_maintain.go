@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strings"
 
@@ -20,20 +21,9 @@ func networkCreateOp() Op {
 		}, "name"),
 		Tier: TierSafe,
 		Handler: func(_ context.Context, env *Env, args Args) (Result, error) {
-			if env.Backend == nil {
-				return Result{}, errNoBackend("network create")
-			}
-			opts, err := networkCreateOptions(args)
+			opts, err := checkNetworkCreate(env, args)
 			if err != nil {
 				return Result{}, err
-			}
-			nets, err := env.Backend.ListNetworks()
-			if err != nil {
-				return Result{}, err
-			}
-			if _, ok := findNetwork(nets, opts.Name); ok {
-				return Result{}, Errorf(CodeUsage, "network %q already exists", opts.Name).
-					WithHint("pick another name; `d9c networks` lists the existing ones")
 			}
 			if err := env.Backend.CreateNetwork(opts); err != nil {
 				return Result{}, err
@@ -48,7 +38,50 @@ func networkCreateOp() Op {
 			}
 			return Result{Data: out}, nil
 		},
+		Plan: func(_ context.Context, env *Env, args Args) ([]string, error) {
+			opts, err := checkNetworkCreate(env, args)
+			if err != nil {
+				return nil, err
+			}
+			step := "create network " + opts.Name + " (driver " + orDefault(opts.Driver, "bridge") + ")"
+			if opts.Subnet != "" {
+				step += ", subnet " + opts.Subnet
+			}
+			if opts.Gateway != "" {
+				step += ", gateway " + opts.Gateway
+			}
+			return []string{step}, nil
+		},
 	}
+}
+
+// orDefault returns s, or "<def> by default" when s is empty.
+func orDefault(s, def string) string {
+	if s == "" {
+		return def + " by default"
+	}
+	return s
+}
+
+// checkNetworkCreate validates a `network create` request and rejects a name
+// already in use.
+func checkNetworkCreate(env *Env, args Args) (docker.NetworkCreateOptions, error) {
+	if env.Backend == nil {
+		return docker.NetworkCreateOptions{}, errNoBackend("network create")
+	}
+	opts, err := networkCreateOptions(args)
+	if err != nil {
+		return opts, err
+	}
+	nets, err := env.Backend.ListNetworks()
+	if err != nil {
+		return opts, err
+	}
+	if _, ok := findNetwork(nets, opts.Name); ok {
+		return opts, Errorf(CodeUsage, "network %q already exists", opts.Name).
+			WithHint("pick another name; `d9c networks` lists the existing ones")
+	}
+	return opts, nil
 }
 
 // networkCreateOptions validates the `network create` arguments: the engine
@@ -106,23 +139,9 @@ func volumeCreateOp() Op {
 		}, "name"),
 		Tier: TierSafe,
 		Handler: func(_ context.Context, env *Env, args Args) (Result, error) {
-			if env.Backend == nil {
-				return Result{}, errNoBackend("volume create")
-			}
-			opts := docker.VolumeCreateOptions{
-				Name:   strings.TrimSpace(args.String("name")),
-				Driver: strings.TrimSpace(args.String("driver")),
-			}
-			if opts.Name == "" {
-				return Result{}, Errorf(CodeUsage, "volume create: empty volume name")
-			}
-			vols, err := env.Backend.ListVolumes()
+			opts, err := checkVolumeCreate(env, args)
 			if err != nil {
 				return Result{}, err
-			}
-			if _, ok := findVolume(vols, opts.Name); ok {
-				return Result{}, Errorf(CodeUsage, "volume %q already exists", opts.Name).
-					WithHint("pick another name; `d9c volumes` lists the existing ones")
 			}
 			if err := env.Backend.CreateVolume(opts); err != nil {
 				return Result{}, err
@@ -135,7 +154,38 @@ func volumeCreateOp() Op {
 			}
 			return Result{Data: out}, nil
 		},
+		Plan: func(_ context.Context, env *Env, args Args) ([]string, error) {
+			opts, err := checkVolumeCreate(env, args)
+			if err != nil {
+				return nil, err
+			}
+			return []string{"create volume " + opts.Name + " (driver " + orDefault(opts.Driver, "local") + ")"}, nil
+		},
 	}
+}
+
+// checkVolumeCreate validates a `volume create` request and rejects a name
+// already in use.
+func checkVolumeCreate(env *Env, args Args) (docker.VolumeCreateOptions, error) {
+	opts := docker.VolumeCreateOptions{
+		Name:   strings.TrimSpace(args.String("name")),
+		Driver: strings.TrimSpace(args.String("driver")),
+	}
+	if env.Backend == nil {
+		return opts, errNoBackend("volume create")
+	}
+	if opts.Name == "" {
+		return opts, Errorf(CodeUsage, "volume create: empty volume name")
+	}
+	vols, err := env.Backend.ListVolumes()
+	if err != nil {
+		return opts, err
+	}
+	if _, ok := findVolume(vols, opts.Name); ok {
+		return opts, Errorf(CodeUsage, "volume %q already exists", opts.Name).
+			WithHint("pick another name; `d9c volumes` lists the existing ones")
+	}
+	return opts, nil
 }
 
 // findVolume looks a volume up by its exact name.
@@ -155,8 +205,9 @@ type PruneData struct {
 	Deleted int    `json:"deleted"`
 }
 
-// pruneOp declares a single-kind prune command.
-func pruneOp(name, summary, kind string, prune func(docker.Backend) (int, error)) Op {
+// pruneOp declares a single-kind prune command; plan lists what it would
+// remove as far as the engine lets us tell.
+func pruneOp(name, summary, kind string, prune func(docker.Backend) (int, error), plan func(docker.Backend) ([]string, error)) Op {
 	return Op{
 		Name:    name,
 		Summary: summary,
@@ -172,19 +223,59 @@ func pruneOp(name, summary, kind string, prune func(docker.Backend) (int, error)
 			}
 			return Result{Data: PruneData{Pruned: kind, Deleted: n}}, nil
 		},
+		Plan: func(_ context.Context, env *Env, _ Args) ([]string, error) {
+			if env.Backend == nil {
+				return nil, errNoBackend(name)
+			}
+			return plan(env.Backend)
+		},
 	}
+}
+
+// danglingImageSteps lists the untagged images an image prune removes.
+func danglingImageSteps(b docker.Backend) ([]string, error) {
+	imgs, err := b.ListImages()
+	if err != nil {
+		return nil, err
+	}
+	steps := []string{}
+	for _, img := range imgs {
+		if strings.Contains(img.Tags, "<none>") {
+			steps = append(steps, fmt.Sprintf("remove dangling image %s (%s) unless a container uses it", img.ID, img.Size))
+		}
+	}
+	return steps, nil
+}
+
+// volumePruneSteps describes a volume prune: which volumes are unused is only
+// known to the engine, so the plan names the existing ones as candidates.
+func volumePruneSteps(b docker.Backend) ([]string, error) {
+	vols, err := b.ListVolumes()
+	if err != nil {
+		return nil, err
+	}
+	if len(vols) == 0 {
+		return []string{}, nil
+	}
+	names := make([]string, len(vols))
+	for i, v := range vols {
+		names[i] = v.Name
+	}
+	return []string{fmt.Sprintf("remove every volume no container uses, with its data "+
+		"(Docker Engine 23+: anonymous volumes only); candidates among the %d volumes: %s",
+		len(vols), strings.Join(names, ", "))}, nil
 }
 
 func imagePruneOp() Op {
 	return pruneOp("image prune", "Remove dangling (untagged) images no container uses.", "images",
-		docker.Backend.PruneImages)
+		docker.Backend.PruneImages, danglingImageSteps)
 }
 
 func volumePruneOp() Op {
 	return pruneOp("volume prune",
 		"Remove volumes no container uses; their data is lost. "+
 			"Docker Engine 23+ removes only anonymous volumes this way.",
-		"volumes", docker.Backend.PruneVolumes)
+		"volumes", docker.Backend.PruneVolumes, volumePruneSteps)
 }
 
 // SystemPruneData is the `system prune` output: the engine's summary of what
@@ -209,6 +300,28 @@ func systemPruneOp() Op {
 				return Result{}, systemPruneError(summary, err)
 			}
 			return Result{Data: SystemPruneData{Summary: strings.TrimSpace(summary)}}, nil
+		},
+		Plan: func(_ context.Context, env *Env, _ Args) ([]string, error) {
+			if env.Backend == nil {
+				return nil, errNoBackend("system prune")
+			}
+			list, err := env.Backend.ListContainers(true)
+			if err != nil {
+				return nil, err
+			}
+			var steps []string
+			for _, c := range list {
+				if !isRunning(c.State) && c.State != "paused" {
+					steps = append(steps, "remove stopped container "+containerLabel(c))
+				}
+			}
+			imgs, err := danglingImageSteps(env.Backend)
+			if err != nil {
+				return nil, err
+			}
+			steps = append(steps, "remove the networks no container uses")
+			steps = append(steps, imgs...)
+			return append(steps, "remove the build cache"), nil
 		},
 	}
 }

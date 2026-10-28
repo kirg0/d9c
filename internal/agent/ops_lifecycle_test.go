@@ -11,7 +11,7 @@ import (
 
 // invokeWrite runs a built-in op on b under the destructive ceiling.
 func invokeWrite(b docker.Backend, name string, args Args) (Result, error) {
-	return Builtin().Invoke(context.Background(), &Env{Backend: b}, name, args, TierDestructive)
+	return Builtin().Invoke(context.Background(), &Env{Backend: b}, name, args, Call{Ceiling: TierDestructive, Confirmed: true})
 }
 
 func TestResolveContainer(t *testing.T) {
@@ -244,7 +244,7 @@ func TestLifecycleTiers(t *testing.T) {
 		{"kill", TierSafe, false},
 		{"kill", TierDestructive, true},
 	} {
-		_, err := r.Invoke(context.Background(), &Env{Backend: docker.NewFakeBackend()}, tt.op, args, tt.ceiling)
+		_, err := r.Invoke(context.Background(), &Env{Backend: docker.NewFakeBackend()}, tt.op, args, Call{Ceiling: tt.ceiling})
 		forbidden := Classify(err) != nil && Classify(err).Code == CodeForbidden
 		if forbidden == tt.allowed {
 			t.Errorf("%s under %s: err = %v, allowed want %v", tt.op, tt.ceiling, err, tt.allowed)
@@ -270,7 +270,7 @@ func TestLifecycleCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	fb := docker.NewFakeBackend()
-	_, err := Builtin().Invoke(ctx, &Env{Backend: fb}, "stop", Args{"targets": []string{"web"}}, TierDestructive)
+	_, err := Builtin().Invoke(ctx, &Env{Backend: fb}, "stop", Args{"targets": []string{"web"}}, Call{Ceiling: TierDestructive, Confirmed: true})
 	if err == nil || !strings.Contains(err.Error(), "not attempted") {
 		t.Fatalf("err = %v, want not attempted", err)
 	}

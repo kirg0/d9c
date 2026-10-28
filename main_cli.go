@@ -64,9 +64,10 @@ func runCLI(cfg *config.Config, reg *agent.Registry, args []string, stdout, stde
 		}
 		pol.Host = policyHost(cfg, store)
 	}
-	// Refuse before dialing: a forbidden command never touches the host.
+	// Refuse before dialing: a forbidden command never touches the host. A
+	// dry run only reads, so the write policy does not hold it back.
 	ceiling, err := pol.Ceiling()
-	if err == nil {
+	if err == nil && !inv.DryRun {
 		err = pol.Check(inv.Op)
 	}
 	if err != nil {
@@ -81,7 +82,8 @@ func runCLI(cfg *config.Config, reg *agent.Registry, args []string, stdout, stde
 		env.Backend = b
 	}
 
-	res, err := reg.Invoke(context.Background(), env, inv.Op.Name, inv.Args, ceiling)
+	res, err := reg.Invoke(context.Background(), env, inv.Op.Name, inv.Args,
+		agent.Call{Ceiling: ceiling, DryRun: inv.DryRun, Confirmed: inv.Yes})
 	if err != nil {
 		return cli.WriteError(stderr, err)
 	}

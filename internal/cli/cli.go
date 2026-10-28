@@ -51,6 +51,36 @@ type Invocation struct {
 	Help bool
 	// Output holds -o/--output, --fields and --limit.
 	Output Output
+	// DryRun is --dry-run: print the plan of a write command, change nothing.
+	DryRun bool
+	// Yes is -y/--yes: the user confirmed a destructive command.
+	Yes bool
+}
+
+// writeUsage lists the write-command flags for help texts.
+const writeUsage = "--dry-run (print the plan, change nothing), -y, --yes (the user confirmed a destructive command)"
+
+// parseWriteFlag consumes --dry-run or -y/--yes: ok is false when name is
+// neither. Like any boolean flag they take an optional =true/=false.
+func (inv *Invocation) parseWriteFlag(name, tok, value string, hasValue bool) (ok bool, err error) {
+	var dst *bool
+	switch name {
+	case "dry-run":
+		dst = &inv.DryRun
+	case "y", "yes":
+		dst = &inv.Yes
+	default:
+		return false, nil
+	}
+	*dst = true
+	if hasValue {
+		b, convErr := strconv.ParseBool(value)
+		if convErr != nil {
+			return true, agent.Errorf(agent.CodeUsage, "flag %s: want true or false, got %q", tok, value)
+		}
+		*dst = b
+	}
+	return true, nil
 }
 
 // global is a connection flag accepted anywhere after the command (before it,
@@ -159,6 +189,12 @@ func Parse(reg *agent.Registry, cfg *config.Config, args []string) (Invocation, 
 		}
 
 		if ok, err := inv.Output.parseFlag(name, tok, takeValue); ok {
+			if err != nil {
+				return Invocation{}, err
+			}
+			continue
+		}
+		if ok, err := inv.parseWriteFlag(name, tok, value, hasValue); ok {
 			if err != nil {
 				return Invocation{}, err
 			}
@@ -391,6 +427,9 @@ func WriteHelp(w io.Writer, reg *agent.Registry, inv Invocation, ceiling agent.T
 		}
 		b.WriteString("\nGlobal flags: " + globalUsage() + "\n")
 		b.WriteString("Output flags: " + outputUsage + "\n")
+		b.WriteString("Write flags: " + writeUsage + ";\n" +
+			"a destructive command without --yes changes nothing and fails with confirmation_required (exit 7),\n" +
+			"carrying the plan: show it to the user and rerun with --yes only after they approve it.\n")
 		b.WriteString("Output: one JSON envelope {\"schema\",\"host\",\"runtime\",\"data\",\"truncated\"} on stdout by default;\n" +
 			"-o ndjson writes list items one per line, -o text a compact table;\n" +
 			"errors as JSON on stderr with a non-zero exit status.\n")
@@ -423,6 +462,12 @@ func WriteHelp(w io.Writer, reg *agent.Registry, inv Invocation, ceiling agent.T
 		}
 		b.WriteString("\nGlobal flags: " + globalUsage() + "\n")
 		b.WriteString("Output flags: " + outputUsage + "\n")
+		if op.Tier > agent.TierRead {
+			b.WriteString("Write flags: " + writeUsage + "\n")
+			if op.Tier == agent.TierDestructive {
+				b.WriteString("Destructive: without --yes it only prints the plan and exits with 7 (confirmation_required).\n")
+			}
+		}
 	}
 	_, err := io.WriteString(w, b.String())
 	return err

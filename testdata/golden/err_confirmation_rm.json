@@ -1,0 +1,16 @@
+{
+  "error": {
+    "code": "confirmation_required",
+    "message": "operation \"rm\" is destructive and needs the user's confirmation",
+    "hint": "show error.plan to the user and rerun with --yes only after they approve it",
+    "plan": {
+      "operation": "rm",
+      "tier": "destructive",
+      "steps": [
+        "remove container web (9ae942fd8fbc) — running, will fail without --force",
+        "remove container db (3f1ab77c9012)"
+      ],
+      "confirm": true
+    }
+  }
+}

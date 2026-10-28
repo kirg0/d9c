@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "operation": "system prune",
+    "tier": "destructive",
+    "steps": [
+      "remove stopped container db (3f1ab77c9012)",
+      "remove the networks no container uses",
+      "remove dangling image b1d3f9e7c4a2 (5 MB) unless a container uses it",
+      "remove the build cache"
+    ],
+    "confirm": true
+  },
+  "truncated": false
+}

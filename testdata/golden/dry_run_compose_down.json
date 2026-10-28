@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "operation": "compose down",
+    "tier": "destructive",
+    "steps": [
+      "stop and remove the 3 containers of project webapp (/srv/webapp): web, api, db",
+      "remove the project's networks; its volumes are kept"
+    ],
+    "confirm": true
+  },
+  "truncated": false
+}

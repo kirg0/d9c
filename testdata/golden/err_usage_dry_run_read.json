@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "usage",
+    "message": "--dry-run applies to commands that change state; \"ps\" only reads",
+    "hint": "run it without --dry-run"
+  }
+}

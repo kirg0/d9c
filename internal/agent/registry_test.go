@@ -12,8 +12,14 @@ import (
 
 func nopHandler(context.Context, *Env, Args) (Result, error) { return Result{}, nil }
 
+func nopPlan(context.Context, *Env, Args) ([]string, error) { return []string{"do it"}, nil }
+
 func testOp(name string, tier Tier) Op {
-	return Op{Name: name, Summary: "test op", Args: NoArgs(), Tier: tier, Handler: nopHandler}
+	op := Op{Name: name, Summary: "test op", Args: NoArgs(), Tier: tier, Handler: nopHandler}
+	if tier > TierRead {
+		op.Plan = nopPlan
+	}
+	return op
 }
 
 func TestRegisterValidation(t *testing.T) {
@@ -152,7 +158,7 @@ func TestInvoke(t *testing.T) {
 	)
 	ctx := context.Background()
 
-	res, err := r.Invoke(ctx, &Env{}, "echo", nil, TierRead)
+	res, err := r.Invoke(ctx, &Env{}, "echo", nil, Call{Ceiling: TierRead})
 	if err != nil || res.Data != 2 || !res.Truncated || res.Hint != "raise n" || gotArgs.Int("n") != 2 {
 		t.Fatalf("echo = %+v, %v (args %v)", res, err, gotArgs)
 	}
@@ -172,7 +178,7 @@ func TestInvoke(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := r.Invoke(ctx, &Env{}, tt.op, tt.args, tt.ceiling)
+			_, err := r.Invoke(ctx, &Env{}, tt.op, tt.args, Call{Ceiling: tt.ceiling})
 			var ae *Error
 			if !errors.As(err, &ae) || ae.Code != tt.want {
 				t.Fatalf("err = %v, want code %q", err, tt.want)
@@ -202,7 +208,7 @@ func TestInvokeWithFakeBackend(t *testing.T) {
 		},
 	})
 	fb := docker.NewFakeBackend()
-	res, err := r.Invoke(context.Background(), &Env{Backend: fb}, "ps", Args{"all": true}, TierRead)
+	res, err := r.Invoke(context.Background(), &Env{Backend: fb}, "ps", Args{"all": true}, Call{Ceiling: TierRead})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "operation": "rm",
+    "tier": "destructive",
+    "steps": [
+      "remove container web (9ae942fd8fbc) — running, will fail without --force",
+      "remove container api (d2c94e258dcb) — running, will fail without --force"
+    ],
+    "confirm": true
+  },
+  "truncated": false
+}
