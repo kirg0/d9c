@@ -1,0 +1,15 @@
+{
+  "error": {
+    "code": "confirmation_required",
+    "message": "operation \"exec\" is destructive and needs the user's confirmation",
+    "hint": "show error.plan to the user and rerun with --yes only after they approve it",
+    "plan": {
+      "operation": "exec",
+      "tier": "destructive",
+      "steps": [
+        "run printenv in container web (9ae942fd8fbc) as its default user; the command can change anything inside the container"
+      ],
+      "confirm": true
+    }
+  }
+}

@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -396,6 +397,15 @@ func criCPUPercent(prev, cur criCPUSample) float64 {
 func (b *criBackend) ExecInteractive(containerID string, cmd []string) (ExecSession, error) {
 	args := append([]string{"exec", "-i", "-t", containerID}, execArgv(cmd)...)
 	return b.runner.interactive(b.args(args...))
+}
+
+// Exec runs cmd in a container (`crictl exec`, no TTY) through the runner, so
+// it works locally and over SSH.
+func (b *criBackend) Exec(ctx context.Context, containerID string, cmd []string, opts ExecOptions) (ExecResult, error) {
+	if len(cmd) == 0 {
+		return ExecResult{}, errEmptyExec
+	}
+	return runnerExec(ctx, b.runner, b.args(append([]string{"exec", containerID}, cmd...)...), opts, cleanNerdctlErr)
 }
 
 // ListPath lists a directory inside the container by running `ls -1Ap` there

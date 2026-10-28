@@ -2,6 +2,8 @@ package docker
 
 import (
 	"bufio"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -34,6 +36,40 @@ func sshOutput(client *ssh.Client, cmd string) (string, error) {
 		return "", fmt.Errorf("%s", msg)
 	}
 	return string(out), nil
+}
+
+// sshCapture runs cmd over SSH to completion with stdout and stderr going to
+// their own writers, and returns the remote exit status (a non-zero status is
+// not an error). Cancelling ctx closes the session, which ends the remote
+// command.
+func sshCapture(ctx context.Context, client *ssh.Client, cmd string, stdout, stderr io.Writer) (int, error) {
+	session, err := client.NewSession()
+	if err != nil {
+		return -1, fmt.Errorf("ssh session: %w", err)
+	}
+	defer func() { _ = session.Close() }()
+	session.Stdout, session.Stderr = stdout, stderr
+	if err := session.Start(cmd); err != nil {
+		return -1, fmt.Errorf("start %q: %w", cmd, err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- session.Wait() }()
+	select {
+	case err = <-done:
+	case <-ctx.Done():
+		_ = session.Signal(ssh.SIGKILL)
+		_ = session.Close()
+		<-done
+		return -1, ctx.Err()
+	}
+	var ee *ssh.ExitError
+	if errors.As(err, &ee) {
+		return ee.ExitStatus(), nil
+	}
+	if err != nil {
+		return -1, err
+	}
+	return 0, nil
 }
 
 // sshStream runs cmd over SSH and streams its combined stdout/stderr line-by-line

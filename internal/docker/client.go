@@ -37,6 +37,11 @@ type Backend interface {
 	ContainerLogs(id string, opts LogOptions) (lines <-chan string, stop func(), err error)
 	ContainerStats(ids []string) (map[string]ContainerStats, error)
 	ExecInteractive(containerID string, cmd []string) (ExecSession, error)
+	// Exec runs cmd in a running container without a TTY and waits for it,
+	// returning stdout and stderr separately (capped by opts.MaxOutput) and
+	// the exit status. A non-zero exit status is a result, not an error;
+	// cancelling ctx abandons the command with ctx's error.
+	Exec(ctx context.Context, containerID string, cmd []string, opts ExecOptions) (ExecResult, error)
 	RunContainer(opts RunOptions) error
 	// RunInteractive starts a disposable interactive container from an image
 	// (`docker run --rm -it` analogue); closing the session removes it.

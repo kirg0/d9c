@@ -31,6 +31,9 @@ const (
 	// CodeConfirmationRequired means a destructive operation was asked for
 	// without explicit confirmation; the caller must show the plan to the user.
 	CodeConfirmationRequired Code = "confirmation_required"
+	// CodeTimeout means the operation's own deadline passed (--timeout of
+	// exec and wait) before it finished.
+	CodeTimeout Code = "timeout"
 )
 
 // exitCodes is the documented code → exit status table (0 is success).
@@ -42,6 +45,8 @@ var exitCodes = map[Code]int{
 	CodeForbidden:            5,
 	CodeAuthRequired:         6,
 	CodeConfirmationRequired: 7,
+	// 8 is ExitPartial, a result rather than an error.
+	CodeTimeout: 9,
 }
 
 // ExitCode returns the process exit status for c (1 for an unknown code).

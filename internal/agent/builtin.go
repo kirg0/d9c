@@ -14,7 +14,7 @@ func Builtin() *Registry {
 		imagesOp(), networksOp(), volumesOp(), systemDFOp(), eventsOp(),
 		composeLsOp(), composePsOp(), composeConfigOp(), composeLogsOp(),
 		startOp(), stopOp(), restartOp(), killOp(), rmOp(),
-		pullOp(),
+		pullOp(), execOp(),
 		composeUpOp(), composeDownOp(), composePullOp(), composeRestartOp(),
 		composeBackupOp(), composeRestoreOp(),
 		networkCreateOp(), volumeCreateOp(),

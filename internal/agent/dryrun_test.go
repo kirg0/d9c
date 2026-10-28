@@ -144,6 +144,7 @@ func TestDryRunNeverMutates(t *testing.T) {
 		"compose restart": {"project": "webapp"}, "compose backup": {"project": "webapp"},
 		"compose restore": {"project": "webapp", "file": "webapp.tar.gz"},
 		"network create":  {"name": "edge"}, "volume create": {"name": "uploads"},
+		"exec": {"container": "web", "cmd": []string{"rm", "-rf", "/data"}},
 	}
 	r := Builtin()
 	for _, op := range r.Ops() {

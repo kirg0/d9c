@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "host": "demo",
+  "runtime": "docker",
+  "data": {
+    "container": "web",
+    "id": "9ae942fd8fbc",
+    "cmd": [
+      "echo",
+      "hello"
+    ],
+    "exit_code": 0,
+    "stdout": "hello\n",
+    "stderr": "",
+    "stdout_bytes": 6,
+    "stderr_bytes": 0
+  },
+  "truncated": false
+}

@@ -1021,6 +1021,7 @@ d9c help logs                            # аргументы одной ком�
 | `compose down <project>`, `compose restore <project> <archive>` | destructive | остановить и удалить проект (тома сохраняются) или восстановить его из бэкапа |
 | `network create <name> [--driver --subnet --gateway]`, `volume create <name> [--driver]` | safe | создать сеть или том |
 | `image prune`, `volume prune`, `system prune` | destructive | удалить неиспользуемое (`system prune` тома не трогает) |
+| `exec <контейнер> -- <команда> [аргументы…] [--timeout 60] [--max-bytes 65536]` | destructive | выполнить команду без терминала; в `data` — `exit_code`, `stdout`, `stderr` (каждый обрезан по `--max-bytes`, полные размеры — `stdout_bytes`/`stderr_bytes`); ненулевой `exit_code` — всё равно код выхода `0` |
 
 Команда с несколькими целями возвращает итог по каждому контейнеру; если упала только часть, в
 конверте `"partial": true`, а код выхода — `8`. Операции compose с файлами проекта (`up`, `pull`,
@@ -1089,7 +1090,7 @@ lifecycle-команды, иначе указанные проект, образ
 **Ошибки** пишутся в stderr как `{"error":{"code","message","hint"}}`, класс различается по коду
 выхода: `0` ok, `1` internal, `2` usage, `3` not_found, `4` connection, `5` forbidden,
 `6` auth_required, `7` confirmation_required, `8` partial (часть целей упала; результат — в
-stdout).
+stdout), `9` timeout (истёк `--timeout` у `exec`/`wait`).
 
 **Безопасность.** Режим командной строки ничего не спрашивает. Для SSH-хоста с паролем пароль
 берётся только из `D9C_SSH_PASSWORD`, иначе команда завершается с `auth_required`. Ключ

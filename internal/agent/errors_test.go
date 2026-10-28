@@ -23,6 +23,7 @@ func TestCodeExitCode(t *testing.T) {
 		{CodeForbidden, 5},
 		{CodeAuthRequired, 6},
 		{CodeConfirmationRequired, 7},
+		{CodeTimeout, 9},
 		{Code("bogus"), 1},
 	}
 	for _, tt := range tests {
